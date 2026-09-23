@@ -657,7 +657,9 @@ class TestBakeEdition(unittest.TestCase):
                    # search hits and issue beads, the panel tray, and the
                    # viewer's make-this-yours chooser are hydration only
                    "seg-tick", "btick", 'class="stick"', "data-czcut",
-                   "cz-rclip", "rv-take", "data-rv=")
+                   "cz-rclip", "rv-take", "data-rv=",
+                   # B2: the preview stage and a paper's ▶ beside each cite
+                   "cz-stage", "pb-pv", "data-pvpid")
         for stub in self.out.rglob("index.html"):
             html = stub.read_text()
             for m in MARKERS:
@@ -2165,6 +2167,64 @@ class TestCuttingRoom(unittest.TestCase):
         r = self.node(body)
         self.assertEqual(r.returncode, 0,
                          f"make-this-yours misbehaved:\n{r.stdout}{r.stderr}")
+
+    def test_the_preview_stage_keeps_its_laws(self):
+        """specs/22 P2 / specs/23 B2: the stage is its own bounded machine.
+        pvStep — its armed gate — is pure: arm only on a report inside the
+        clip and before the end, stop once armed at the end, nothing while
+        settling or ended or without a clip. And the laws are pinned by
+        token: the page player hears only its own frame, the stage only its
+        own; every page seek pauses the stage; the stage's start pauses the
+        page; leaving the studio or collapsing the rail pauses it; the stage
+        markup lives outside the repainted reel body."""
+        body = "\n".join([
+            self.lift(r"  function pvStep\(pv, t\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const clip = { start: 100, end: 110 };",
+            "const S = (o) => Object.assign({ clip, armed: false, settling: false, ended: false }, o);",
+            "if (pvStep(S({ clip: null }), 105) !== null) fail('no clip, no action');",
+            "if (pvStep(S({}), 50) !== null) fail('far before the clip must not arm');",
+            "if (pvStep(S({}), 99.5) !== 'arm') fail('inside the lead-in must arm');",
+            "if (pvStep(S({}), 105) !== 'arm') fail('inside the clip must arm');",
+            "if (pvStep(S({}), 109.95) !== null) fail('a stale report at the end must not arm');",
+            "if (pvStep(S({}), 120) !== null) fail('past the end, unarmed, must not arm');",
+            "if (pvStep(S({ armed: true }), 105) !== null) fail('armed and inside: keep playing');",
+            "if (pvStep(S({ armed: true }), 109.9) !== 'stop') fail('armed at the end must stop');",
+            "if (pvStep(S({ armed: true }), 200) !== 'stop') fail('armed and past must stop');",
+            "if (pvStep(S({ settling: true }), 105) !== null) fail('settling ignores reports');",
+            "if (pvStep(S({ armed: true, ended: true }), 200) !== null) fail('an ended clip stays stopped');",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"the stage's gate misbehaved:\n{r.stdout}{r.stderr}")
+        for token in ("if (e.source !== YT.win) return;",      # the page player's gate
+                      "if (e.source !== PV.win) return;",      # the stage's gate
+                      "function pvPlay(clip)", "function pagePause()", "function pvPause()",
+                      'if (m !== "studio") pvPause();',        # leaving the studio
+                      "if (v) pvPause();",                     # collapsing the rail
+                      'class="cz-block cz-stagebox" id="cz-stagebox" hidden',
+                      'data-cz="pvplay"', 'data-cz="pvstop"',
+                      'window.addEventListener("message", onPV, false)'):
+            self.assertIn(token, self.JS, f"{token!r} drifted — a stage law is loose")
+        # every page seek pauses the stage — the three doors into the page player
+        for fn in ("function loadTape(vid, seekTo) {\n    pvPause();",
+                   "function ytSeek(t) {\n    pvPause();",
+                   "function startReel(clips) {\n    pvPause();"):
+            self.assertIn(fn, self.JS, f"a page seek no longer pauses the stage: {fn[:30]!r}")
+        # the stage's start pauses the page
+        play = self.JS[self.JS.index("function pvPlay(clip)"):self.JS.index("function onPV(e)")]
+        self.assertIn("pagePause();", play)
+        # the stage markup is a sibling of the reel body, never inside it
+        markup = self.JS[self.JS.index("function studioMarkup()"):self.JS.index("let STUDIO = null;")]
+        self.assertLess(markup.index('class="cz-reelbody"'), markup.index('id="cz-stagebox"'))
+        self.assertIn("</section>\n          <section class=\"cz-block cz-stagebox\"", markup)
+        # the paper's ▶ paints only in the studio, in the paper palette
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        self.assertIn(".pb-pv{display:none}", css)
+        self.assertIn("html.cz-m-studio .pb-pv{display:inline-flex", css)
+        pv = css[css.index("html.cz-m-studio .pb-pv{"):css.index("html.cz-m-studio .pb-pv:focus-visible")]
+        self.assertNotIn("studio-accent", pv, "the paper's ▶ wears a studio hue")
 
     def test_the_cutting_markers_are_present(self):
         """The drift guard: the pieces the stylesheet, the hydrators and the
