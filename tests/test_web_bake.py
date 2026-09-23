@@ -650,7 +650,12 @@ class TestBakeEdition(unittest.TestCase):
                    "cz-pill", "cz-enter",
                    # specs/23 A2/A3: the card affordances and the on-page
                    # editor are script-added in preview/studio only
-                   "cz-mk", "cz-ed", "cz-drop")
+                   "cz-mk", "cz-ed", "cz-drop",
+                   # specs/22 (phase B): the cut ticks on transcript rows,
+                   # search hits and issue beads, the panel tray, and the
+                   # viewer's make-this-yours chooser are hydration only
+                   "seg-tick", "btick", 'class="stick"', "data-czcut",
+                   "cz-rclip", "rv-take", "data-rv=")
         for stub in self.out.rglob("index.html"):
             html = stub.read_text()
             for m in MARKERS:
@@ -922,10 +927,16 @@ class TestBakeEdition(unittest.TestCase):
         for forbidden in ("askStudio", "API +", "/api/", "http://", "run.app"):
             self.assertNotIn(forbidden, block,
                              f"the reel path reached for {forbidden!r}")
-        # every plane the reel reads is a same-origin edition path
+        # every plane the reel reads is a same-origin edition path — the
+        # JSON planes, and the one raw fetch (transcript.txt, specs/22 §5.6)
         for plane in re.findall(r"getJSON\(`([^`]+)`", block):
             self.assertTrue(plane.startswith("${BASE}/"),
                             f"{plane} is not an edition path")
+        raw = re.findall(r"fetch\(`([^`]+)`", block)
+        self.assertTrue(raw, "the trim's transcript.txt fetch left the reel section?")
+        for url in raw:
+            self.assertTrue(url.startswith("${BASE}/m/"),
+                            f"a raw fetch reaches past the edition: {url}")
 
     def test_the_thirteen_tool_doors_left_the_masthead(self):
         """The desk tools no longer share the record's masthead: the rail is
@@ -1944,6 +1955,234 @@ class TestReel(unittest.TestCase):
         r = self.node(body)
         self.assertEqual(r.returncode, 0,
                          f"clip identity is wrong:\n{r.stdout}{r.stderr}")
+
+
+class TestCuttingRoom(unittest.TestCase):
+    """specs/22 P0: cut from anywhere, executed in node. The ticks put clips
+    on the tray from three new surfaces; the tray acts on the STORED reel
+    from any page; trims snap to the record's own segment bounds fetched
+    from the pressed transcript.txt. The pieces with edges — the timestamp
+    parser, the trim step, the segment tick's bounds, the mid-fetch race —
+    are lifted and run, decodeReel's-law style."""
+
+    JS = (REPO / "web" / "static" / "app.js").read_text()
+    PRELUDE = "\n".join([
+        'const BASE = "/app";',
+        'const location = { origin: "https://publicrecord.studio" };',
+    ])
+
+    def node(self, body):
+        import shutil
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node not available")
+        return subprocess.run([node, "-e", body], capture_output=True, text=True)
+
+    def lift(self, pattern):
+        m = re.search(pattern, self.JS, re.S)
+        self.assertTrue(m, f"{pattern!r} not found in the reader — did it move?")
+        return m.group(0)
+
+    def test_transcript_times_parse_both_shapes_and_drop_garbage(self):
+        """parseSegTimes is total over the pressed transcript.txt: [M:SS]
+        under an hour, [H:MM:SS] over, and every other line — the title, the
+        date, ASR noise, a blank — is simply not a bound."""
+        body = "\n".join([
+            self.lift(r"  function parseSegTimes\(tx\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const tx = ['Brookline School Committee - June 18, 2026',",
+            "  '2026-06-18', '', '[0:22] [music]', '[3:54] Mhm.',",
+            "  '[59:59] almost an hour', '[1:03:45] over an hour',",
+            "  '[5:04:03] the long tape', 'no stamp here', '[bad] stamp',",
+            "  '[12] lonely'].join('\\n');",
+            "const got = parseSegTimes(tx);",
+            "const want = [22, 234, 3599, 3825, 18243];",
+            "if (JSON.stringify(got) !== JSON.stringify(want))",
+            "  fail(JSON.stringify(got) + ' want ' + JSON.stringify(want));",
+            "if (parseSegTimes(null).length || parseSegTimes('').length)",
+            "  fail('empty input must parse to no bounds');",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"parseSegTimes drifted:\n{r.stdout}{r.stderr}")
+
+    def test_step_edge_snaps_to_bounds_and_nudges_without_them(self):
+        """One honest trim step: with bounds, the next/previous segment
+        start; past the poles or without bounds, the two-second nudge,
+        clamped to the tape."""
+        body = "\n".join([
+            self.lift(r"  function stepEdge\(t, dir, segs, dur\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const segs = [10, 20, 30];",
+            "const CASES = [",
+            "  [15, '+', segs, 100, 20],",   # snap forward
+            "  [20, '+', segs, 100, 30],",   # from a bound, the next one
+            "  [15, '-', segs, 100, 10],",   # snap back
+            "  [30, '+', segs, 100, 32],",   # past the last bound → nudge
+            "  [10, '-', segs, 100, 8],",    # no bound before the first → nudge
+            "  [5, '-', segs, 100, 3],",     # before first bound → nudge
+            "  [15, '+', [], 100, 17],",     # no bounds → nudge
+            "  [99.5, '+', [], 100, 100],",  # nudge clamps to the tape
+            "  [1, '-', [], 100, 0],",       # nudge clamps to zero
+            "];",
+            "for (const [t, dir, s, dur, want] of CASES) {",
+            "  const got = stepEdge(t, dir, s, dur);",
+            "  if (got !== want) fail(`stepEdge(${t},${dir}) -> ${got}, want ${want}`);",
+            "}",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"stepEdge drifted:\n{r.stdout}{r.stderr}")
+
+    def test_a_segment_tick_cuts_the_rows_own_bounds(self):
+        """The transcript tick's contract: the clip is the row's own segment
+        — start at the row's time, end at the NEXT row's (the record's own
+        unit), the words as the quote — and a second press removes it."""
+        body = "\n".join([
+            self.PRELUDE,
+            "const r1 = t => Math.round(t * 10) / 10;",
+            "const MIN_CLIP = 1.0;",
+            "const cut = (s, n) => String(s).slice(0, n);",
+            "const clipKey = c => (c.pid || '') + '@' + (c.kind || 'moment') + '@' + r1(c.t);",
+            "let store = [];",
+            "const readReel = () => JSON.parse(JSON.stringify(store));",
+            "const REEL_KEY = 'cz-reel';",
+            "let toasts = [];",
+            "const toast = m => toasts.push(m);",
+            "function writeTray(clips) { store = clips; }",
+            "const CREEL = { pid: 'vidX', segs: [0.9, 10.9, 20.9],",
+            "  meta: { duration: 300, video_id: 'vX', title: 'Select Board',",
+            "          body: 'Board', town: 'Testville', date: '2026-03-10' } };",
+            "const row = { dataset: { t: '10.9' },",
+            "  querySelector: () => ({ textContent: '  the override passes  ' }) };",
+            "const btn = { dataset: { czcut: 'segment' }, closest: () => row };",
+            self.lift(r"  function toggleCut\(b\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "toggleCut(btn);",
+            "if (store.length !== 1) fail('tick did not cut: ' + JSON.stringify(store));",
+            "const c = store[0];",
+            "if (c.start !== 10.9 || c.end !== 20.9) fail('bounds ' + c.start + '-' + c.end);",
+            "if (c.kind !== 'segment') fail('kind ' + c.kind);",
+            "if (c.quote !== 'the override passes') fail('quote ' + JSON.stringify(c.quote));",
+            "if (c.pid !== 'vidX' || c.mtitle !== 'Select Board') fail('meta lost');",
+            "toggleCut(btn);",
+            "if (store.length !== 0) fail('second press did not remove');",
+            # the LAST row: no next bound → 12s window, capped by the tape
+            "row.dataset.t = '20.9';",
+            "toggleCut(btn);",
+            "if (store[0].end !== 32.9) fail('last-row end ' + store[0].end);",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"the segment tick misbehaved:\n{r.stdout}{r.stderr}")
+
+    def test_tray_trim_survives_a_reorder_that_landed_mid_fetch(self):
+        """trayAct's trims await a bounds fetch, and the reel is RE-READ and
+        the clip RE-FOUND by identity after the await — so a reorder (or a
+        tick) that landed meanwhile is never overwritten, and the trim lands
+        on the clip that was pressed, wherever it now sits."""
+        body = "\n".join([
+            "const r1 = t => Math.round(t * 10) / 10;",
+            "const MIN_CLIP = 1.0;",
+            "const clipKey = c => (c.pid || '') + '@' + (c.kind || 'moment') + '@' + r1(c.t);",
+            "const REEL_KEY = 'cz-reel';",
+            "const A = { pid: 'p1', kind: 'segment', t: 10, start: 10, end: 20 };",
+            "const B = { pid: 'p1', kind: 'segment', t: 30, start: 30, end: 40 };",
+            "let reads = 0;",
+            # first read: [A, B]; during the await another tab reorders to [B, A]
+            "const readReel = () => JSON.parse(JSON.stringify(++reads === 1 ? [A, B] : [B, A]));",
+            "const segBounds = async () => [8, 10, 30];",
+            "const SEGB_SAID = new Set();",
+            "const CREEL = null;",
+            "const toast = () => {};",
+            "let wrote = null;",
+            "function writeTray(clips) { wrote = clips; }",
+            "function stepEdge(t, dir, segs, dur) {",
+            "  if (segs && segs.length) {",
+            "    if (dir === '+') { const nx = segs.find(s => s > t + 0.05);",
+            "      return nx == null ? Math.min(dur, t + 2) : nx; }",
+            "    const pv = segs.filter(s => s < t - 0.05).pop();",
+            "    return pv == null ? Math.max(0, t - 2) : pv;",
+            "  }",
+            "  return dir === '+' ? Math.min(dur, t + 2) : Math.max(0, t - 2);",
+            "}",
+            self.lift(r"  async function trayAct\(i, act\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "(async () => {",
+            "  await trayAct(0, 's-');",   # pressed on A at index 0
+            "  if (!wrote) fail('nothing written');",
+            # after the await the list is [B, A]; A re-found at index 1
+            "  if (wrote[0].start !== 30) fail('B was disturbed: ' + JSON.stringify(wrote[0]));",
+            "  if (wrote[1].start !== 8) fail('A did not trim to the bound: ' + JSON.stringify(wrote[1]));",
+            "  console.log('ok');",
+            "})();",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"the mid-fetch race lost a change:\n{r.stdout}{r.stderr}")
+
+    def test_make_this_yours_is_explicit_and_never_silent(self):
+        """specs/22 §5.4, settled §6.3: an empty tray just receives the reel;
+        a tray with clips is asked — append (clips already held, by
+        identity, are not doubled) or replace (only past a confirm) or keep.
+        takeMerge is the pure half; a refusal returns null and the tray is
+        untouched."""
+        body = "\n".join([
+            "const r1 = t => Math.round(t * 10) / 10;",
+            "const clipKey = c => (c.pid || '') + '@' + (c.kind || 'moment') + '@' + r1(c.t);",
+            self.lift(r"  function takeMerge\(answer, have, clips, confirmed\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const A = { pid: 'p1', kind: 'moment', t: 10, start: 9, end: 20 };",
+            "const B = { pid: 'p1', kind: 'moment', t: 30, start: 29, end: 40 };",
+            "const C = { pid: 'p2', kind: 'segment', t: 5, start: 5, end: 12 };",
+            "let out = takeMerge('append', [A], [A, B, C], false);",
+            "if (out.map(clipKey).join('|') !== [A, B, C].map(clipKey).join('|')) fail('append doubled or dropped: ' + JSON.stringify(out));",
+            "out = takeMerge('append', [B], [A, B], false);",
+            "if (out.length !== 2 || out[0] !== B) fail('append must keep mine first: ' + JSON.stringify(out));",
+            # the same CUT under a reconstructed identity (a taken reel's kind
+            # and t come from the moments plane) is still already held
+            "const A2 = { pid: 'p1', kind: 'tension', t: 12, start: 9, end: 20 };",
+            "out = takeMerge('append', [A], [A2, C], false);",
+            "if (out.length !== 2 || out[1] !== C) fail('the same cut was doubled: ' + JSON.stringify(out));",
+            "if (takeMerge('replace', [A], [B, C], false) !== null) fail('replace without a confirm wrote');",
+            "out = takeMerge('replace', [A], [B, C], true);",
+            "if (!out || out.length !== 2 || out[0] !== B) fail('replace with a confirm: ' + JSON.stringify(out));",
+            "if (takeMerge('keep', [A], [B], true) !== null) fail('keep wrote');",
+            "if (takeMerge('nonsense', [A], [B], true) !== null) fail('an unknown answer wrote');",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"make-this-yours misbehaved:\n{r.stdout}{r.stderr}")
+
+    def test_the_cutting_markers_are_present(self):
+        """The drift guard: the pieces the stylesheet, the hydrators and the
+        panel lean on keep their names — and the preview stays a NEW-TAB
+        deep link (the settled §6.1 answer; the /app/r singleton untouched)."""
+        for token in ("function toggleCut(", "function paintCutTicks(",
+                      "function wireSegTicks(", "function wireBeadTicks(",
+                      "function trayAct(", "function writeTray(",
+                      "function segBounds(", "function parseSegTimes(",
+                      'b.dataset.czcut = "segment"', 'data-czcut="hit"',
+                      'b.dataset.czcut = "bead"', 'data-cz="rtact"',
+                      'target="_blank" rel="noopener"',
+                      # P1 — the remix loop: make this yours on /app/r, and
+                      # the tray's outputs offered from the panel
+                      'data-rv="mine"', "function takeReel(", "function takeMerge(",
+                      'data-cz="reelcite"', 'data-cz="reeljson"',
+                      "const trayMeta = reelMeta"):
+            self.assertIn(token, self.JS, f"{token!r} drifted in app.js")
+        # the panel's reel block offers file-into-paper right where the tray is
+        panel = self.JS[self.JS.index("function refreshReelSummary("):
+                        self.JS.index("function clearReel(")]
+        self.assertIn('data-cz="preel"', panel, "the tray does not offer file-into-paper")
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        for token in (".seg-tick", ".stick", ".btick", ".cz-rclip",
+                      ".cz-rprev"):
+            self.assertIn(token, css, f"{token!r} missing from the sheet")
 
 
 class TestPaper(unittest.TestCase):

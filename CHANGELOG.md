@@ -2,6 +2,54 @@
 
 ## unreleased
 
+### specs/22 — the cutting room: reels, cut from anywhere — 2026-09-23 (v2.1.12)
+
+The record was readable everywhere and cuttable in exactly one place: the
+moment cards of a meeting page. Now every timed unit the record shows is
+a clip waiting to happen, the tray follows you, and a shared reel opens
+back up into yours (specs/22, the five settlements of 2026-07-22, all
+five built to the letter; specs/23 phase B).
+
+**Cut from anywhere.** Every transcript row grows a quiet tick (hidden
+until the row is hovered or focused — a big tape is thousands of rows —
+but always in the accessibility tree, and a pressed tick stays): the clip
+is the row's own segment, start to the next row's start, its words as the
+quote. Every search hit gets one, beside the row (a sibling in a wrapper,
+never a control inside a link); every issue bead gets one after the bead.
+Clip identity stays `(pid, kind, t)`; the link grammar never carried kind
+and does not change. The composer stands on every meeting page now,
+moments or none — the rows are cuttable, so a page with zero scored
+moments still cuts.
+
+**The panel is the tray — everywhere.** The studio panel's reel block
+grew from a count into the real thing: the clip list with per-clip trim
+(in/out, snapped to the record's own lines), reorder, remove, and a ▶
+preview that opens the tape in a new tab (the settled answer — the
+`/app/r` player-singleton is not touched). The meeting-page tray and the
+panel tray are one engine (`trayAct`) painting one key (`writeTray`);
+trims may await a bounds fetch, and the reel is re-read and the clip
+re-found by identity after the await, so a press that landed meanwhile is
+never overwritten. **Cross-page trims are honest now**: the tray fetches
+the clip's meeting `transcript.txt` (already pressed; one fetch per
+meeting, parsed `[H:MM:SS]` starts, cached) and snaps anywhere; where the
+fetch fails the two-second nudge remains and the tray says so, once.
+
+**The remix loop.** `/app/r` offers **make this reel yours**: into an
+empty tray the clips simply arrive; into a tray with clips the choice is
+explicit and painted — append after what you have (clips already held,
+by identity, are not doubled), replace it behind a confirm, or keep
+yours — never silently either. The panel tray offers **file into your
+paper** (a snapshot; the tray keeps rolling), the cite sheet, and
+`reel.json` for a single-meeting reel, wherever the panel stands.
+
+The uncommitted ~531-line partial in control-z's working tree was the
+basis of the P0 half — read hunk by hunk, applied here, and owned:
+adapted to phase A's editor and panel, guarded (the byte-clean sweep now
+covers `seg-tick`, `btick`, `stick`, `data-czcut`, the panel tray and the
+viewer's chooser; the reel-path scan now checks the one raw fetch stays
+on the edition), twin-tested (`parseSegTimes`, `stepEdge`, the segment
+tick's bounds, the mid-fetch race, `takeMerge`). REVIEW_LINE_B
+
 ### specs/23 A — the open newsroom: the front door + the real editor — 2026-09-23 (v2.1.11)
 
 The diagnosis, verified live on v2.1.10: nothing was broken — the making

@@ -236,6 +236,7 @@
       const k = e && e.key;
       if (k === REEL_KEY || k === null) {
         if (CREEL) { CREEL.clips = readReel(REEL_KEY); buildTray(); paintTicks(); }
+        paintCutTicks();         // the cut ticks on THIS page track the other tab
         refreshReelSummary();
         refreshPaperSummary();   // the reel add-button's count rides the tray
       }
@@ -282,6 +283,15 @@
       if (act === "reelcopy") { const c = readReel(REEL_KEY);
         if (c.length) copyText(reelShareURL(c), "share link copied"); }
       else if (act === "reelclear") clearReel();
+      // the panel tray (specs/22 P0) — every per-clip act is a call into the
+      // page-agnostic trayAct; nothing here touches a server. Its outputs
+      // (specs/22 P1) are the meeting tray's, offered wherever the panel
+      // stands: the cite sheet, and reel.json for a single-meeting reel.
+      else if (act === "rtact") trayAct(+b.dataset.i, b.dataset.act);
+      else if (act === "reelcite") { const c = readReel(REEL_KEY);
+        if (c.length) copyText(citeSheet(trayMeta(c), c), "cite sheet copied — receipts for every clip"); }
+      else if (act === "reeljson") { const c = readReel(REEL_KEY);
+        if (c.length && reelPids(c).length <= 1) downloadReel(trayMeta(c), c); }
       // your paper (P1) — every handler here is a call into the paper section;
       // painting and arranging stay pure localStorage, and the one server
       // touch a paper can have (the optional short link) happens only inside
@@ -360,35 +370,95 @@
      composer fills as you tick moments across meetings. The studio reads the
      same `cz-reel` key the meeting page writes, and shows it as a count on the
      preview pill and a panel in studio — a play link, a share link, a clear. */
-  function refreshReelSummary() {
+  /* the panel's reel block is the REAL tray now (specs/22 P0, §5.2): the
+     clip list with per-clip trim / reorder / remove and a ▶ preview that
+     opens the tape in a new tab (the settled §6.1 answer — the /app/r
+     player-singleton is not touched). Page-agnostic: every act dispatches
+     to trayAct against the stored reel; the meeting page's own tray
+     repaints from the same write. Repaints preserve keyboard focus the
+     paper panel's way. */
+  function refreshReelSummary(focus) {
     if (!STUDIO) return;
     const clips = readReel(REEL_KEY);
     const n = clips.length;
     const body = $(".cz-reelbody", STUDIO), mini = $(".cz-pill-reel", STUDIO);
+    if (!body) return;
     if (!n) {
-      if (body) body.innerHTML = `<p class="cz-hint">No clips yet. Open a
-        meeting, tick its moments, and they gather here as a reel — across
-        meetings if you like.</p>`;
+      body.innerHTML = `<p class="cz-hint">No clips yet. Tick a moment or any
+        transcript line on a meeting page, a search hit, or an issue’s bead —
+        they gather here as a reel, across meetings if you like.</p>`;
       if (mini) { mini.hidden = true; mini.removeAttribute("href"); mini.textContent = ""; }
       return;
     }
+    // the storage-event path repaints with no focus arg — if the keyboard
+    // was on one of OUR controls, capture it before the innerHTML wipe
+    if (!focus) {
+      const ae = document.activeElement;
+      if (ae && ae.dataset && ae.dataset.cz === "rtact")
+        focus = { act: ae.dataset.act, i: +ae.dataset.i };
+    }
     const url = reelShareURL(clips), meets = reelPids(clips).length;
     const span = meets > 1 ? ` · ${meets} meetings` : "";
-    if (body) body.innerHTML =
+    const act = (a, i, label, glyph, dis) =>
+      `<button type="button" class="cz-pact" data-cz="rtact" data-act="${a}"
+        data-i="${i}" title="${esc(label)}" aria-label="${esc(label)}"${dis ? " disabled" : ""}>${glyph}</button>`;
+    const rows = clips.map((c, i) => {
+      const from = c.mtitle || c.pid || "";
+      const label = (c.quote || "").trim() || `(${c.kind || "moment"})`;
+      return `<div class="cz-rclip" data-i="${i}">
+        <span class="cz-rord">${i + 1}</span>
+        <span class="cz-rmain">
+          <span class="cz-rquote" tabindex="-1" title="${esc(label)}">${esc(label)}</span>
+          <span class="cz-rmeta">${esc(c.kind || "moment")}${meets > 1 && from ? ` · ${esc(from)}` : ""}
+            · <span class="ts">${hms(c.start)}</span>–<span class="ts">${hms(c.end)}</span> · ${hms(clipLen(c))}</span>
+          <span class="cz-rtrim" role="group" aria-label="trim clip ${i + 1} — the edges snap to the record’s own lines">
+            <span class="cz-rtl">in</span>${act("s-", i, `clip ${i + 1}: start earlier`, "◀")}${act("s+", i, `clip ${i + 1}: start later`, "▶")}
+            <span class="cz-rtl">out</span>${act("e-", i, `clip ${i + 1}: end earlier`, "◀")}${act("e+", i, `clip ${i + 1}: end later`, "▶")}
+          </span>
+        </span>
+        <span class="cz-racts">
+          <a class="cz-pact cz-rprev" href="${BASE}/m/${esc(c.pid || "")}#t${Math.floor(c.start)}"
+            target="_blank" rel="noopener"
+            title="preview — the tape in a new tab"
+            aria-label="preview clip ${i + 1} in a new tab">▶</a>
+          ${act("up", i, `move clip ${i + 1} up`, "↑", !i)}
+          ${act("down", i, `move clip ${i + 1} down`, "↓", i === n - 1)}
+          ${act("rm", i, `remove clip ${i + 1}`, "✕")}
+        </span></div>`;
+    }).join("");
+    body.innerHTML =
         `<p class="cz-reeln"><b>${n}</b> clip${n > 1 ? "s" : ""} · ${hms(reelRuntime(clips))}${span}</p>`
+      + `<div class="cz-rclips">${rows}</div>`
       + `<div class="cz-reelacts">`
       +   `<a class="btn primary" href="${esc(url)}">▶ play the reel</a>`
       +   `<button type="button" class="btn" data-cz="reelcopy">⧉ share link</button>`
+      +   `<button type="button" class="btn" data-cz="preel">📰 file into your paper</button>`
+      +   `<button type="button" class="btn" data-cz="reelcite">⧉ cite sheet</button>`
+      +   (meets > 1 ? "" : `<button type="button" class="btn" data-cz="reeljson">⬇ reel.json</button>`)
       +   `<button type="button" class="btn" data-cz="reelclear">clear</button></div>`
       + `<p class="cz-hint">The reel lives in this browser and its link — no
-         account, no server.</p>`;
+         account, no server. Trims snap to the record’s own lines; filing it
+         into your paper keeps a snapshot, and the tray keeps rolling.</p>`;
     if (mini) { mini.hidden = false; mini.href = url;
       mini.textContent = `▶ ${n} clip${n > 1 ? "s" : ""} · ${hms(reelRuntime(clips))}`; }
+    if (focus) {
+      let t = focus.act === "row"
+        ? $(`.cz-rclip[data-i="${focus.i}"] .cz-rquote`, body)
+        : $(`[data-cz="rtact"][data-act="${focus.act}"][data-i="${focus.i}"]`, body);
+      // a move that landed on a pole: the arrow under the keyboard went
+      // disabled — hand focus to the opposite arrow, NEVER the ✕ (the
+      // paper panel's rule: a held key must not find delete armed)
+      if (t && t.disabled) {
+        const other = focus.act === "up" ? "down" : "up";
+        t = $(`[data-cz="rtact"][data-act="${other}"][data-i="${focus.i}"]`, body);
+      }
+      if (!t) t = $(".cz-reelacts .btn", body);
+      if (t) t.focus();
+    }
   }
   function clearReel() {
-    try { localStorage.setItem(REEL_KEY, "[]"); } catch { /* private mode */ }
-    if (CREEL) { CREEL.clips = []; buildTray(); paintTicks(); }
-    refreshReelSummary(); refreshPaperSummary(); toast("reel cleared");
+    writeTray([]);   // one write, every surface repaints — ticks included
+    toast("reel cleared");
   }
 
   /* Your paper, in the panel (specs/21 P1): the making surface. Title it, add
@@ -1379,7 +1449,9 @@
   let CREEL = null;   // {pid, meta, moments, clips, segs}
 
   function wireComposer(m) {
-    if (!(m.moments && m.moments.length)) return;
+    // P0 (specs/22): the composer stands on EVERY meeting page now, moments
+    // or none — the transcript's own rows are cuttable, so a page with zero
+    // scored moments still cuts (the gate used to skip everything here)
     const meta = { pid: m.pid, title: m.title || "", town: m.town || "",
                    body: m.body || "", date: m.date || "",
                    video_id: m.video_id || "", url: m.url || "",
@@ -1387,10 +1459,12 @@
     // the transcript's segment starts, for trimming a clip to segment bounds
     const segs = $$("#transcript .seg").map(s => +s.dataset.t)
       .filter(t => isFinite(t)).sort((a, b) => a - b);
-    CREEL = { pid: m.pid, meta, moments: m.moments, clips: loadReel(), segs };
+    CREEL = { pid: m.pid, meta, moments: m.moments || [], clips: loadReel(), segs };
     wireTicks();
+    wireSegTicks();   // every transcript row grows its quiet tick (specs/22 §5.1)
     buildTray();
     paintTicks();
+    paintCutTicks();
     // loadReel() may have just migrated legacy per-meeting drafts into the global
     // reel; the studio summary was painted before this meeting hydrated, so bring
     // it in line with what the tray now holds — the paper panel's "＋ your reel"
@@ -1434,12 +1508,7 @@
     return Array.isArray(a)
       ? a.filter(c => c && isFinite(c.start) && isFinite(c.end)) : [];
   } catch { return []; } }
-  const saveReel = () => { try {
-    localStorage.setItem(REEL_KEY, JSON.stringify(CREEL.clips));
-  } catch { /* private mode: the tray still works for this visit */ }
-    refreshReelSummary();     // keep the studio's reel count live as you tick
-    refreshPaperSummary();    // and the panel's "＋ your reel" button with it
-  };
+  const saveReel = () => writeTray(CREEL.clips);
 
   function wireTicks() {
     $$(".mo-card").forEach(card => {
@@ -1474,7 +1543,7 @@
                             mtitle: CREEL.meta.title, body: CREEL.meta.body,
                             town: CREEL.meta.town, date: CREEL.meta.date,
                             duration: CREEL.meta.duration || 0 });
-    saveReel(); buildTray(); paintTicks();
+    saveReel();   // writeTray repaints every surface, this tray included
     toast(i >= 0 ? "removed from the reel" : "added to the reel");
   }
   function paintTicks() {
@@ -1488,6 +1557,112 @@
         b.textContent = inr ? "✓ in reel" : "＋ reel"; }
     });
   }
+
+  /* ---- CUT FROM ANYWHERE (specs/22 P0, §5.1) -------------------------------
+     Every place the record shows a timed unit grows the moment cards' quiet
+     tick: transcript rows (kind "segment" — the row's own bounds), search
+     hits (kind "hit"), issue beads (kind "bead"). All hydration — the
+     pressed pages carry none of it, and JS-off stays the clean reading.
+     Clip identity stays (pid, kind, t); the link grammar never carried kind
+     and does not change. */
+  function toggleCut(b) {
+    const kind = b.dataset.czcut;
+    let clip = null;
+    if (kind === "segment") {
+      // the row holds everything: its own start, the next row's start as the
+      // end (the segment's true bound), and the words as the quote
+      const row = b.closest(".seg"); if (!row || !CREEL) return;
+      const t = r1(+row.dataset.t);
+      if (!isFinite(t)) return;
+      const nx = (CREEL.segs || []).find(s => s > t + 0.05);
+      let end = nx != null ? nx : t + 12;
+      if (CREEL.meta.duration) end = Math.min(end, CREEL.meta.duration);
+      if (end <= t) end = t + MIN_CLIP;
+      const sx = row.querySelector(".sx");
+      clip = { t, start: t, end: r1(end), kind: "segment",
+               quote: cut((sx && sx.textContent || "").trim(), 120),
+               pid: CREEL.pid, video_id: CREEL.meta.video_id,
+               mtitle: CREEL.meta.title, body: CREEL.meta.body,
+               town: CREEL.meta.town, date: CREEL.meta.date,
+               duration: CREEL.meta.duration || 0 };
+    } else {
+      // search hits and issue beads stamp what they know at render; the end
+      // starts at the composer's twelve-second window and trims to the
+      // record's own bounds in the tray (§5.6)
+      const d = b.dataset, t = r1(+d.t);
+      if (!isFinite(t) || !d.pid) return;
+      clip = { t, start: t, end: r1(t + 12), kind,
+               quote: cut(d.quote || "", 120),
+               pid: d.pid, mtitle: d.mtitle || "" };
+    }
+    const clips = readReel(REEL_KEY);
+    const i = clips.findIndex(c => clipKey(c) === clipKey(clip));
+    if (i >= 0) clips.splice(i, 1); else clips.push(clip);
+    writeTray(clips);
+    toast(i >= 0 ? "removed from the reel" : "added to the reel");
+  }
+  /* membership, painted on every cut tick at once — a Set of the tray's
+     keys, then one lookup per button (a transcript holds thousands). */
+  function paintCutTicks() {
+    const btns = $$("[data-czcut]");
+    if (!btns.length) return;
+    const keys = new Set(readReel(REEL_KEY).map(clipKey));
+    for (const b of btns) {
+      let key;
+      if (b.dataset.czcut === "segment") {
+        const row = b.closest(".seg"); if (!row || !CREEL) continue;
+        key = clipKey({ pid: CREEL.pid, kind: "segment", t: r1(+row.dataset.t) });
+      } else {
+        key = clipKey({ pid: b.dataset.pid, kind: b.dataset.czcut,
+                        t: r1(+b.dataset.t) });
+      }
+      const inr = keys.has(key);
+      b.classList.toggle("on", inr);
+      b.setAttribute("aria-pressed", inr ? "true" : "false");
+      b.title = inr ? "in the reel — press to remove" : "add to the reel";
+      b.textContent = b.classList.contains("stick")
+        ? (inr ? "✓ in reel" : "＋ reel")
+        : (inr ? "✓" : "＋");
+    }
+  }
+  /* the transcript's rows, made cuttable — one small button each, quiet
+     until the row is hovered or focused (CSS), always there to a reader of
+     the accessibility tree. One fragment pass; a big tape is thousands of
+     rows and this must not thrash layout per row. */
+  function wireSegTicks() {
+    const rows = $$("#transcript .seg");
+    if (!rows.length || $(".seg-tick")) return;
+    for (const row of rows) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "seg-tick";
+      b.dataset.czcut = "segment";
+      b.setAttribute("aria-label", "add this line to the reel");
+      row.appendChild(b);
+    }
+  }
+  /* an issue's beads, made cuttable — the bead is an anchor, so its tick is
+     a SIBLING (interactive inside interactive is a keyboard trap). */
+  function wireBeadTicks() {
+    $$(".issue .bead").forEach(a => {
+      const m = /\/m\/([\w-]+)#t(\d+)$/.exec(a.getAttribute("href") || "");
+      if (!m) return;
+      const node = a.closest(".tnode");
+      const tt = node && node.querySelector(".ttitle");
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btick";
+      b.dataset.czcut = "bead"; b.dataset.pid = m[1]; b.dataset.t = m[2];
+      b.dataset.quote = (a.textContent || "").replace(/^\s*[\d:]+\s*/, "").trim().slice(0, 120);
+      if (tt) b.dataset.mtitle = tt.textContent.trim();
+      b.setAttribute("aria-label", "add this moment to the reel");
+      a.after(b);
+    });
+    paintCutTicks();
+  }
+  // one delegated press for every tick, wherever a page grew one
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest("[data-czcut]");
+    if (b) { e.preventDefault(); toggleCut(b); }
+  });
 
   function buildTray() {
     let tray = $("#reeltray");
@@ -1545,9 +1720,7 @@
   }
   function wireTray() {
     const tray = $("#reeltray"); if (!tray) return;
-    $(".rt-clear", tray).onclick = () => {
-      CREEL.clips = []; saveReel(); buildTray(); paintTicks(); toast("reel cleared");
-    };
+    $(".rt-clear", tray).onclick = () => { writeTray([]); toast("reel cleared"); };
     $$(".rt-clip", tray).forEach(rowEl => {
       const i = +rowEl.dataset.i;
       $$(".rt-b", rowEl).forEach(b => b.onclick = () => clipAct(i, b.dataset.act));
@@ -1556,23 +1729,14 @@
     const url = $(".rt-url", tray); if (url) url.onclick = () => url.select();
   }
   function clipAct(i, act) {
-    const clips = CREEL.clips, c = clips[i]; if (!c) return;
-    // trimming snaps to transcript segment bounds, which are only on the page for
-    // THIS meeting; a clip from another meeting nudges by two seconds instead.
-    const own = !c.pid || c.pid === CREEL.pid;
-    const dur = own ? (CREEL.meta.duration || 1e9) : (c.duration || 1e9);
-    if (act === "rm") clips.splice(i, 1);
-    else if (act === "up" && i > 0) clips.splice(i - 1, 0, clips.splice(i, 1)[0]);
-    else if (act === "down" && i < clips.length - 1) clips.splice(i + 1, 0, clips.splice(i, 1)[0]);
-    else if (act[0] === "s") c.start = r1(Math.max(0, Math.min(trimTo(c.start, act[1], dur, own), c.end - MIN_CLIP)));
-    else if (act[0] === "e") c.end = r1(Math.min(dur, Math.max(trimTo(c.end, act[1], dur, own), c.start + MIN_CLIP)));
-    saveReel(); buildTray(); paintTicks();
+    // the meeting tray and the panel tray are the same tray — one engine
+    // (specs/22 §5.2); the composer's rows just address it by index
+    trayAct(i, act);
   }
-  /* trim to segment bounds: step a clip edge to the next/previous transcript
-     segment boundary (the seg starts already on the page); with no transcript
-     to snap to — no page segs, or a clip from another meeting — nudge two seconds. */
-  function trimTo(t, dir, dur, own) {
-    const segs = own ? CREEL.segs : null;
+  /* one honest trim step, shared by both trays: snap to the record's own
+     segment bounds when we hold them, else nudge two seconds (specs/22
+     §5.6 — sub-segment trims are settled OUT; the units are the record's). */
+  function stepEdge(t, dir, segs, dur) {
     if (segs && segs.length) {
       if (dir === "+") { const nx = segs.find(s => s > t + 0.05);
         return nx == null ? Math.min(dur, t + 2) : nx; }
@@ -1581,16 +1745,92 @@
     }
     return dir === "+" ? Math.min(dur, t + 2) : Math.max(0, t - 2);
   }
+  /* segment bounds for ANY meeting, one fetch each: the pressed
+     transcript.txt re-read as the record's own units (specs/22 §5.6 — no
+     new plane; the file every meeting page already offers for download).
+     A fetch that fails leaves [] and the trim falls to its honest nudge —
+     said out loud, once per meeting, by the caller. */
+  const SEGB = {};      // pid → sorted segment starts
+  const SEGB_P = {};    // pid → the one in-flight fetch
+  const SEGB_SAID = new Set();   // pids whose missing bounds were said out loud
+  /* the pressed transcript's own timestamps, total: [M:SS] under an hour,
+     [H:MM:SS] over (hms()'s two shapes); any line that isn't one is not a
+     bound. A node twin executes this against both shapes and the garbage. */
+  function parseSegTimes(tx) {
+    const out = [];
+    for (const line of String(tx || "").split("\n")) {
+      const m = /^\[(\d+):(\d\d)(?::(\d\d))?\]/.exec(line);
+      if (m) out.push(m[3] == null
+        ? +m[1] * 60 + +m[2]
+        : +m[1] * 3600 + +m[2] * 60 + +m[3]);
+    }
+    return out.sort((a, b) => a - b);
+  }
+  function segBounds(pid) {
+    if (!pid) return Promise.resolve([]);
+    if (SEGB[pid]) return Promise.resolve(SEGB[pid]);
+    return SEGB_P[pid] ||= fetch(`${BASE}/m/${encodeURIComponent(pid)}/transcript.txt`)
+      .then(r => r.ok ? r.text() : "")
+      .catch(() => "")
+      .then(tx => (SEGB[pid] = parseSegTimes(tx)));
+  }
+  /* the tray, written once for every writer — the ticks, the meeting tray,
+     the panel — and every painted surface reconciled from the one truth
+     (other tabs reconcile through the storage event, as before). */
+  function writeTray(clips, focus) {
+    try { localStorage.setItem(REEL_KEY, JSON.stringify(clips)); }
+    catch { /* private mode: the tray still works for this visit */ }
+    if (CREEL) { CREEL.clips = clips; buildTray(); paintTicks(); }
+    paintCutTicks();
+    refreshReelSummary(focus);
+    refreshPaperSummary();   // the "＋ your reel" count rides the tray
+  }
+  /* every tray action, page-agnostic (specs/22 §5.2): index-addressed
+     against the stored reel as it stands. Trims may await a bounds fetch —
+     the reel is RE-READ after the await and the clip re-found by its
+     identity, so a press that landed meanwhile is never overwritten. */
+  async function trayAct(i, act) {
+    let clips = readReel(REEL_KEY);
+    let c = clips[i]; if (!c) return;
+    let focus = { act, i };
+    if (act === "rm") {
+      clips.splice(i, 1);
+      // focus falls to the next ROW, never its ✕ — a held Enter must not
+      // cascade deletes (the paper panel's rule)
+      focus = clips.length ? { act: "row", i: Math.min(i, clips.length - 1) } : null;
+    } else if (act === "up" && i > 0) {
+      clips.splice(i - 1, 0, clips.splice(i, 1)[0]); focus = { act, i: i - 1 };
+    } else if (act === "down" && i < clips.length - 1) {
+      clips.splice(i + 1, 0, clips.splice(i, 1)[0]); focus = { act, i: i + 1 };
+    } else if (act[0] === "s" || act[0] === "e") {
+      const own = CREEL && (!c.pid || c.pid === CREEL.pid);
+      const segs = own ? CREEL.segs : await segBounds(c.pid);
+      if (!own && !(segs && segs.length) && !SEGB_SAID.has(c.pid || "")) {
+        SEGB_SAID.add(c.pid || "");
+        toast("that meeting’s transcript didn’t load — nudging by two seconds instead");
+      }
+      // the fetch awaited — re-read and re-find, another press may have landed
+      clips = readReel(REEL_KEY);
+      const j = clips.findIndex(x => clipKey(x) === clipKey(c));
+      c = clips[j]; if (!c) return;
+      focus = { act, i: j };
+      const dur = own ? (CREEL.meta.duration || 1e9) : (c.duration || 1e9);
+      if (act[0] === "s") c.start = r1(Math.max(0, Math.min(stepEdge(c.start, act[1], segs, dur), c.end - MIN_CLIP)));
+      else c.end = r1(Math.min(dur, Math.max(stepEdge(c.end, act[1], segs, dur), c.start + MIN_CLIP)));
+    } else return;
+    writeTray(clips, focus);
+  }
   /* the meeting a single-meeting reel belongs to: this page's when its clips are
      from here, else reconstructed from what a clip carries (a reel built on
      another meeting, viewed from this one). */
   function reelMeta(clips) {
-    if (clips.every(c => !c.pid || c.pid === CREEL.pid)) return CREEL.meta;
+    if (CREEL && clips.every(c => !c.pid || c.pid === CREEL.pid)) return CREEL.meta;
     const c = clips[0] || {};
     return { pid: c.pid || "", title: c.mtitle || "", town: c.town || "",
              body: c.body || "", date: c.date || "", video_id: c.video_id || "",
-             url: c.url || "", duration: 0 };
+             url: c.url || "", duration: +c.duration || 0 };
   }
+  const trayMeta = reelMeta;   // the panel tray's name for it — no page needed
   function output(kind) {
     const clips = CREEL.clips; if (!clips.length) return;
     if (kind === "link") copyText(reelShareURL(clips), "share link copied");
@@ -1707,16 +1947,29 @@
     cites.innerHTML = head + `<div class="reelcitelist">${rows}</div>`
       + (where ? `<p class="rc-where">${esc(where)}</p>` : "")
       + `<div class="rt-btns">
+          <button class="btn primary" type="button" data-rv="mine">✂ make this reel yours</button>
           <button class="btn" type="button" data-rv="cite">⧉ Copy cite sheet</button>
           ${multi ? "" : '<button class="btn" type="button" data-rv="json">⬇ reel.json</button>'}
           ${multi ? "" : `<a class="btn" href="${BASE}/m/${esc(vmeta.pid)}">open the meeting →</a>`}</div>
+        <p class="rv-take" id="rvtake" hidden></p>
         <p class="hint">This reel lives in the link you followed — no account, no
-          server kept it. ${multi
+          server kept it. <b>Make it yours</b> and its clips land on your own
+          tray, to re-cut and re-share. ${multi
             ? "<b>This reel spans meetings</b> — it plays and cites here; rendering one video across meetings is a desk step still to come."
             : "<b>Rendering it as a video needs the desk</b> — the reel.json opens in Highlighter."}</p>`;
+    // the clips a taken reel hands to the tray: ordinary clips — the same
+    // identity (pid, kind, t), the same trim rules, the meeting's duration
+    // for the trim's ceiling — nothing the record would not say itself
+    const mine = () => clips.map(c => ({
+      pid: c.pid, start: r1(c.start), end: r1(c.end),
+      t: c.t != null ? r1(c.t) : r1(c.start), kind: c.kind || "moment",
+      quote: c.quote || "", video_id: c.video_id || "", mtitle: c.mtitle || "",
+      body: c.body || "", town: c.town || "", date: c.date || "",
+      duration: +((mby[c.pid] || {}).duration) || 0 }));
     $$("[data-rv]", cites).forEach(b => b.onclick = () =>
       b.dataset.rv === "cite" ? copyText(citeSheet(vmeta, clips), "cite sheet copied")
-                              : downloadReel(vmeta, clips));
+      : b.dataset.rv === "json" ? downloadReel(vmeta, clips)
+      : takeReel(mine(), $("#rvtake", cites)));
     // clicking a cite while the reel plays jumps to that clip (switching the tape
     // when the clip is from another meeting); a tape-less clip just follows its
     // deep link, and so does any click when the reel isn't playing
@@ -1727,6 +1980,65 @@
       REELPLAY.i = i; REELPLAY.armed = false;
       reelSeek(c); reelShow();
     }));
+  }
+  /* make this yours (specs/22 §5.4, settled §6.3): a shared reel becomes
+     the reader's. Into an EMPTY tray it simply arrives. Into a tray that
+     holds clips the choice is explicit and painted, never silent: append
+     after what you have (clips already on the tray, by identity, are not
+     doubled), or replace it — behind a confirm — or keep yours. Pure over
+     (tray, clips, the reader's answer); the write is writeTray's, so every
+     surface (the panel, the pill) repaints from the one truth. */
+  function takeReel(clips, box) {
+    if (!clips.length) return;
+    const have = readReel(REEL_KEY);
+    if (!have.length) {
+      writeTray(clips);
+      toast(`${clips.length} clip${clips.length > 1 ? "s" : ""} on your tray now — cut on from the studio`);
+      if (box) { box.hidden = false;
+        box.innerHTML = `these clips are on <b>your</b> tray now — open the studio to re-cut, or ${clips.length > 1 ? "add more" : "add more"} from any meeting`; }
+      return;
+    }
+    if (!box) return;
+    box.hidden = false;
+    box.innerHTML = `Your tray already holds <b>${have.length}</b> clip${have.length > 1 ? "s" : ""}. `
+      + `<button type="button" class="btn" data-take="append">append these after them</button> `
+      + `<button type="button" class="btn" data-take="replace">replace them with this reel</button> `
+      + `<button type="button" class="btn" data-take="keep">keep mine</button>`;
+    $$("[data-take]", box).forEach(b => b.onclick = () => takeAnswer(b.dataset.take, clips, box));
+    const first = $("[data-take]", box); if (first) first.focus();
+  }
+  /* the answer, applied — separated so a node twin can drive it without a
+     DOM: returns what the tray was written with, or null for a refusal */
+  function takeMerge(answer, have, clips, confirmed) {
+    if (answer === "append") {
+      // already held = the same identity (pid, kind, t) OR the same cut
+      // (pid, start, end): a taken clip's kind and t are reconstructed from
+      // the record's moments, so a reel appended twice must still not double
+      const keys = new Set(have.map(clipKey));
+      const cuts = new Set(have.map(c => `${c.pid || ""}@${r1(c.start)}-${r1(c.end)}`));
+      return have.concat(clips.filter(c => !keys.has(clipKey(c))
+        && !cuts.has(`${c.pid || ""}@${r1(c.start)}-${r1(c.end)}`)));
+    }
+    if (answer === "replace") return confirmed ? clips.slice() : null;
+    return null;
+  }
+  function takeAnswer(answer, clips, box) {
+    const have = readReel(REEL_KEY);
+    const confirmed = answer !== "replace"
+      || window.confirm(`Replace your ${have.length} clip${have.length > 1 ? "s" : ""} with this reel’s ${clips.length}? Your own cuts would be gone.`);
+    const next = takeMerge(answer, have, clips, confirmed);
+    if (!next) {
+      if (box) { box.innerHTML = answer === "keep" ? "kept yours — this reel stays a link you can come back to"
+                                                  : "kept yours"; }
+      toast("your tray is unchanged");
+      return;
+    }
+    const added = next.length - (answer === "append" ? have.length : 0);
+    writeTray(next);
+    toast(answer === "append"
+      ? `${added} clip${added === 1 ? "" : "s"} appended — ${next.length} on your tray now`
+      : `your tray is this reel now — ${next.length} clip${next.length > 1 ? "s" : ""}`);
+    if (box) box.innerHTML = `on <b>your</b> tray now — ${next.length} clip${next.length > 1 ? "s" : ""}; open the studio to re-cut`;
   }
   function startReel(clips) {
     // begin at the first clip that has a tape — a reel that opens on an
@@ -3584,11 +3896,24 @@
       + ` · <span class="live">live</span></p>`
       + r.hits.map(h => {
         const bits = [h.title, h.body, SCOPE.town ? "" : h.town, h.date];
-        return `<a class="sresult" href="${BASE}/m/${encodeURIComponent(h.meeting_id)}#t${Math.floor(h.t || 0)}">
+        // the hit is an anchor, so its tick is a SIBLING in a wrapper —
+        // a button inside a link is a keyboard trap (specs/22 §5.1)
+        return `<div class="swrap"><a class="sresult" href="${BASE}/m/${encodeURIComponent(h.meeting_id)}#t${Math.floor(h.t || 0)}">
           <span class="ts">${hms(h.t)}</span>${why(h.why)}${mark(h.text || "", terms)}
-          <span class="smeta">${esc(bits.filter(Boolean).join(" · "))}${h.speaker ? " · " + esc(h.speaker) : ""}</span></a>`;
+          <span class="smeta">${esc(bits.filter(Boolean).join(" · "))}${h.speaker ? " · " + esc(h.speaker) : ""}</span></a>${searchTick(h.meeting_id, h.t, h.text, h.title)}</div>`;
       }).join("");
+    paintCutTicks();
     return true;
+  }
+  /* a search hit's tick: everything the tray can label with, stamped at
+     render — the end starts at the twelve-second window and trims to the
+     record's own bounds in the tray (specs/22 §5.6). */
+  function searchTick(pid, t, text, title) {
+    return `<button class="stick" type="button" data-czcut="hit"
+      data-pid="${esc(pid)}" data-t="${r1(+t || 0)}"
+      data-quote="${esc(cut(String(text || ""), 120))}"
+      data-mtitle="${esc(title || "")}"
+      aria-label="add this moment to the reel">＋ reel</button>`;
   }
 
   /* Why this hit is here. Four words, and the reader is owed the difference:
@@ -3669,10 +3994,11 @@
       hits.map(id => {
         const [mi, t, spk, text] = segs[id];
         const m = meta[mi] || {};
-        return `<a class="sresult" data-sid="${id}" href="${BASE}/m/${m.pid}#t${Math.floor(t)}">
+        return `<div class="swrap"><a class="sresult" data-sid="${id}" href="${BASE}/m/${m.pid}#t${Math.floor(t)}">
           <span class="ts">${hms(t)}</span>${mark(text, terms)}
-          <span class="smeta">${esc([m.title, m.body, SCOPE.town ? "" : m.town, m.date].filter(Boolean).join(" · "))}${spk ? " · " + esc(spk) : ""}</span>${peek(segs, id, mi)}</a>`;
+          <span class="smeta">${esc([m.title, m.body, SCOPE.town ? "" : m.town, m.date].filter(Boolean).join(" · "))}${spk ? " · " + esc(spk) : ""}</span>${peek(segs, id, mi)}</a>${searchTick(m.pid, t, text, m.title)}</div>`;
       }).join("");
+    paintCutTicks();
     selReset();
   }
   /* The peek: ±1 segment of context from the segs plane, already in hand
@@ -3733,6 +4059,7 @@
 
   /* ================= ISSUE (follows) ================= */
   function issue() {
+    wireBeadTicks();   // every bead grows its quiet tick (specs/22 §5.1)
     const slug = path.split("/i/")[1];
     const followed = follows();
     const head = $(".issue h1"); if (!head) return;
