@@ -2320,9 +2320,14 @@ class TestPaper(unittest.TestCase):
             self.lift(r"const paperHasLive = .+?;"),
             self.lift(r"const cut = .+?;"),
             self.lift(r"const noteText = .+?;"),
+            self.lift(r"const PAPER_LAYOUTS = .+?;"),
+            self.lift(r"const LAYOUT_LABEL = .+?;"),
+            self.lift(r"const withLayout = .+?;"),
             self.lift(r"function chartRecordURL\(b\) \{.+?\n  \}"),
             self.lift(r"function normalizePaper\(p\) \{.+?\n  \}"),
             self.lift(r"function normalizeBlock\(b\) \{.+?\n  \}"),
+            self.lift(r"function normalizeKind\(b\) \{.+?\n  \}"),
+            self.lift(r"function decodePart\(kind, rest, out\) \{.+?\n  \}"),
             self.lift(r"function portablePaper\(p\) \{.+?\n  \}"),
             self.lift(r"function encodePaperQS\(p\) \{.+?\n  \}"),
             self.lift(r"function paperShareURL\(p\) \{.+?\n  \}"),
@@ -2904,6 +2909,108 @@ class TestPaper(unittest.TestCase):
                      "html.cz-m-studio.cz-rail body{padding-left:44px}"):
             self.assertIn(rule, css, f"{rule!r} missing from the sheet")
 
+    def test_the_shelf_migrates_the_old_draft_once_and_is_total(self):
+        """specs/23 C1: `cz-papers` holds every paper and which one is open.
+        The single P1 draft migrates in exactly once (kept whole, then its
+        key removed, the loadReel way); garbage on the shelf drops; an
+        empty shelf grows one blank paper; a dangling pointer falls to the
+        first; readPaper/savePaper address the OPEN paper; new/switch/
+        delete keep the shelf never empty."""
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "const STORE = {}; const localStorage = { getItem: k => (k in STORE ? STORE[k] : null),",
+            "  setItem: (k, v) => { STORE[k] = String(v); }, removeItem: k => { delete STORE[k]; } };",
+            "let PAPER_SHORT = ''; const toast = () => {}; const retireShortOut = () => {};",
+            "const refreshPaperSummary = () => {}; const renderPaperNow = () => {}; const schedulePaperRender = () => {};",
+            "const window = { confirm: () => true };",
+            self.lift(r"  const PAPER_KEY = .+?;"),
+            self.lift(r"  const PAPERS_KEY = .+?;"),
+            self.lift(r"  const PAPERS_MAX = .+?;"),
+            self.lift(r"  const PAPER_ID = .+?;"),
+            self.lift(r"  const paperId = .+?;"),
+            self.lift(r"  function readPapers\(\) \{.+?\n  \}"),
+            self.lift(r"  function writePapers\(sh\) \{.+?\n  \}"),
+            self.lift(r"  function readPaper\(\) \{.+?\n  \}"),
+            self.lift(r"  function savePaper\(p\) \{.+?\n  \}"),
+            self.lift(r"  function newPaper\(\) \{.+?\n  \}"),
+            self.lift(r"  function switchPaper\(id\) \{.+?\n  \}"),
+            self.lift(r"  function deletePaper\(\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            # the old draft migrates once
+            "STORE['cz-paper'] = JSON.stringify({ title: 'mine', blocks: [{kind:'note',text:'kept'}] });",
+            "let p = readPaper();",
+            "if (p.title !== 'mine' || p.blocks.length !== 1) fail('the P1 draft did not migrate: ' + JSON.stringify(p));",
+            "if ('cz-paper' in STORE) fail('the old key must go once the shelf holds it');",
+            "const sh1 = JSON.parse(STORE['cz-papers']);",
+            "if (sh1.papers.length !== 1 || sh1.active !== sh1.papers[0].id) fail('shelf shape ' + STORE['cz-papers']);",
+            # save addresses the open paper
+            "savePaper({ title: 'renamed', blocks: [] });",
+            "if (readPaper().title !== 'renamed') fail('save did not address the open paper');",
+            # new, switch, delete
+            "newPaper(); const sh2 = readPapers();",
+            "if (sh2.papers.length !== 2 || readPaper().title !== '') fail('new paper did not open blank');",
+            "switchPaper(sh2.papers[0].id);",
+            "if (readPaper().title !== 'renamed') fail('switch did not open the first paper');",
+            "deletePaper();",
+            "if (readPapers().papers.length !== 1 || readPaper().title !== '') fail('delete left the wrong paper open');",
+            "deletePaper();",
+            "if (readPapers().papers.length !== 1) fail('the shelf must never stand empty');",
+            # total over garbage
+            "STORE['cz-papers'] = JSON.stringify({ active: 'nope', papers: [null, 7, {id:'BAD ID'}, {id:'ok1234', title:'t', blocks:'x'}, {id:'ok1234', title:'dup'}] });",
+            "const sh3 = readPapers();",
+            "if (sh3.papers.length !== 1 || sh3.papers[0].id !== 'ok1234' || sh3.active !== 'ok1234') fail('garbage on the shelf: ' + JSON.stringify(sh3));",
+            "STORE['cz-papers'] = 'not json';",
+            "if (!readPapers().papers.length) fail('unreadable shelf must grow a blank paper');",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"the shelf misbehaved:\n{r.stdout}{r.stderr}")
+
+    def test_layouts_travel_the_link_the_export_and_the_store_form(self):
+        """specs/23 C1: a layout is an enum on a block; it rides `l=` in the
+        link (index:layout pairs, so v1/v2 `b=` never changes shape), lifts
+        the link to v=3, survives the round trip, sits in the portable form
+        and the receipt; an unknown layout is dropped by the reader (total),
+        a mangled `l=` costs a layout never a throw, and a layout names its
+        block by the LINK's part index — a dropped part does not shift it."""
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const p = { title: 'laid out', blocks: [",
+            "  {kind:'story',story:'meeting',pid:'vid1',layout:'lead'},",
+            "  {kind:'chart',chart:'votes',layout:'half'},",
+            "  {kind:'chart',chart:'topics',layout:'half'},",
+            "  {kind:'note',text:'words',layout:'bogus'},",
+            "  {kind:'story',story:'issue',slug:'s1'} ] };",
+            "const n = normalizePaper(p);",
+            "if (n.blocks[3].layout) fail('an unknown layout must drop');",
+            "if (n.blocks[0].layout !== 'lead' || n.blocks[1].layout !== 'half') fail('layouts lost in normalize');",
+            "const qs = encodePaperQS(p);",
+            "if (!qs.startsWith('v=3')) fail('a laid-out paper travels as v=3: ' + qs);",
+            "if (!qs.includes('&l=0:lead,1:half,2:half')) fail('l= grammar: ' + qs);",
+            "const d = decodePaper('?' + qs);",
+            "const lays = d.blocks.map(b => b.layout || '');",
+            "if (lays.join(',') !== 'lead,half,half,,') fail('round trip: ' + lays.join(','));",
+            "if (JSON.stringify(portablePaper(p).blocks[0]) !== JSON.stringify({kind:'story',story:'meeting',pid:'vid1',layout:'lead'})) fail('portable form: ' + JSON.stringify(portablePaper(p).blocks[0]));",
+            "if (paperJSON(p).blocks[1].layout !== 'half') fail('the receipt lost the layout');",
+            # a paper with no layout stays v=1/v=2 byte-stable
+            "const plain = { title: 't', blocks: [{kind:'story',story:'meeting',pid:'vid1'}] };",
+            "if (encodePaperQS(plain) !== 'v=1&t=t&b=m.vid1') fail('a plain paper changed shape: ' + encodePaperQS(plain));",
+            # mangled l= never throws; a layout follows the LINK index
+            "for (const l of ['', 'x', '0:', ':lead', '0:lead,,9:half', '1:LEAD', '0:lead;1:half', 'NaN:lead']) {",
+            "  const dd = decodePaper('?v=3&b=m.vid1,c.votes&l=' + l);",
+            "  if (dd.blocks.length !== 2) fail('mangled l= dropped a block: ' + l);",
+            "}",
+            # part 1 is a mangle (dropped); the layout at link index 2 must land on the votes chart
+            "const dz = decodePaper('?v=3&b=m.vid1,zz.bad,c.votes&l=2:head');",
+            "if (dz.blocks.length !== 2 || dz.blocks[1].layout !== 'head' || dz.blocks[0].layout) fail('layout index shifted: ' + JSON.stringify(dz.blocks));",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"layouts misbehaved:\n{r.stdout}{r.stderr}")
+
     def test_the_editor_helpers_are_pure_and_total(self):
         """specs/23 A3: the on-page editor's three pure helpers, in node —
         insertBlock lands at the index it is given (or the end) and refuses
@@ -2965,7 +3072,7 @@ class TestPaper(unittest.TestCase):
                              f"the paper's make path reached for {forbidden!r} "
                              f"— composing must not touch a server (specs/21 §5)")
         # and the draft is localStorage, the same private preference the mode is
-        self.assertIn("localStorage.setItem(PAPER_KEY", block)
+        self.assertIn("localStorage.setItem(PAPERS_KEY", block)
 
     def test_the_paper_markers_are_present(self):
         """The drift guard, extended: the pieces the stylesheet, the stub and
@@ -2984,7 +3091,13 @@ class TestPaper(unittest.TestCase):
                       "function lexRank(", "function moveBlock(",
                       "function insertBlock(", "function paperTeach(",
                       'hp.has("edit")', 'hp.get("tpl")', "cz-edrow",
-                      "restoreEdFocus(el, PAGE_FOCUS || keep)"):
+                      "restoreEdFocus(el, PAGE_FOCUS || keep)",
+                      # C1: the shelf and the layouts
+                      'const PAPERS_KEY = "cz-papers"', "function readPapers(",
+                      "function newPaper(", "function switchPaper(", "function deletePaper(",
+                      'data-cz="pnew"', 'data-cz="pdelete"', "function paintLayouts(",
+                      "function renderHead(", "function setBlockLayout(", "cz-edlayout",
+                      "const PAPER_VS = [\"1\", \"2\", \"3\"]"):
             self.assertIn(token, self.JS, f"{token!r} drifted in app.js")
 
 

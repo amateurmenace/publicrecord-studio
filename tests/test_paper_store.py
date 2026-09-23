@@ -16,6 +16,7 @@ import json
 import unittest
 from pathlib import Path
 
+from record import papers
 from record.papers import (NOTE_MAX, SCHEMA, TITLE_MAX, MemPapers, PaperError,
                            canonical, paper_id)
 
@@ -34,6 +35,42 @@ def portable(title="Overrides, watched", blocks=None):
                 ]},
             ]}
 
+
+
+class TestLayouts(unittest.TestCase):
+    """specs/23 C1: a block may carry one layout — an enum, strictly one of
+    LAYOUTS, refused otherwise; the canonical form carries it, so the same
+    paper laid out two ways is two papers; a clip never carries one."""
+
+    def _doc(self, block):
+        return {"schema": papers.SCHEMA, "title": "", "blocks": [block]}
+
+    def test_each_layout_is_accepted_and_travels_into_the_canonical_form(self):
+        for lay in papers.LAYOUTS:
+            out = papers.canonical(self._doc(
+                {"kind": "story", "story": "meeting", "pid": "vid1", "layout": lay}))
+            self.assertIn(f'"layout":"{lay}"', out)
+        # the same block without a layout is a different (older) paper
+        plain = papers.canonical(self._doc({"kind": "story", "story": "meeting", "pid": "vid1"}))
+        self.assertNotIn("layout", plain)
+        self.assertNotEqual(papers.paper_id(plain),
+                            papers.paper_id(papers.canonical(self._doc(
+                                {"kind": "story", "story": "meeting", "pid": "vid1", "layout": "lead"}))))
+
+    def test_an_unknown_layout_is_refused_not_corrected(self):
+        for bad in ("wide", "", None, 1, "LEAD", "lead "):
+            with self.assertRaises(papers.PaperError, msg=repr(bad)):
+                papers.canonical(self._doc(
+                    {"kind": "chart", "chart": "votes", "layout": bad}))
+
+    def test_every_kind_may_lay_out_and_a_clip_may_not(self):
+        for block in ({"kind": "note", "text": "a word", "layout": "head"},
+                      {"kind": "chart", "chart": "reach", "slug": "s", "layout": "half"},
+                      {"kind": "reel", "clips": [{"pid": "v", "start": 1, "end": 2}], "layout": "lead"}):
+            self.assertIn('"layout"', papers.canonical(self._doc(block)))
+        with self.assertRaises(papers.PaperError):
+            papers.canonical(self._doc({"kind": "reel", "layout": "lead",
+                "clips": [{"pid": "v", "start": 1, "end": 2, "layout": "lead"}]}))
 
 class TestCanonicalForm(unittest.TestCase):
     def test_canonical_is_deterministic_and_key_order_blind(self):

@@ -55,6 +55,10 @@ NOTE_MAX = 2000
 # record's own pressed planes, so a stored paper cannot assert a number the
 # record would not draw.
 CHARTS = ("votes", "reach", "framing", "topics")
+# The layouts a block may ask for (specs/23 C1): an enum, never data. A
+# block with no layout reads as it always did; any other value is refused —
+# the store holds no layout the reader would have to guess at.
+LAYOUTS = ("lead", "head", "half")
 
 # A pid or an issue slug. The bake mints pids to 80 chars and issue slugs to
 # 96 (web/bake.py pid()/islug()); 128 leaves headroom and matches the reader's
@@ -84,13 +88,35 @@ def _t(x, what):
 
 
 def _exact_keys(obj, want, what):
-    got = set(obj)
+    # `layout` is the one optional key any block may add (C1) — checked by
+    # _layout; every other key is exact
+    got = set(obj) - {"layout"}
     if got != want:
         raise PaperError(
             f"{what} must carry exactly {sorted(want)} (got {sorted(got)})")
 
 
+def _layout(b, what):
+    """The block's layout, when it asks for one — strictly one of LAYOUTS."""
+    if "layout" not in b:
+        return None
+    lay = b.get("layout")
+    if lay not in LAYOUTS:
+        raise PaperError(
+            f"{what}: unknown layout {lay!r} — a block may be "
+            f"{', '.join(LAYOUTS)}, or carry no layout at all")
+    return lay
+
+
 def _block(b, i):
+    out = _block_kind(b, i)
+    lay = _layout(b, f"block {i + 1}")
+    if lay:
+        out["layout"] = lay
+    return out
+
+
+def _block_kind(b, i):
     what = f"block {i + 1}"
     if not isinstance(b, dict):
         raise PaperError(f"{what} is not an object")
@@ -122,7 +148,10 @@ def _block(b, i):
             cw = f"{what}, clip {j + 1}"
             if not isinstance(c, dict):
                 raise PaperError(f"{cw} is not an object")
-            _exact_keys(c, {"pid", "start", "end"}, cw)
+            if set(c) != {"pid", "start", "end"}:
+                raise PaperError(
+                    f"{cw} must carry exactly ['end', 'pid', 'start'] "
+                    f"(got {sorted(c)})")
             pid = c.get("pid")
             if not isinstance(pid, str) or not _REF.fullmatch(pid):
                 raise PaperError(f"{cw}: not a meeting id")

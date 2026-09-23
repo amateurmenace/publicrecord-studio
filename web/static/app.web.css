@@ -526,6 +526,27 @@ h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
 .paperbody .mcard{margin:0 0 var(--space-3)}
 .pb-reel{margin:var(--space-5) 0}
 .pb-play{margin:var(--space-3) 0 0}
+/* layouts (specs/23 C1) — the paper palette only. A lead grows to the full
+   column with the large treatment; a section head is a name over the rule;
+   two halves share a row (one column on a phone). */
+.pb-lead{margin:var(--space-4) 0 var(--space-5);padding-bottom:var(--space-4);
+  border-bottom:var(--border-w-strong) solid var(--text-primary)}
+.pb-lead>.mcard{flex-direction:column;align-items:stretch;padding:0;border:0;
+  background:none;margin:0}
+.pb-lead>.mcard img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;
+  border-radius:var(--radius-sm)}
+.pb-lead>.mcard .mc-body{padding:var(--space-3) 0 0}
+.pb-lead>.mcard .mc-body b{font-size:26px;line-height:1.15;white-space:normal;
+  font-weight:var(--weight-black);letter-spacing:-.015em;margin-top:var(--space-2)}
+.pb-lead>.pb-chart,.pb-lead>.pb-reel,.pb-lead>.pb-note{margin-top:0}
+.pb-head{font-family:var(--font-mono);font-size:var(--text-xs);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-secondary);border-bottom:var(--border-w-strong) solid var(--text-primary);
+  padding-bottom:var(--space-2);margin:var(--space-5) 0 var(--space-3);font-weight:var(--weight-bold)}
+.pb-head a{color:var(--text-primary);text-decoration:underline;text-underline-offset:2px}
+.pb-head a:hover{color:var(--accent)}
+.pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5);align-items:start}
+.pb-half{min-width:0}
 .pb-gone{font-size:var(--text-sm);color:var(--text-secondary);
   background:var(--tint-1);border:var(--border-w) dashed var(--border-strong);
   border-radius:var(--radius-sm);padding:var(--space-3);margin:0 0 var(--space-3)}
@@ -922,6 +943,7 @@ table.twin a{color:var(--accent)}
   .yp-hl{font-size:22px}
   .yp-start{width:100%;text-align:center}
   .yp-or{margin-left:0;flex:0 0 100%}
+  .pb-pair{grid-template-columns:1fr}
   .masthead{padding:var(--space-3) var(--space-4) 0}
   .brand{gap:var(--space-2)}
   .brand .brandmark svg{width:26px;height:26px}
@@ -1133,6 +1155,16 @@ html.cz-m-studio.cz-rail .cz-rail-btn{margin:0}
 /* --- your paper, in the panel (specs/21 P1) — the arranging surface. The
    accents stay inside the tokens the studio already declared, so all of this
    is exactly as bounded as the block above it. --- */
+/* the shelf (C1): which paper is open, a new one, delete */
+.cz-shelf{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)}
+.cz-shelflabel{font:var(--weight-bold) var(--text-xs)/1.3 var(--font-mono);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-secondary);
+  display:inline-flex;align-items:center;gap:6px;flex:1;min-width:0}
+.cz-shelfsel{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);text-transform:none;
+  letter-spacing:0;color:var(--text-primary);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  padding:5px 6px;min-height:24px;max-width:100%;flex:1;min-width:0}
+.cz-shelf .btn{font-size:var(--text-xs);padding:5px 9px}
 .cz-ptitle{width:100%;box-sizing:border-box;
   font:var(--weight-bold) var(--text-md)/1.3 var(--font-mono);  /* 16px: under it, iOS zooms the drawer on focus */
   color:var(--text-primary);background:var(--surface-card);
@@ -1258,6 +1290,11 @@ html.cz-m-studio .cz-edkind{flex:1;min-width:0;
   font:var(--weight-bold) var(--text-xs)/1.2 var(--font-mono);
   letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-secondary);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.cz-m-studio .cz-edlayout{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);
+  color:var(--text-primary);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  padding:5px 6px;min-height:24px;max-width:120px}
+html.cz-m-studio .cz-edlayout:hover{border-color:var(--studio-accent)}
 html.cz-m-studio .cz-edacts{display:inline-flex;gap:2px}
 html.cz-m-studio .cz-edact{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
   background:none;border:0;color:var(--text-secondary);cursor:pointer;padding:7px;
@@ -1335,6 +1372,7 @@ html.cz-m-studio .cz-edstart:hover b{color:var(--studio-accent-text);text-decora
 html.cz-m-studio .cz-edteach .cz-hint{margin:var(--space-2) 0}
 /* keyboard-visible focus for every editor control — with the fallback, or
    the bare token resolves to outline:none (the block's documented trap) */
+html.cz-m-studio .cz-edlayout:focus-visible,.cz-shelfsel:focus-visible,.cz-shelf .btn:focus-visible,
 html.cz-m-studio .cz-edtitle:focus-visible,html.cz-m-studio .cz-edhandle:focus-visible,
 html.cz-m-studio .cz-edact:focus-visible,html.cz-m-studio .cz-edadd:focus-visible,
 html.cz-m-studio .cz-edstart:focus-visible,html.cz-m-studio .cz-edq:focus-visible,
