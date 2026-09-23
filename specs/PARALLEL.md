@@ -157,6 +157,14 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (evening) — **specs/23 C is LIVE (v2.1.14 / r36): the rich tier.**
+  A shelf of papers (`cz-papers`, the P1 draft migrated once), layouts as
+  enums (lead / head / half) through doc, link (`l=`), export and store,
+  three ref-only kinds (pull-quote, document, digest) with an inline line
+  search over the static index, and a print sheet — with the preview
+  stage's second fold (both frames held silent until seen silent; a stop
+  before ready cues the tape). specs/23 A–C are done;
+  D2's remainder is Stephen's (the queue, the captions, the secrets).
 - 2026-09-23 (later still) — **specs/22 is DONE: the preview stage is LIVE
   (v2.1.13 / r35).** One small player in the studio drawer on its own engine
   (source-gated dispatch; one engine seeks; its own armed gate; one clip;

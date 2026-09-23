@@ -1,11 +1,11 @@
 # 23 — The open newsroom: the making half, visible and powerful
 
-**Status:** v0.2 · **Stage:** **Phase A SHIPPED + LIVE (v2.1.11 / r33,
-2026-09-23)** — the front door, ＋ your paper on the cards, the on-page
-editor, the teaching draft; **Phases B + B2 SHIPPED + LIVE (v2.1.12 / r34 and
-v2.1.13 / r35, 2026-09-23)** — the cutting room and its preview stage; SETTLED
-(Stephen, 2026-09-23 — all four scope answers on the record below); **C (the
-rich tier) is next.** ·
+**Status:** v0.2 · **Stage:** **Phases A–C SHIPPED + LIVE (v2.1.11 → v2.1.14,
+2026-09-23)** — the front door and the on-page editor (A, v2.1.11), the
+cutting room and its preview stage (B, v2.1.12; B2, v2.1.13), the rich tier
+(C, v2.1.14); D1 shipped with them; D2 diagnosed (§4 D); SETTLED (Stephen,
+2026-09-23 — all four scope answers on the record below); **what remains is
+Stephen's (§4 D2: the queue, the captions, the nightly-edition secrets).** ·
 **Owner:**
 Stephen Walter (Weird Machine) · **Related:** specs/20 (the reader + reels),
 specs/21 (the studio + your paper, shipped whole), specs/22 (the cutting
@@ -102,7 +102,10 @@ segment-snapped trim with cross-page bounds from the clip's meeting
 your own work; never commit it blind; after the port ships, ask Stephen
 whether to discard the control-z copy.
 
-**C — the rich tier (two deploys).**
+**C — the rich tier (one deploy, not the two first planned). ✓ C1 + C2 SHIPPED +
+LIVE 2026-09-23 (v2.1.14 / r36) — one link version, `v=3`, names the whole tier,
+so the halves shipped together and no reader ever holds a decoder that knows
+one grammar and not the other.**
 - C1 **Multiple papers + layout power**: named drafts (`cz-papers` map +
   an active pointer; migrate the single `cz-paper` draft once, the
   loadReel-migration pattern); per-block layout as ENUMS (lead story,
@@ -119,7 +122,14 @@ whether to discard the control-z copy.
   print` makes a rendered paper a real printable page (masthead, columns,
   page breaks, citations legible in ink).
 
-**D — openness mechanics + the record grows.**
+**D — openness mechanics + the record grows. D1 ✓ SHIPPED (SOURCE_REPO,
+the release step, CI, the nightly-edition workflow); D2 DIAGNOSED 2026-09-23
+(the poll files nightly; the pipeline finds 0 approved — the steward queue is
+unattended; Cloud Run's address is served a YouTube bot wall, so a hosted
+caption probe/fetch cannot work; the press had no scheduler and the Pages
+carry was by hand — the nightly workflow closes that once its three secrets
+exist). Stephen's: work the queue; a Data API key or a desk-side caption step;
+provision the secrets; then the growth checkpoint.**
 - D1 Repoint `SOURCE_REPO` in `web/emit.py` to this repo; OPERATING §5
   gains the native release step (push + tag `vX.Y.Z` at every deployed
   commit); minimal CI (Actions: the no-PG suite run on push/PR).

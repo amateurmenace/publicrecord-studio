@@ -2,6 +2,115 @@
 
 ## unreleased
 
+### specs/23 B2, refolded — one engine, held — 2026-09-23 (v2.1.14)
+
+The preview stage's own re-review (three lenses, eighteen findings, eight
+distinct once deduplicated) found the first fold right in shape and loose
+at the edges. Both frames are now held silent after the other engine
+speaks until they are SEEN silent — a paused or cued report — because a
+pause sent before playback begins is a no-op to the player; a play
+reported meanwhile with no reader's hand in the frame is an autoplay
+landing late, and is paused again. A stop before a frame is ready cues
+the tape where the reader asked for it instead of trusting a pause. The
+ready work runs once. The reader's own ▶ on the stage frame resumes a
+clip, bounded and unarmed, or plays the tape unbounded and says so; a ▶
+on the page frame resumes a reel the stage paused. The status line says
+what the frame is doing — previewing, paused on the frame, played,
+playing the tape with no clip's bounds, stopped — a trim never flips a
+played clip back to previewing, and the tray's focus never lands on an
+arrow. Two node twins drive the real stage and page dispatchers through
+every case, and the pane ran eight scenarios against the real tape; the
+worst of them, a page frame already buffering its autoplay when the
+stage spoke, went to cued without a sound. This re-review's skeptic pass
+never ran (the account's session limit); every finding was read against
+the code by hand and folded.
+
+### specs/23 C2 — a pull-quote, a document, a digest, and the paper in print — 2026-09-23 (v2.1.14)
+
+Three more kinds a paper may carry, every one a reference and none of
+them words. A **pull-quote** is a transcript line by (pid, t): its words
+are read off the pressed tape when the paper renders, never stored, and
+the store refuses a quote that tries to carry text. A **document** is one
+of a meeting's own filings by its id, resolved from the meeting plane. A
+**digest** is "what changed" — an issue and a window of its latest
+appearances, computed from the issue's timeline at render, the window
+clamped to twelve. Each rides the link in its own grammar (`q.<pid>:<t>`,
+`d.<pid>~<doc>`, `g.<slug>:<n>`), lifts the link to v=3 like a layout
+does, round-trips, and degrades — a mangled part drops alone. The editor
+reaches them where they live: the inline add-search now searches the
+tape's own lines through the reader's static search index (the same
+planes the search page reads — no new door) and offers to quote one; a
+meeting hit offers its documents, one button per filing; an issue hit
+offers its digest; a clip on the tray offers to quote its line. And a
+rendered paper **prints** as a paper: the nameplate stays, the studio and
+the reader's controls go, the title runs the page, a lead and a section
+head start a fresh line, two half-width blocks share a row, and every
+citation prints its address so the receipts survive on paper. Five review lenses reported thirty-two findings against C1 and C2,
+twenty-four once deduplicated. The skeptic pass ran into the account's
+session limit after fifteen votes: thirteen stood, and two refuted one
+printed-address finding as cosmetic (folded anyway). Every finding was
+read against the code by hand and folded, with five more of the author's
+own from reading the printed pages back. A quote by (pid, second) is
+every line the tape holds at that second; a tape that did not load is
+said as such, never as curated away; a digest ranks dated appearances
+and counts the undated; a section head paints for every kind and never
+drops a note's body; the add-search paints at once and never paints a
+stale query; the shelf survives a blocking dialog, and a fresh reader's
+visit writes nothing; the printed paper spells every address whole on a
+line of its own and drops the studio's sidebar shift. One link version,
+v=3, names the whole tier, so C shipped as one deploy, not the two first
+planned.
+
+### specs/23 C1 — a shelf of papers, and layouts that travel — 2026-09-23 (v2.1.14)
+
+One browser kept one paper; now it keeps a shelf. `cz-papers` holds every
+paper and which one is open; the single P1 draft migrates in exactly once
+(kept whole as the first paper, then its key removed — the loadReel way);
+the panel offers new / open / delete — a shelf that is never empty, a
+delete that asks when there is anything to lose. Every panel, editor and
+render still means one thing by "the draft": the open paper, in P1's own
+shape. And a block may ask for a **layout** — an enum, never data: lead
+(full width, the large treatment), head (its name over a rule), half (two
+halves share a row; one column on a phone). It rides the doc, the link
+(`l=` as index:layout pairs, so a v1 or v2 `b=` never changes shape, and a
+laid-out paper travels as v=3 by `paperV`'s own rule), the export, and the
+store (one optional key, strictly one of three values, part of the
+canonical bytes; a clip never carries one). The decoder is total: an
+unknown layout drops, a mangled `l=` costs a layout never a throw, and a
+layout names its block by the link's own part index. The on-page editor
+gets a layout control per block; templates lead with their first block.
+
+### specs/23 D2 — the freeze, diagnosed — 2026-09-23
+
+`edition_date` stopped at 2026-06-18 not because the feed died. Verified
+in the cloud's own logs: `record-nightly-poll` runs every night and files
+submissions (Boston, three a day around the 22nd; Brookline's titles miss
+every rule), and `record-nightly-ingest` runs every night and finds *0
+approved submissions waiting* — the steward queue is unattended. And the
+caption probe, run from inside Cloud Run, is intercepted: for a meeting
+this Mac sees captions on, the datacenter address is served a watch page
+with neither captions nor video details — YouTube's wall for addresses it
+does not trust — so a hosted ingest of a YouTube meeting cannot fetch its
+words either. There was no scheduler for the press and the Pages carry
+was by hand; D1 wrote the workflow that closes that gap. What remains is
+Stephen's: working the queue, and either a YouTube Data API key for the
+hosted probe and fetch (spend) or a desk-side step that brings the
+captions in.
+
+### specs/23 D1 — the source points home, releases are tagged, CI runs the suite, the nightly edition — 2026-09-23 (live since v2.1.13)
+
+The constitution's "check it yourself" and the covenant's source line
+point at this repository now — the record's home since the extraction —
+and `LICENSING.md` with them. OPERATING §5 gains the release step the
+deploy loop already practised: push and tag `vX.Y.Z` at the exact commit
+the container was built from, named for its image. A minimal GitHub
+Actions workflow runs the no-Postgres suite on every push and pull
+request, with node present so the JS twins execute. And the freeze's
+missing step is written: a nightly workflow that presses from the cloud
+after the ingest, carries the edition into the Pages repo and pushes only
+when it changed — standing down, saying so, until Stephen provisions the
+three credentials it needs (OPERATING §5 names them).
+
 ### specs/22 P2 — the preview stage: hearing a clip before keeping it — 2026-09-23 (v2.1.13)
 
 The one dangerous item in the cutting room, built as its own bounded
