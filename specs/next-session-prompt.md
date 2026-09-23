@@ -1,123 +1,109 @@
-# Session prompt — publicrecord-studio: ship the v2.1.15 fold, then what is Stephen's
+# Session prompt — publicrecord-studio: after v2.1.16, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (on a new machine: `gh repo clone amateurmenace/publicrecord-studio`, then
-`python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`).
-`CLAUDE.md` carries the laws; `specs/23-open-newsroom.md` is the scope (A–C
-live, D1 live, D2 diagnosed). **Memory from the last machine does not travel —
-this file is the state.** Written 2026-09-23 at the end of the day.
+`python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt` —
+system python may be 3.14, too new). `CLAUDE.md` carries the laws;
+`specs/24-two-paths.md` is the newest scope (BUILT + LIVE); `specs/23` is
+done. **Memory from the last machine does not travel — this file is the
+state.** Written 2026-09-23, late.
 
 ## Where things stand
 
-- **LIVE: v2.1.14** — image `record/api:r36`, tag `v2.1.14` at `a1b2515`,
-  SW cache `cz-record-2.1.14-…`. specs/23 A–C: the front door and the on-page
-  editor (A), the cutting room and its preview stage (B, B2), the rich tier —
-  a shelf of papers, layouts, pull-quote / filing / digest refs, print (C).
-  `main` = what is live, plus docs.
-- **READY, NOT DEPLOYED: branch `fold-v2.1.15`** — two commits on top of
-  `main` (`git log --oneline main..fold-v2.1.15`): the code fold, then its
-  changelog entry. It folds a focused re-review of v2.1.14's
-  two folds: fourteen findings (twelve distinct), all folded — live print
-  twins for the editor's note and title; halves painted at half width only
-  where the reader's page pairs them; the add-search's lines appended in
-  place and no premature "no match"; undated digests shown as undated; an
-  empty tape's quote said as "not in this pressing"; a real "try again" in
-  the document chooser; on /app/r, a second cite of a stashed switch's
-  meeting moves the switch, and a page-frame ▶ resumes a paused reel from
-  where the frame stands; the stage cues a stopped clip at its exact start
-  and a trim reaches the clip a stop left behind. 560 tests green; a
-  mutation pass reverted each of the seventeen fixes and every revert fails
-  the suite; pane-checked on a local preview. Review tally: eight findings
-  reached their skeptics (fifteen votes, all standing); six were read
-  against the code by hand (their skeptics hit the account's spend limit).
+- **LIVE: v2.1.16 / r38** — tag `v2.1.16` at the deployed commit, SW cache
+  `cz-record-2.1.16-…`. Two things shipped together:
+  1. **The front page is the story** (specs/24): two pressed stories behind a
+     toggle — *the record, over time* (counted headline and lede, the record
+     by the numbers, votes as dots, the six widest threads month by month, the
+     eight lenses as a heat strip, recurring topics, the record in words, what
+     changed) and *the latest meeting, what happened* (the labeled summary,
+     a counted commentary, the meeting in numbers, the shape of the tape, the
+     moments that decided it, roll calls, framing, questions, words,
+     sparklines, names, filings). `web/story.py` writes the words,
+     `web/charts.py` the pictures — pure functions of the planes, no model,
+     byte-identical press to press. The studio's two path templates (one
+     meeting · over time) on five new ref-only kinds (`chart·numbers`,
+     `chart·shape`, `chart·ledger`, `chart·votes`+pid, `reading`; links at
+     `v=4`), the writing desk beside every note, and a Read / Edit mode bar
+     under the section line.
+  2. **Nightly intake** (OPERATING §5 "Nightly intake"): a per-source
+     standing rule (`auto_approve`, a checkbox in the console) approves a
+     rule-matched candidate only when YouTube's own caption list names a
+     track; the probe asks Data API `captions.list` when
+     `RECORD_YOUTUBE_API_KEY` is set (verified: a key alone answers, the
+     auto track counts, `videos.list`'s flag lies). The relay caption route
+     was **proven from inside Cloud Run** (7,842 cues in 5.7 s). Every Cloud
+     Run job now moves with each deploy — the poll and pipeline had sat on
+     r18 since July.
+- v2.1.15 / r37 shipped the same day: the v2.1.14 folds, the second review
+  folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
+- `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
+  and `story-paths` are merged and can be deleted (Stephen's).
 
-## Do, in order
+## Stephen's decisions (never unprompted) — the switches that make the night run
 
-1. `git fetch && git checkout fold-v2.1.15`; run the suite
-   (`.venv/bin/python -m unittest discover -s tests -t . -q` → 560; the
-   Postgres-backed tests skip without `RECORD_TEST_PG_DSN` — none of them
-   cover what this fold touches). Read the fold: `git show fold-v2.1.15~1`.
-2. If credits allow, a lean adversarial review of that commit (three lenses,
-   ≤ 5 findings each, two skeptics per finding). Verifiers read the working
-   tree — don't edit it while they run — and they share the Browser pane, so
-   stay out of the pane until they finish. Fold what they confirm, then
-   re-review your own fixes (fixes have introduced regressions here before).
-3. **Deploy v2.1.15** by `record/OPERATING.md` §5 (pre-authorized):
-   - `docker build --platform linux/amd64 -f record/Dockerfile -t us-east1-docker.pkg.dev/publicrecord-studio/record/api:r37 .`
-     from the branch tip; parity-check sha256 of `web/static/app.js`,
-     `web/static/app.web.css`, `web/emit.py`, `web/bake.py`,
-     `record/papers.py`, `record/press.py` inside the image against the
-     tree (in zsh, list the files literally); `docker push`.
-   - `gcloud run jobs update record-press --region=us-east1 --image=…:r37 --args="^|^-m|record.press|--version|2.1.15"`,
-     `gcloud run deploy record-api --image=…:r37 --region=us-east1 --quiet`,
-     `gcloud run jobs execute record-press --region=us-east1 --wait`.
-   - Clone `amateurmenace/publicrecord`;
-     `gcloud storage rsync -r --delete-unmatched-destination-objects gs://publicrecord-edition/app app`;
-     gunzip every gzip-magic file in place (the Python loop in §5); keep the
-     root hand-files (`CNAME`, `index.html`, `constitution/`, `.nojekyll`);
-     confirm the pressed HTML is byte-clean (no `cz-`/`pb-pv`/`pb-quote`/
-     studio hues); commit and push.
-   - Poll `https://publicrecord.studio/app/sw.js` until it names
-     `cz-record-2.1.15-…`; confirm the live `app.js` carries the fold
-     (`function reelNext`, `const halfPairs`, `notePrint`).
-   - `git checkout main && git merge --ff-only fold-v2.1.15`;
-     `git tag -a v2.1.15 <deployed commit> -m "v2.1.15 / r37 — …"`;
-     `git push origin main --tags`. Update specs/23's status line,
-     `specs/PARALLEL.md`'s "State of main", and replace this prompt.
-4. Report what is live, and Stephen's decisions (below).
+1. **Store the YouTube Data API key** (he made one on 2026-09-23 and pasted it
+   in chat — treat it as exposed: restrict to YouTube Data API v3, rotate):
+   `printf '%s' 'KEY' | gcloud secrets create youtube-data-api-key --data-file=- --project=publicrecord-studio`
+   then `gcloud run jobs update record-poll --region=us-east1 --update-secrets=RECORD_YOUTUBE_API_KEY=youtube-data-api-key:latest`.
+   Without it the probe reads the walled watch page and a standing rule
+   approves nothing from the cloud.
+2. **Flip the standing rule** on the sources he trusts (the console's intake
+   screen, per source). The audit names the rule. The constitution page
+   already says a standing rule may gate the record.
+3. **Provision the nightly-edition workflow's three secrets** (OPERATING §5)
+   so ingested meetings reach readers without a hand: until then a press +
+   Pages sync is manual (§5), and `edition_date` stays where the last hand
+   left it.
+4. **Work the steward queue** meanwhile (3 Boston submissions filed
+   2026-09-23; 0 approved).
+5. **A model-drafted analysis** beside the summary (specs/24 §4) — spend and
+   a ledger row in the same commit; the `reading` block is where it renders.
+6. The ledger names Gemini Flash as the hosted summary lane, but the twelve
+   live meetings' summaries are labeled `ai:gpt-4o-mini` (desk-drafted, before
+   the hosted lane). A sentence on `/app/ai` about lanes past and present is
+   his call.
+7. Still his alone: stored free text beyond title + notes, re-pointing
+   sources, spend over $100/mo, paper-as-homepage (declined), brand questions,
+   deleting anything, a `record` template for the over-time story.
 
-## Tooling on a new machine
+## Do, in order (a normal session)
 
-- gcloud authenticated as **swalter4669@gmail.com** (project
-  `publicrecord-studio`, region `us-east1`); a second account on the old
-  machine could not refresh non-interactively. `gcloud auth configure-docker us-east1-docker.pkg.dev`.
-- Docker Desktop running; `gh auth status` able to push both repos.
-- **Never rebake the public edition from a local corpus.** Every deploy
-  bumps `--version` (the service worker's cache key).
+1. Suite (`.venv/bin/python -m unittest discover -s tests -t . -q` → 584; PG
+   tests skip without `RECORD_TEST_PG_DSN`).
+2. Read the live front page first (`https://publicrecord.studio/app/`), both
+   stories; then the console's queue. The nightly logs:
+   `gcloud logging read 'resource.type="cloud_run_job" AND resource.labels.job_name="record-poll"' --limit=40 --freshness=1d`.
+3. Any change: review (lenses → skeptics → fold → re-review the fixes,
+   executed twins over token pins), deploy by OPERATING §5 — **one image tag
+   per deploy, every job moved, press `--version` bumped**, parity-check the
+   nine files (`web/static/app.js`, `web/static/app.web.css`, `web/emit.py`,
+   `web/bake.py`, `web/story.py`, `web/charts.py`, `record/papers.py`,
+   `record/press.py`, `record/connectors/youtube.py`), Pages sync with the
+   gunzip loop, verify `sw.js`, tag, push.
 
 ## Verifying locally
 
-A preview needs a corpus. Seed one from the LIVE record: fetch
-`https://publicrecord.studio/app/search/meta.json` and
-`/app/m/<pid>/transcript.txt` for a few meetings, parse `[H:MM:SS] text`
-lines into segments, upsert meetings and issues into `memory.store.Corpus`,
-then `web.bake.bake(db, out, "9.9.9-x", "http://localhost:8765")`; symlink the
-output as `app/` under a served root; `python3 -m http.server`. Unregister the
-service worker between same-version presses. In the Browser pane, post
-`{event:'command',func:'playVideo'}` to an iframe to stand in for the
-reader's own ▶ on the real YouTube embed, and log messages by `e.source`
-per frame. Call `resize_window` before any geometry (a hidden pane reports
-`innerWidth: 0`). Print checks: headless Chrome `--print-to-pdf` against a
-copy of the edition without `sw.js` (it hangs otherwise), under a subprocess
-timeout; the Read tool renders the PDF.
+Seed a corpus from the LIVE edition (the last session's `seed.py` recipe:
+fetch `search/meta.json`, each `meetings/<pid>.json` + `m/<pid>/transcript.txt`,
+the top issue planes; parse `[H:MM:SS] text` into segments; upsert meetings,
+votes, documents, issues with `link_segments` on the nearest segment; then
+`web.bake.bake(db, out, "9.9.9-x", "http://localhost:8765")`), symlink the
+output as `app/` under a served root, `python3 -m http.server`. The pane is
+narrow (phone width) — use `find` + `scroll_to`; headless Chrome
+`--screenshot` works against a copy without `sw.js` (it may hang on exit;
+the file is written first).
 
 ## Traps this arc taught
 
-- YouTube's widget: a `pauseVideo` sent before playback begins is ignored;
-  `cueVideoById` replaces a pending autoplay; `initialDelivery` and
-  `onReady` arrive together (ready work runs once); `infoDelivery` carries
-  `playerState` only when it changes.
-- The two engines — the page player (`YT`) and the preview stage (`PV`) —
-  hold a frame silent after the other speaks until it is SEEN paused or
-  cued; a play meanwhile with no reader focus in the frame is paused again.
-  Every door into one engine pauses the other.
-- Node twins lift functions by regex: lift every helper a lifted function
-  calls (`reelNext` beside `reelAdvance`); `helpers()` already defines `r1`,
-  and `PRELUDE` defines `BASE` and `location`.
-- A token pin can survive a revert — prefer twins that execute the code,
-  and mutation-check each new fix.
-- Worktree branches: `.gitignore` lists `.venv` (a symlink) as well as
-  `.venv/`; check `git ls-tree -r HEAD | grep .venv` before pushing one.
-
-## Stephen's decisions (never unprompted)
-
-- Work the steward queue — the pipeline finds 0 approved submissions, which
-  is why `edition_date` still reads 2026-06-18.
-- A YouTube Data API key (spend) or a desk-side caption step — Cloud Run's
-  address is served YouTube's bot wall, so a hosted caption fetch fails.
-- Provision the nightly-edition workflow's three secrets (OPERATING §5).
-- Discard control-z's uncommitted specs/22 partial (ported here); delete
-  stale branches and worktrees (`c1f`, and `fold-v2.1.15` once merged).
-- Still his alone: stored free text beyond title + notes, re-pointing
-  sources, spend over $100/mo, paper-as-homepage (declined), the brand
-  questions, deleting anything.
+- A key pasted in chat is never stored by the assistant; give the commands.
+- `--include=*.py` under zsh needs quotes (`--include='*.py'`); `grep` is
+  ugrep here — use `/usr/bin/grep` for `-P`-free sanity.
+- f-strings cannot hold a backslash in the expression (3.11); build the piece
+  first. JS strings in test twins: use ’ not \\'.
+- The `both` engine twin stubs the reel engine; the executed twins in
+  `TestReviewFoldTwins` are the pattern for new fixes.
+- The video flag in `videos.list` is not a captions answer; `captions.list`
+  is.
+- Headless renders of the front page may show both stories (the toggle runs
+  on DOMContentLoaded); the pane shows one, as readers see.

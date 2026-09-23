@@ -157,6 +157,18 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (late) — **v2.1.16 / r38 is LIVE: the front page is the story,
+  and nightly intake has its switches.** Two pressed stories behind a toggle
+  — the record over time and the latest meeting, what happened — written by
+  the press from the planes (`web/story.py`, `web/charts.py`; no model,
+  byte-identical), each ending in *make this story yours*; the studio's two
+  path templates on five new ref-only kinds (numbers, shape, ledger, one
+  meeting's votes, the record's reading; links at v=4); the writing desk;
+  the Read / Edit mode bar (specs/24, BUILT + LIVE). And nightly intake: a
+  per-source standing rule approves what YouTube's own caption list names a
+  track for; the probe asks the Data API when the key is stored; the relay
+  route proven from Cloud Run (OPERATING §5). 584 tests. What remains is
+  Stephen's: the key, the rule, the three secrets, the queue.
 - 2026-09-23 (night) — **v2.1.15 / r37 is LIVE.** The v2.1.14 folds, folded
   (specs/23 C + B2: live print twins, true pairs, the reader's last press,
   tests that run the real stops), and a second review of that fold folded

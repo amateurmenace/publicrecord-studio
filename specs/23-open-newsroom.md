@@ -4,8 +4,9 @@
 2026-09-23; v2.1.15 folds the two review passes on C's folds)** — the front door and the on-page editor (A, v2.1.11), the
 cutting room and its preview stage (B, v2.1.12; B2, v2.1.13), the rich tier
 (C, v2.1.14); D1 shipped with them; D2 diagnosed (§4 D); SETTLED (Stephen,
-2026-09-23 — all four scope answers on the record below); **what remains is
-Stephen's (§4 D2: the queue, the captions, the nightly-edition secrets).** ·
+2026-09-23 — all four scope answers on the record below); **D2's mechanism shipped at v2.1.16 (a standing rule + YouTube's own caption
+list, OPERATING §5); what remains is Stephen's — the key, the rule, the
+secrets, the queue. The front page moved on to specs/24.** ·
 **Owner:**
 Stephen Walter (Weird Machine) · **Related:** specs/20 (the reader + reels),
 specs/21 (the studio + your paper, shipped whole), specs/22 (the cutting
