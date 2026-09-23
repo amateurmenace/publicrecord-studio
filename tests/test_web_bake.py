@@ -2200,6 +2200,21 @@ class TestCuttingRoom(unittest.TestCase):
                          f"the stage's gate misbehaved:\n{r.stdout}{r.stderr}")
         for token in ("if (e.source !== YT.win) return;",      # the page player's gate
                       "if (e.source !== PV.win) return;",      # the stage's gate
+                      # the review's folds: a stop before the frame is ready
+                      # silences its autoplay; the page player hushes on ready
+                      # when the stage spoke during its load gap; a native play
+                      # in either frame yields the other; the stage follows a
+                      # trim; the mark is programmatic; a tape-less clip's ▶ is
+                      # disabled; the stage opens the studio and the rail first
+                      "PV.stopped = true", "if (PV.stopped || !PV.clip)",
+                      "YT.hush = true", "if (YT.hush) {",
+                      "if (d.info && d.info.playerState === 1 && PV.clip && !PV.ended) pvPause();",
+                      "function pvRetrim(clips)", 'b.setAttribute("aria-current", "true")',
+                      '${c.video_id ? "" : " disabled"}',
+                      'if (shownMode() !== "studio") { writeRail(false); setMode("studio"); }\n    else if (shownRail()) toggleRail();',
+                      "REELPLAY.paused = true; reelShow();",
+                      'PV.blocked ? "the tape hasn’t started',
+                      "if (now && now.textContent !== line) now.textContent = line;",
                       "function pvPlay(clip)", "function pagePause()", "function pvPause()",
                       'if (m !== "studio") pvPause();',        # leaving the studio
                       "if (v) pvPause();",                     # collapsing the rail

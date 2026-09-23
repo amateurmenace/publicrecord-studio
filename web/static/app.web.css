@@ -1354,7 +1354,10 @@ html.cz-m-studio .cz-ednote:focus-visible,html.cz-m-studio .cz-edpanel .btn:focu
   color:var(--text-secondary);margin:var(--space-2) 0 0;min-height:1.4em;overflow-wrap:anywhere}
 .cz-stageacts{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)}
 .cz-stageacts .btn{font-size:var(--text-xs)}
-.cz-rplay.on{color:var(--studio-accent-text, var(--accent))}
+.cz-rplay.on{color:var(--studio-accent-text, var(--accent));
+  outline:var(--border-w) solid var(--studio-accent, var(--accent));outline-offset:1px;border-radius:var(--radius-sm)}
+.cz-rplay[disabled]{opacity:.35;cursor:default}
+.cz-stageopen[hidden]{display:none}
 /* a paper's reel rows: the cite stays a link; a ▶ sits beside it as a
    sibling — painted ONLY in the studio, in the paper's own deep green */
 .pb-cite{display:flex;gap:6px;align-items:stretch}
