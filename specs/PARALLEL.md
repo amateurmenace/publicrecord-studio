@@ -157,6 +157,14 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (later) — **specs/23 B is LIVE (v2.1.12 / r34): the cutting
+  room.** Transcript rows, search hits and issue beads are cuttable; the
+  studio panel is the tray on every page (trims snapped to `transcript.txt`
+  bounds across pages); `/app/r` offers make-this-reel-yours (append /
+  replace / keep); the tray files into your paper and offers the cite sheet
+  + reel.json. control-z's ~531-line partial was the P0 basis, ported and
+  owned here — Stephen decides whether the control-z copy is discarded.
+  B2 (the preview stage) is built on branch `b2`.
 - 2026-09-23 — **publicrecord-studio is the record's dev home; specs/23 A is
   LIVE (v2.1.11 / r33)**: the front page carries a real door to the making
   half (`yp-`), every meeting/issue card offers "＋ your paper" in

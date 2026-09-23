@@ -1,7 +1,11 @@
 # 22 — The cutting room: reels, cut from anywhere
 
-**Status:** v0.2 · **Stage:** **SETTLED (Stephen, 2026-07-22 — all five §6
-questions answered, every proposal taken) — P0 is buildable.** · **Owner:**
+**Status:** v0.3 · **Stage:** **P0 + P1 SHIPPED + LIVE (v2.1.12 / r34,
+2026-09-23, as specs/23 phase B) — cut from anywhere, the panel tray
+everywhere, transcript.txt-snapped trims, new-tab preview, make-this-yours,
+file-into-paper + outputs from the panel; P2 (the preview stage) is built on
+branch b2 and ships next.** SETTLED (Stephen, 2026-07-22 — all five §6
+questions answered, every proposal taken). · **Owner:**
 Stephen Walter (Weird Machine) · **Direction:** Stephen, 2026-07-22 — *"the
 full ability to create highlight reels within and cross meetings."* ·
 **Related:** specs/20 (the newspaper; §6/§7 built the reel composer and

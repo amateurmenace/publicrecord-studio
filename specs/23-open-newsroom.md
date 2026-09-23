@@ -2,8 +2,9 @@
 
 **Status:** v0.2 · **Stage:** **Phase A SHIPPED + LIVE (v2.1.11 / r33,
 2026-09-23)** — the front door, ＋ your paper on the cards, the on-page
-editor, the teaching draft; SETTLED (Stephen, 2026-09-23 — all four scope
-answers on the record below); **Phase B (the cutting room) is next.** ·
+editor, the teaching draft; **Phase B SHIPPED + LIVE (v2.1.12 / r34,
+2026-09-23)** — the cutting room; SETTLED (Stephen, 2026-09-23 — all four scope
+answers on the record below); **B2 (the preview stage) is next.** ·
 **Owner:**
 Stephen Walter (Weird Machine) · **Related:** specs/20 (the reader + reels),
 specs/21 (the studio + your paper, shipped whole), specs/22 (the cutting
@@ -90,7 +91,7 @@ broken — everything is undiscoverable.
   green, editor markers pinned, node twins untouched (A changes no codec).
 
 **B — the cutting room (specs/22 P0 → its own deploy; then B2 the scoped
-preview stage).** Per the five settled answers (2026-07-22): all three
+preview stage). ✓ B SHIPPED + LIVE 2026-09-23 (v2.1.12 / r34); B2 next.** Per the five settled answers (2026-07-22): all three
 cutting surfaces (transcript rows, search hits, issue beads), ONE tray +
 file-into-paper, append-or-replace explicit on `/app/r` make-this-yours,
 segment-snapped trim with cross-page bounds from the clip's meeting
