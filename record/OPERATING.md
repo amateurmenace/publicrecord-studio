@@ -166,6 +166,25 @@ inside a transaction. Running it twice is a no-op — that is asserted by a test
 because a command nobody dares re-run after a partial failure is a command
 nobody runs at all.
 
+### Releasing — push and tag at every deployed commit
+
+This repository is the record's home (specs/23 D1), and what is live must be
+findable by name. Every deploy bumps the press `--version` (the service
+worker's cache key — a code-only change served under the old version reaches
+returning readers as cached JS), and once the edition is verified live, the
+exact commit the container was built from is tagged and pushed:
+
+```bash
+git tag -a v2.1.N <deployed commit> -m "v2.1.N / rNN — <what shipped>"
+git push origin main --tags
+```
+
+The tag names the image (`rNN`) so a rollback (`gcloud run services
+update-traffic`, above) and the source it ran can be matched without a
+search. CI (`.github/workflows/ci.yml`) runs the no-Postgres suite on every
+push and pull request; the PG-backed half is proven at the desk before a
+deploy, not in Actions (no database there, on purpose).
+
 ### Refreshing what publicrecord.studio serves
 
 The reader at publicrecord.studio is a **static edition on GitHub Pages** (repo

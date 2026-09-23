@@ -1,0 +1,24 @@
+# The record's suite, on every push and pull request — the no-Postgres run
+# (536+ tests; the PG-backed half skips with a sentence, and is proven at
+# the desk before a deploy). Node is here for the JS twins: every codec in
+# app.js is executed, not only pinned.
+name: suite
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -t . -q

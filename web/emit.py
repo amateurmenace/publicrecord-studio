@@ -32,7 +32,10 @@ COMMUNITYAI = "https://communityai.studio"
 # The covenant page promises the source is published; a promise with a dead
 # link behind it is worse than no promise, so these are constants and a test
 # asserts the covenant page carries them.
-SOURCE_REPO = "https://github.com/amateurmenace/control-z"
+# the record's own home (specs/23 D1): this repository, extracted from the
+# control-z monorepo 2026-09-23 — every prompt, gate and fallback the
+# constitution points at lives here now, and the releases are tagged here
+SOURCE_REPO = "https://github.com/amateurmenace/publicrecord-studio"
 LICENSING_DOC = SOURCE_REPO + "/blob/main/LICENSING.md"
 _CSP_BASE = ("default-src 'self'; base-uri 'self'; form-action 'self'; "
              "frame-src https://www.youtube-nocookie.com; "
@@ -1404,7 +1407,7 @@ def page_covenant(manifest, base):
         product.</li>
     </ul>
     <p class="hint">The source is at
-      <a href="{SOURCE_REPO}">github.com/amateurmenace/control-z</a>; which
+      <a href="{SOURCE_REPO}">github.com/amateurmenace/publicrecord-studio</a>; which
       licence covers which part, in full, is in
       <a href="{LICENSING_DOC}">LICENSING.md</a>.</p>
     <p class="hint">A strict Content-Security-Policy on every page enforces all
@@ -1772,7 +1775,7 @@ def page_ai(manifest, base):
         is that a public thing stays public. A constitution nobody can audit
         is a press release.
         <details><summary>check it yourself</summary><p>The source is at
-          <a href="{SOURCE_REPO}">github.com/amateurmenace/control-z</a>;
+          <a href="{SOURCE_REPO}">github.com/amateurmenace/publicrecord-studio</a>;
           which license covers which part is in
           <a href="{LICENSING_DOC}">LICENSING.md</a>.</p></details></li>
       <li><b>Built with AI, signed by people.</b> This software is itself
