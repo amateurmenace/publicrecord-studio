@@ -1821,7 +1821,8 @@ class TestReel(unittest.TestCase):
         (past-the-clip) time, and TWO such stale reports must not arm-then-skip
         the clip. The `armed` gate — which arms only on a report inside the clip
         and before its end — is what proves the short clip actually plays."""
-        adv = self.lift(r"  function reelAdvance\(t\) \{.+?\n  \}")
+        adv = (self.lift(r"  function reelAdvance\(t\) \{.+?\n  \}") + "\n"
+               + self.lift(r"  function reelNext\(\) \{.+?\n  \}"))
         rseek = self.lift(r"  function reelSeek\(c\) \{.+?\n  \}")
         body = "\n".join([
             "const seeks = [];",
@@ -1920,7 +1921,8 @@ class TestReel(unittest.TestCase):
         (audio-only civic tape). It must NOT play on the previous meeting's tape
         under a label naming another — reelAdvance skips it to the next clip that
         has a tape, and reelSeek never falls back to the loaded video."""
-        adv = self.lift(r"  function reelAdvance\(t\) \{.+?\n  \}")
+        adv = (self.lift(r"  function reelAdvance\(t\) \{.+?\n  \}") + "\n"
+               + self.lift(r"  function reelNext\(\) \{.+?\n  \}"))
         rseek = self.lift(r"  function reelSeek\(c\) \{.+?\n  \}")
         body = "\n".join([
             "const sent = []; const seeks = [];",
@@ -2280,6 +2282,8 @@ class TestCuttingRoom(unittest.TestCase):
             self.lift(r"  function onPV\(e\) \{.+?\n  \}"),
             self.lift(r"  function pvStarted\(\) \{.+?\n  \}"),
             self.lift(r"  function pvState\(s, t\) \{.+?\n  \}"),
+            self.lift(r"  function pvPause\(\) \{.+?\n  \}"),
+            self.lift(r"  function pvRetrim\(clips\) \{.+?\n  \}"),
             "function fail(m){ console.log('FAIL', m, JSON.stringify(PV), JSON.stringify(SENT)); process.exit(1); }",
             "const A = { pid: 'p1', kind: 'cut', t: 100, start: 100, end: 110, video_id: 'v1' };",
             "function reset(o) { Object.assign(PV, { win: {}, el: FRAME, ready: true, clip: null, armed: false,",
@@ -2340,6 +2344,31 @@ class TestCuttingRoom(unittest.TestCase):
             "if (PV.hold) fail('seen paused releases the hold');",
             "reset({ hold: true, state: -1, last: A }); onPV(ev({ event: 'infoDelivery', info: { playerState: 5 } }));",
             "if (PV.hold) fail('seen cued releases the hold');",
+            # a stop before ready cues the EXACT start (a clip at x.9): the
+            # frame's own ▶ at the cue point re-adopts the clip, bounded
+            "const A9 = { pid: 'p9', kind: 'cut', t: 100.9, start: 100.9, end: 110.9, video_id: 'v1' };",
+            "reset({ ready: false, stopped: true, hold: true, last: A9, state: -2 }); onPV(ev({ event: 'onReady' }));",
+            "const cue9 = sent('cueVideoById');",
+            "if (cue9.length !== 1 || cue9[0][1][0].startSeconds !== 100.9) fail('the cue lands at the exact start');",
+            "onPV(ev({ event: 'infoDelivery', info: { playerState: 5 } }));",
+            "onPV(ev({ event: 'infoDelivery', info: { playerState: 1, currentTime: 100.95 } }));",
+            "if (PV.clip !== A9 || PV.free || !PV.armed) fail('the frame\\'s ▶ at the cue point resumes the clip');",
+            "onPV(ev({ event: 'infoDelivery', info: { currentTime: 110.85 } }));",
+            "if (!PV.ended || !sent('pauseVideo').length) fail('…and the gate stops it at its end');",
+            # a stop leaves its clip behind; a trim reaches it; the frame's ▶
+            # resumes the TRIMMED clip and the gate stops at the new end
+            "reset({ clip: A, playing: true, armed: true, state: 1 }); pvPause();",
+            "if (PV.clip || PV.last !== A || !PV.hold) fail('a stop leaves its clip behind, held until seen silent');",
+            "onPV(ev({ event: 'infoDelivery', info: { playerState: 2 } }));",
+            "pvRetrim([Object.assign({}, A, { end: 106 })]);",
+            "if (PV.last.end !== 106) fail('a trim reaches the clip a stop left behind');",
+            "onPV(ev({ event: 'infoDelivery', info: { playerState: 1, currentTime: 104 } }));",
+            "if (!PV.clip || PV.clip.end !== 106) fail('the frame\\'s ▶ resumes the trimmed clip');",
+            "onPV(ev({ event: 'infoDelivery', info: { currentTime: 105.9 } }));",
+            "if (!PV.ended) fail('the gate stops at the new end');",
+            # a trim of a played clip keeps it played; nothing is sent
+            "reset({ clip: A, ended: true }); pvRetrim([Object.assign({}, A, { end: 120 })]);",
+            "if (!PV.ended || PV.clip.end !== 120 || SENT.length) fail('a trim of a played clip keeps it played');",
             "console.log('ok');",
         ]))
         self.assertEqual(stage.stdout.strip(), "ok", stage.stdout + stage.stderr)
@@ -2354,12 +2383,13 @@ class TestCuttingRoom(unittest.TestCase):
             "const followAlong = () => {}, strip = () => {}, tick = () => {}, reelAdvance = () => {};",
             "const PV = { clip: null, free: false };",
             "let REELPLAY = null; let YT = {};",
+            "let NEXT = 0, RSEEKS = []; const reelNext = () => { NEXT++; }; const reelSeek = c => { RSEEKS.push(c.start); };",
             self.lift(r"  const inFrame = [^\n]+"),
             self.lift(r"  function onYT\(e\) \{.+?\n  \}"),
             "function fail(m){ console.log('FAIL', m, JSON.stringify(YT), JSON.stringify(SENT)); process.exit(1); }",
             "function reset(y, r) { YT = Object.assign({ win: WIN, el: EL, vid: 'v1', loaded: true, ready: false,",
             "  time: 0, pending: null, hold: false, state: -2 }, y); REELPLAY = r || null;",
-            "  SENT = []; PVPAUSED = 0; SEEKS = []; SHOWN = 0; document.activeElement = ELSE; PV.clip = null; PV.free = false; }",
+            "  SENT = []; PVPAUSED = 0; SEEKS = []; SHOWN = 0; NEXT = 0; RSEEKS = []; document.activeElement = ELSE; PV.clip = null; PV.free = false; }",
             "const ev = d => ({ source: WIN, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
             "const ready = () => { onYT(ev({ event: 'initialDelivery', info: { playerState: -1 } })); onYT(ev({ event: 'onReady' })); };",
             # held in the load gap: cued at the kept place, never played; ready runs once
@@ -2391,12 +2421,111 @@ class TestCuttingRoom(unittest.TestCase):
             "reset({ ready: true, hold: true, state: 3 }); PV.clip = { x: 1 }; document.activeElement = EL;",
             "onYT(ev({ event: 'infoDelivery', info: { playerState: 1 } }));",
             "if (sent('pauseVideo').length || YT.hold || PVPAUSED !== 1) fail('the hand in the page frame is the reader\\'s press');",
+            # the page frame's ▶ resumes a paused reel from where it stands:
+            # at the clip's end (the gate never saw it) → on to the next clip;
+            # before the clip → to its start; inside → where it stands
+            "const R = () => ({ paused: true, active: false, armed: true, i: 0, clips: [{ start: 10, end: 20 }, { start: 40, end: 50 }] });",
+            "reset({ ready: true, state: 2 }, R()); onYT(ev({ event: 'infoDelivery', info: { playerState: 1, currentTime: 19.95 } }));",
+            "if (NEXT !== 1 || REELPLAY.paused || !REELPLAY.active || RSEEKS.length) fail('a resume at the clip\\'s end advances the reel');",
+            "reset({ ready: true, state: 2 }, R()); onYT(ev({ event: 'infoDelivery', info: { playerState: 1, currentTime: 3 } }));",
+            "if (NEXT || RSEEKS.join() !== '10' || SHOWN !== 1) fail('a resume before the clip seeks its start');",
+            "reset({ ready: true, state: 2 }, R()); onYT(ev({ event: 'infoDelivery', info: { playerState: 1, currentTime: 15 } }));",
+            "if (NEXT || RSEEKS.length || SHOWN !== 1 || REELPLAY.armed) fail('a resume inside the clip goes on from where it stands, unarmed');",
             # another frame's message is not the page player's
             "reset({}); onYT({ source: {}, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify({ event: 'onReady' }) });",
             "if (YT.ready || SENT.length) fail('the page hears only its own frame');",
             "console.log('ok');",
         ]))
         self.assertEqual(page.stdout.strip(), "ok", page.stdout + page.stderr)
+        # two cites of ANOTHER meeting pressed in the page's load gap: the
+        # second moves the stashed switch's start — the reader's last press
+        # is the one that loads (or, held, the one that is cued)
+        cites = self.node("\n".join([
+            "const WIN = {}, EL = {};",
+            "const document = { activeElement: {} };",
+            "let SENT = [], SEEKS = [];",
+            "const ytSend = (k, f, a) => SENT.push(k === 'listening' ? ['listening'] : [f, a]);",
+            "const sent = f => SENT.filter(x => x[0] === f);",
+            "const ytSeek = t => SEEKS.push(t); const pvPause = () => {}; const reelShow = () => {};",
+            "const followAlong = () => {}, strip = () => {}, tick = () => {}, reelAdvance = () => {}, reelNext = () => {};",
+            "const PV = { clip: null, free: false };",
+            "let REELPLAY, YT;",
+            self.lift(r"  const inFrame = [^\n]+"),
+            self.lift(r"  function reelSeek\(c\) \{.+?\n  \}"),
+            self.lift(r"  function onYT\(e\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m, JSON.stringify({ SENT, SEEKS, YT, REELPLAY })); process.exit(1); }",
+            "const ev = d => ({ source: WIN, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
+            "function run(held) {",
+            "  YT = { win: WIN, el: EL, vid: 'v1', loaded: true, ready: false, time: 0, pending: 10, hold: false, state: -2 };",
+            "  REELPLAY = { vid: 'v1', pending: null, clips: [] }; SENT = []; SEEKS = [];",
+            "  reelSeek({ video_id: 'v2', start: 300 });",
+            "  reelSeek({ video_id: 'v2', start: 100 });",
+            "  if (held) YT.hold = true;",
+            "  onYT(ev({ event: 'initialDelivery', info: { playerState: -1 } })); onYT(ev({ event: 'onReady' }));",
+            "}",
+            "run(false); const l = sent('loadVideoById');",
+            "if (SEEKS.length || l.length !== 1 || l[0][1][0].videoId !== 'v2' || l[0][1][0].startSeconds !== 100) fail('the last press loads, once');",
+            "run(true); const c = sent('cueVideoById');",
+            "if (c.length !== 1 || c[0][1][0].videoId !== 'v2' || c[0][1][0].startSeconds !== 100 || sent('loadVideoById').length || SEEKS.length) fail('held: the last press is cued');",
+            "console.log('ok');",
+        ]))
+        self.assertEqual(cites.stdout.strip(), "ok", cites.stdout + cites.stderr)
+        # the holds are SET by the real stops: the real pagePause and pvPause,
+        # the real dispatchers, and only the two frames' postMessage stubbed
+        both = self.node("\n".join([
+            "const STAGE = { f: 'stage' }, PAGE = { f: 'page' }, ELSE = { f: 'else' };",
+            "const document = { activeElement: ELSE };",
+            "const SW = {}, PW = {};",
+            "let SENT = [];",
+            "const pvSend = (f, a) => SENT.push(['stage', f, a]);",
+            "const ytSend = (k, f, a) => SENT.push(['page', k === 'listening' ? 'listening' : f, a]);",
+            "const sent = (fr, f) => SENT.filter(x => x[0] === fr && x[1] === f);",
+            "const NOW = { textContent: '' }; const $ = s => s === '#cz-stagenow' ? NOW : null; const $$ = () => [];",
+            "const hms = t => String(t); const cut = (x, n) => String(x).slice(0, n); const clipKey = c => c.pid + '|' + c.t; const BASE = '/app';",
+            "let REELPLAY = null; const reelShow = () => {}; const reelNext = () => {}; const reelSeek = () => {};",
+            "const followAlong = () => {}, strip = () => {}, tick = () => {}, reelAdvance = () => {};",
+            self.lift(r"  const inFrame = [^\n]+"),
+            self.lift(r"  const PV = \{.+?\};"),
+            self.lift(r"  let YT = \{.+?\};"),
+            self.lift(r"  function pagePause\(\) \{.+?\n  \}"),
+            self.lift(r"  function pvPause\(\) \{.+?\n  \}"),
+            self.lift(r"  function pvShow\(\) \{.+?\n  \}"),
+            self.lift(r"  function onPV\(e\) \{.+?\n  \}"),
+            self.lift(r"  function pvStarted\(\) \{.+?\n  \}"),
+            self.lift(r"  function pvState\(s, t\) \{.+?\n  \}"),
+            self.lift(r"  function pvStep\(pv, t\) \{.+?\n  \}"),
+            self.lift(r"  function pvAdvance\(t\) \{.+?\n  \}"),
+            self.lift(r"  function ytSeek\(t\) \{.+?\n  \}"),
+            self.lift(r"  function onYT\(e\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m, JSON.stringify(SENT)); process.exit(1); }",
+            "const A = { pid: 'p1', kind: 'cut', t: 100, start: 100, end: 110, video_id: 'v1' };",
+            "const pe = d => ({ source: PW, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
+            "const se = d => ({ source: SW, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
+            # 1. the page loading (a #t720 stashed), the stage speaks: the page is
+            #    held, and its ready CUES it at 720 — no seek, no play, and the
+            #    preview the reader started survives
+            "Object.assign(YT, { win: PW, el: PAGE, vid: 'v1', loaded: true, ready: false, pending: 720 });",
+            "pagePause();",
+            "if (!YT.hold) fail('a page still loading is held when the stage speaks');",
+            "Object.assign(PV, { win: SW, el: STAGE, ready: true, clip: A, state: 3 });",
+            "onYT(pe({ event: 'initialDelivery', info: { playerState: 3 } })); onYT(pe({ event: 'onReady' }));",
+            "const cue = sent('page', 'cueVideoById');",
+            "if (cue.length !== 1 || cue[0][2][0].startSeconds !== 720 || sent('page', 'seekTo').length || sent('page', 'playVideo').length) fail('the held page is cued, never played');",
+            "if (PV.clip !== A) fail('the preview survives the page\\'s ready');",
+            "onYT(pe({ event: 'infoDelivery', info: { playerState: 1 } }));",
+            "if (sent('page', 'pauseVideo').length !== 1 || PV.clip !== A) fail('a late page autoplay while held is paused again, the stage untouched');",
+            # 2. the stage ready but not yet playing; the reader seeks the page:
+            #    the real pvPause holds the stage, and its late play is silenced
+            #    without pausing the page the reader chose
+            "SENT = []; Object.assign(YT, { ready: true, hold: false, state: 2 }); Object.assign(PV, { clip: A, state: 3, hold: false, ready: true });",
+            "ytSeek(300);",
+            "if (!PV.hold || PV.clip) fail('a page seek stops the stage and holds it');",
+            "onPV(se({ event: 'infoDelivery', info: { playerState: 1, currentTime: 101 } }));",
+            "if (sent('stage', 'pauseVideo').length !== 2) fail('the stage\\'s late play is paused again');",
+            "if (sent('page', 'pauseVideo').length) fail('the stage\\'s late play must not pause the page the reader chose');",
+            "console.log('ok');",
+        ]))
+        self.assertEqual(both.stdout.strip(), "ok", both.stdout + both.stderr)
         for token in ("const inFrame = el => !!el && document.activeElement === el;",
                       "if (!PV.free && PV.hold && !inFrame(PV.el)) { pvSend(\"pauseVideo\"); return; }",
                       "if (YT.hold && !inFrame(YT.el)) ytSend(\"cmd\", \"pauseVideo\", []);",
@@ -2408,7 +2537,8 @@ class TestCuttingRoom(unittest.TestCase):
                       "YT.el = ifr; YT.vid = vid; YT.hold = false;",
                       "? $(`.cz-rclip[data-i=\"${focus.i}\"] .cz-rprev`, body)",
                       "if (!t || t.disabled) t = $(\".cz-reelacts .btn\", body);",
-                      "if (ae.classList.contains(\"pb-pv\")) return { act: \"pbpv\", key: ae.dataset.pvkey };"):
+                      "if (ae.classList.contains(\"pb-pv\")) return { act: \"pbpv\", key: ae.dataset.pvkey };",
+                      'ifr.className = "cz-stagefr"; PV.el = ifr;'):
             self.assertTrue(token in self.JS, f"{token!r} drifted — the B2 re-review fold was reverted")
         retrim = self.JS[self.JS.index("function pvRetrim(clips)"):self.JS.index("function pvPlay(clip)")]
         self.assertNotIn("PV.ended = false", retrim, "a trim must never flip a played clip back to previewing")
@@ -3216,13 +3346,12 @@ class TestPaper(unittest.TestCase):
                       "for (const l of (lines || [])) {",
                       '.then(r => r.ok ? r.text() : null).catch(() => null)',
                       "if (tx == null) return null;",
-                      "if (l === null || l.length) lines[pid] = l;",
+                      "const lines = {}; for (const [pid, l] of lineSets) lines[pid] = l;",
                       "if (lines === null) return paperDark(",
                       "const paperDark = (what, where) =>",
                       '<figure class="pb-quote"><blockquote>',
                       "<figcaption>",
-                      'data-cite="${esc(location.origin)}${cite}"',
-                      "const nodes = tl.filter(n => n.date).sort(",
+                      "const nodes = dated.length ? dated.slice(0, b.n) : tl.slice(-b.n).reverse();",
                       "undated appearance${undated === 1 ? \"\" : \"s\"} not ranked here",
                       'else if (b.kind === "quote") {\n      const m = mby[b.pid]; if (!m) return null;',
                       '} else if (b.kind === "doc") {\n      const m = mby[b.pid]; if (!m) return null;',
@@ -3236,11 +3365,24 @@ class TestPaper(unittest.TestCase):
                       '<div class="cz-ednote-print" aria-hidden="true">',
                       'data-layout="${esc(b.layout || "")}"',
                       "const first = $(\"button, [tabindex]\", span); if (first) first.focus();",
-                      "this meeting’s plane didn’t load — try again",
+                      "if (!m) delete _cache[url];",
+                      'aria-label="try again — load this meeting’s documents">try again</button>',
+                      '(btn.closest(".cz-eddocs") || btn).replaceWith(span);',
+                      '<p class="ptitle cz-edtitle-print" aria-hidden="true">${esc(doc.title)}</p>',
+                      'const tw = $(".cz-edtitle-print", el); if (tw) tw.textContent = d.title;',
+                      "if (tw) tw.innerHTML = notePrint(d.blocks[i].text);",
+                      'window.addEventListener("beforeprint", () => {',
+                      "const paired = halfPairs(doc.blocks);",
+                      '${pair ? \' data-pair="1"\' : ""}',
+                      '"searching the tape’s own lines…" : countLine([]);',
                       'aria-label="quote — the line at ${hms(l.t)} of ${esc(l.title)}, in your paper"',
                       "(opens in a new tab)"):
             self.assertTrue(token in self.JS, f"{token!r} drifted — the C fold was reverted")
         self.assertTrue("docChooserHTML" not in self.JS)   # the dead second chooser is gone
+        # the tape's lines land in place: appending never rebuilds the hits a
+        # reader may already have tabbed onto
+        self.assertIn('box2.insertAdjacentHTML("beforeend", `<span class="cz-edgroup">lines of the tape</span>', self.JS)
+        self.assertNotIn("box2.innerHTML +=", self.JS)
         # part 3: a clear that did not hold says only that; a read writes nothing
         clear = self.JS[self.JS.index("function clearPaper()"):]
         clear = clear[:clear.index("\n  }\n")]
@@ -3255,12 +3397,15 @@ class TestPaper(unittest.TestCase):
                      '.reelcite[href^="/"]::after',
                      ".cz-editing .cz-ednote{display:none}",
                      ".cz-editing .cz-ednote-print{display:block}",
-                     '.cz-editing .cz-edrow[data-layout="half"]{display:inline-block;width:48%'):
+                     '.cz-editing .cz-edrow[data-pair]{display:inline-block;width:48%',
+                     "html.cz-m-studio .cz-editing .cz-edtitle{display:none}",
+                     "html.cz-m-studio .cz-editing .cz-edtitle-print{display:block"):
             self.assertIn(rule, prn, f"the print sheet lost {rule!r}")
-        self.assertIn(".cz-ednote-print{display:none}", css)
+        self.assertIn(".cz-ednote-print,.cz-edtitle-print{display:none}", css)
         self.assertNotIn("word-break:break-all", prn)       # an address breaks only when it must
         self.assertIn(".cz-shelf .btn{font-size:var(--text-xs);padding:5px 9px;display:inline-flex;align-items:center;min-height:24px}", css)
-        self.assertIn('html.cz-m-studio .cz-edrow[data-layout="half"] .cz-edbody{width:50%', css)
+        self.assertIn('@media (min-width:721px){html.cz-m-studio .cz-edrow[data-pair] .cz-edbody{width:50%', css)
+        self.assertNotIn('.cz-edrow[data-layout="half"]', css)   # never every half — only the paired
         self.assertIn(".pb-quote figcaption{", css)
         self.assertNotIn(".pb-quote cite", css)
         # the lines at a second — the twin
@@ -3277,6 +3422,75 @@ class TestPaper(unittest.TestCase):
             "if (linesAt(L, 2).length !== 0) fail('before the first line: nothing');",
             "if (linesAt(null, 9).length !== 0 || linesAt([], 9).length !== 0) fail('total over null and []');",
             "if (lineAt(null, 9) !== null) fail('lineAt is total over null');",
+            "console.log('ok');"]))
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+        # the renderer's facts, executed: a dark tape, a tape past the page's
+        # fetch cap, and a tape with no lines are three different sentences;
+        # a head is additive for every kind with a body, and IS a story
+        r = self.node("\n".join([
+            self.PRELUDE,
+            "const esc = x => String(x == null ? '' : x).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));",
+            "const hms = t => String(t); const chartRowLabel = b => '▤ ' + (b.chart || 'chart');",
+            self.lift(r"  const paperGone = what => .+?</p>`;"),
+            self.lift(r"  const paperDark = \(what, where\) => .+?</p>`;"),
+            self.lift(r"  const paperBudget = what => .+?</p>`;"),
+            self.lift(r"  const lineAt = \(lines, t\) => \{.+?return hit; \};"),
+            self.lift(r"  const linesAt = \(lines, t\) => \{.+?\n  \};"),
+            self.lift(r"  function renderQuote\(b, mby, aux\) \{.+?\n  \}"),
+            self.lift(r"  function renderHead\(b, mby, iby\) \{.+?\n  \}"),
+            self.lift(r"  function withLayoutHTML\(html, b, mby, iby\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const M = { p1: { title: 'Board', documents: [{ doc_id: 'doc:m', title: 'Minutes', url: 'https://ex.test/m.pdf' }] } };",
+            "const I = { z: { name: 'Zoning' } };",
+            "const T = { m: new Set(['p1']), i: new Set() };",
+            "const q = { kind: 'quote', pid: 'p1', t: 54 };",
+            "if (!renderQuote(q, M, { lines: { p1: null }, tried: T }).includes('didn’t load here')) fail('a dark tape is said as dark');",
+            "if (!renderQuote(q, M, { lines: {}, tried: T }).includes('left unfetched')) fail('past the cap is said as such');",
+            "if (!renderQuote(q, M, { lines: { p1: [] }, tried: T }).includes('isn’t in this pressing')) fail('a tape with no lines: the line is not in this pressing');",
+            "const two = renderQuote(q, M, { lines: { p1: [{ t: 54, spk: 'A', text: 'My vote.' }, { t: 54, spk: 'B', text: 'Aye.' }] }, tried: T });",
+            "if ((two.match(/<p>/g) || []).length !== 2 || !two.includes('<figcaption>') || two.includes('data-cite')) fail('two lines at the second, one figure: ' + two);",
+            "const W = b => withLayoutHTML('<BODY>', Object.assign({}, b, { layout: 'head' }), M, I);",
+            "if (W({ kind: 'story', story: 'meeting', pid: 'p1' }).includes('<BODY>')) fail('a story\\'s head is the story');",
+            "for (const b of [{ kind: 'note', text: 'Line one\\nline two' }, { kind: 'chart', chart: 'votes' }, { kind: 'reel', clips: [{}, {}] }, q,",
+            "                 { kind: 'doc', pid: 'p1', doc: 'doc:m' }, { kind: 'digest', slug: 'z', n: 3 }]) {",
+            "  const out = W(b); if (!out.includes('<h3 class=\"pb-head\">') || !out.includes('<BODY>')) fail('head + body for ' + b.kind + ': ' + out); }",
+            "if (!W({ kind: 'note', text: 'Line one\\nline two' }).includes('>Line one</h3>')) fail('a note\\'s head is its first line');",
+            "console.log('ok');",
+        ]))
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+        # the editor pairs halves by the reader's own rule (paintLayouts):
+        # two consecutive halves, taken two at a time
+        r = self.node("\n".join([
+            self.lift(r"  const halfPairs = blocks => \{.+?return s; \};"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const L = s => s.split('').map(c => ({ layout: c === 'h' ? 'half' : c === 'l' ? 'lead' : '' }));",
+            "const P = s => [...halfPairs(L(s))].sort((a, b) => a - b).join();",
+            "if (P('hh') !== '0,1') fail('two halves pair');",
+            "if (P('h') !== '' || P('h.h') !== '' || P('hl') !== '') fail('a half with no half beside it is not paired');",
+            "if (P('hhh') !== '0,1') fail('three halves: the first two pair, the third stands alone');",
+            "if (P('hhhh') !== '0,1,2,3') fail('four halves: two pairs');",
+            "if (P('.hh.hh') !== '1,2,4,5') fail('pairs anywhere in the paper');",
+            "console.log('ok');"]))
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+        self.assertIn('if (b.layout === "half" && pairs[i + 1] && pairs[i + 1][0].layout === "half") {', self.JS)
+        # a digest of an issue whose appearances are all undated shows them,
+        # said as undated — never "curated away"; an empty timeline is gone
+        r = self.node("\n".join([
+            self.PRELUDE,
+            "const esc = x => String(x == null ? '' : x).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));",
+            "const paperGone = w => 'GONE ' + w; const paperBudget = w => 'BUDGET ' + w;",
+            self.lift(r"  function renderDigest\(b, iby, tried\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const T = { m: new Set(), i: new Set() };",
+            "const I = tl => ({ z: { name: 'Zoning', timeline: tl } });",
+            "const node = (pid, date) => ({ pid, date, body: 'Board', n: 1, beads: [] });",
+            "let h = renderDigest({ slug: 'z', n: 3 }, I([node('a', ''), node('b', '')]), T);",
+            "if (h.startsWith('GONE') || !h.includes('2 undated appearances') || (h.match(/>undated</g) || []).length !== 2) fail('all undated: ' + h);",
+            "if (!h.includes('none of its appearances is dated')) fail('the source line says why');",
+            "h = renderDigest({ slug: 'z', n: 2 }, I([node('a', '2026-01-02'), node('b', '2026-03-04'), node('c', '')]), T);",
+            "const d = [...h.matchAll(/pb-dg-d\">([^<]*)</g)].map(m => m[1]).join();",
+            "if (d !== '2026-03-04,2026-01-02' || !h.includes('1 undated appearance not ranked here')) fail('dated newest first, the undated counted: ' + d);",
+            "if (!renderDigest({ slug: 'z', n: 3 }, I([]), T).startsWith('GONE')) fail('an empty timeline is gone');",
             "console.log('ok');"]))
         self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
         # deletePaper re-reads the shelf after the confirm: another tab's
