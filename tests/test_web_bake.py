@@ -452,6 +452,14 @@ class TestBakeEdition(unittest.TestCase):
         # the commentary is counted, never modeled — and says so
         self.assertIn("no model wrote a line of it", over)
         self.assertIn("no model wrote a line of it", latest)
+        # the toggle hides by its own class on the story's wrapper, never by
+        # `hidden` — the town scope paints hidden on every card with a
+        # data-town and would show the latest story again (a live catch)
+        js = (REPO / "web" / "static" / "app.js").read_text()
+        self.assertIn('box(stories[k]).classList.toggle("fp-off", k !== which)', js)
+        self.assertNotIn("stories[k].hidden = k !== which", js)
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        self.assertIn("html.js .fp-off{display:none !important}", css)
 
     def test_issues_index_plane_names_every_issue(self):
         """specs/23 A3: the editor's add-search reads the record's own

@@ -10,8 +10,10 @@ state.** Written 2026-09-23, late.
 
 ## Where things stand
 
-- **LIVE: v2.1.16 / r38** — tag `v2.1.16` at the deployed commit, SW cache
-  `cz-record-2.1.16-…`. Two things shipped together:
+- **LIVE: v2.1.17 / r39** — tag `v2.1.17` at the deployed commit, SW cache
+  `cz-record-2.1.17-…` (v2.1.17 is a one-line hot fix over v2.1.16: the
+  story toggle hides by its own class, so the town scope's `hidden` no longer
+  shows the hidden story again). v2.1.16 shipped two things together:
   1. **The front page is the story** (specs/24): two pressed stories behind a
      toggle — *the record, over time* (counted headline and lede, the record
      by the numbers, votes as dots, the six widest threads month by month, the

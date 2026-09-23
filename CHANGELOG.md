@@ -2,6 +2,18 @@
 
 ## unreleased
 
+### The toggle and the scope, composed — 2026-09-23 (v2.1.17)
+
+Live at v2.1.16 the front page's two stories stood stacked for a returning
+reader: the toggle hid the other story with `hidden`, and the town scope —
+which paints `hidden` on every card that carries a `data-town`, the latest
+meeting's story included — painted it back the moment it ran. The toggle
+now hides by its own class on the story's make-wrapper, so the scope's
+`hidden` and the toggle compose: under a town's scope a story of another
+town stays hidden by the scope, the unselected story by the toggle, and
+returning to the whole record shows exactly the story the reader chose.
+Pane-checked in every combination. 584 tests.
+
 ### The front page is the story — the record over time, the latest meeting, the two paths, the mode bar — 2026-09-23 (v2.1.16)
 
 The record's front page led with a picture and a door. It now leads with

@@ -157,6 +157,9 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (last) — **v2.1.17 / r39 is LIVE**: the story toggle composes
+  with the town scope (a live catch at v2.1.16 — both stories stood stacked
+  for a returning reader). One class, one rule, pinned. 584 tests.
 - 2026-09-23 (late) — **v2.1.16 / r38 is LIVE: the front page is the story,
   and nightly intake has its switches.** Two pressed stories behind a toggle
   — the record over time and the latest meeting, what happened — written by
