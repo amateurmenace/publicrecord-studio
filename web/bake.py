@@ -335,6 +335,18 @@ def _overlap_frac(a, b) -> float:
     return inter / max(1e-6, min(a["end"] - a["start"], b["end"] - b["start"]))
 
 
+def _draft_of(an):
+    """The reading's draft, when a model wrote one — text and the model's
+    label, nothing else; None otherwise (the plane says so plainly)."""
+    d = (an or {}).get("draft")
+    if not isinstance(d, dict):
+        return None
+    text, origin = str(d.get("text") or "").strip(), str(d.get("origin") or "")
+    if not text or not origin.startswith("ai:"):
+        return None
+    return {"text": text[:4000], "origin": origin}
+
+
 def _build_moments(segs, votes, decisions, questions, tension) -> list:
     """The moments plane (specs/20 §6) — the analyzer's scored moments, pressed
     once so the meeting page never re-analyzes at read time. Four kinds, ranked
@@ -568,6 +580,9 @@ class Bake:
                                   for q in quests[:24]],
                     "tension": [{"t": d["t"], "text": d["text"],
                                  "words": d.get("words", [])} for d in tension[:10]],
+                    # the reading's draft (specs/24 §4): a model's paragraphs,
+                    # pressed only when a model wrote them, with its name
+                    "draft": _draft_of(an),
                 },
                 # the moments plane (specs/20 §6) — pressed, never re-analyzed
                 "moments": _build_moments(

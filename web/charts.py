@@ -413,6 +413,22 @@ def sparklines(segments: Sequence[dict], terms: Sequence[str], duration: float, 
 # small pieces — a numbers strip, question bars, lens bars with drift
 # --------------------------------------------------------------------------
 
+_STAMP = re.compile(r"\[(\d{1,3}):(\d\d)(?::(\d\d))?\]")
+
+
+def receipt_paras(text: str, href_base: str) -> str:
+    """A model's paragraphs with their receipts turned into links: every
+    [MM:SS] or [H:MM:SS] the draft carries opens the tape there
+    (`href_base` is the meeting page, or "" for the page itself). Escaped
+    first, linked after — a draft is untrusted text."""
+    def link(m):
+        a, b, c = m.groups()
+        sec = (int(a) * 3600 + int(b) * 60 + int(c)) if c is not None else (int(a) * 60 + int(b))
+        return f'<a class="ts" href="{href_base}#t{sec}">[{m.group(0)[1:-1]}]</a>'
+    paras = [p.strip() for p in re.split(r"\n\s*\n|\n", str(text or "")) if p.strip()]
+    return "".join(f"<p>{_STAMP.sub(link, esc(p))}</p>" for p in paras)
+
+
 def numbers_strip(cells: Sequence[Tuple[object, str, str]]) -> str:
     return '<div class="lead-nums">' + "".join(
         f'<a class="ln" href="{esc(href)}"><b>{esc(n)}</b><span>{esc(label)}</span></a>'

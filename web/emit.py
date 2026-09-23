@@ -545,6 +545,17 @@ def page_meeting(m, manifest, base):
         summ = (f'<section class="card summary"><span class="tag">{origin} — '
                 'supplements the official record</span>'
                 f'<p>{esc(m["summary"])}</p></section>')
+    # the reading, drafted (specs/24 §4): a model's three paragraphs — what
+    # it meant, who moved it, what to watch — under the model's own name,
+    # every receipt a link into the tape below; pressed only when a model
+    # wrote them, beside the counted read, never instead of it
+    draft = (m.get("analysis") or {}).get("draft") or None
+    if draft and draft.get("text"):
+        from . import charts as _charts
+        summ += (f'<section class="card summary draft"><span class="tag">the reading, drafted by a '
+                 f'model — {esc(draft.get("origin") or "")}, labeled · what it meant, who moved it, '
+                 'what to watch · check it against the tape</span>'
+                 + _charts.receipt_paras(draft["text"], "") + '</section>')
     # the roll calls — who voted how, read from the record (officials only)
     votes_html = ""
     if m.get("votes"):
@@ -1750,11 +1761,23 @@ def page_ai(manifest, base):
           <td>the static keyword index answers, labeled “lexical”</td></tr>
         <tr><td>meeting summaries</td>
           <td>drafts one paragraph from the transcript</td>
-          <td>Google Gemini (Flash) — labeled <code>ai:&lt;model&gt;</code>
-            in the data</td>
-          <td>our pipeline, at press time, over public transcript text</td>
+          <td>Google Gemini (Flash) on the hosted lane — labeled
+            <code>ai:&lt;model&gt;</code> in the data. A summary pressed
+            before that lane existed names the desk model that drafted it
+            (<code>ai:gpt-4o-mini</code>); the label is always the model
+            that wrote the words</td>
+          <td>our pipeline, at ingest, over public transcript text</td>
           <td>an extractive summary — sentences drawn from the transcript
             itself, labeled <code>extractive</code></td></tr>
+        <tr><td>the reading, drafted</td>
+          <td>drafts three short paragraphs — what the meeting meant, who
+            moved it, what to watch — with a timestamp beside every claim</td>
+          <td>Google Gemini (Flash) — labeled <code>ai:&lt;model&gt;</code>
+            beside the text on the meeting page, the front page and in a
+            paper’s reading block</td>
+          <td>our pipeline, at ingest, over public transcript text</td>
+          <td>the counted reading stands alone — decisions, questions, names
+            and pushback drawn from the transcript by open rules</td></tr>
         <tr><td>issue names &amp; labels</td>
           <td>suggests a plain name for a thread that spans meetings</td>
           <td>the same Gemini lane, labeled the same way</td>

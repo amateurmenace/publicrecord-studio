@@ -157,10 +157,13 @@ takes the studio's own accents, and only there.
 - **Ship it**: v2.1.16 / r38 — this branch, which carries the nightly-intake
   change too (OPERATING §5; press `--version 2.1.16`; all five jobs and the
   service to r38; the Pages sync; the tag).
-- **A model-drafted analysis** beside the summary (*what it means, who moved
-  it, what to watch*, with receipts) — spend and a ledger row in the same
-  commit; the `reading` block is where it would render, under its own label.
-  The extractive reading ships now.
+- ~~A model-drafted analysis beside the summary~~ **SHIPPED at v2.1.18**
+  (Stephen's yes, 2026-09-23): `memory/analyze.py::draft` at ingest, stored
+  as `analysis.draft {text, origin}`, pressed only when a model wrote it,
+  shown on the meeting page, the front page's latest story and the paper's
+  `reading` block under the model's name with every receipt a link; the
+  ledger row in the same commit. An issue-level draft (the arc across
+  meetings) is the follow-on — it needs a column on `issues`.
 - **A `record` template** (the over-time story as a draft in one press,
   beyond the roll-calls shape) — a small follow-on once the story has been
   read on the live record.

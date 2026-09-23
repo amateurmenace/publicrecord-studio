@@ -10,10 +10,16 @@ state.** Written 2026-09-23, late.
 
 ## Where things stand
 
-- **LIVE: v2.1.17 / r39** — tag `v2.1.17` at the deployed commit, SW cache
-  `cz-record-2.1.17-…` (v2.1.17 is a one-line hot fix over v2.1.16: the
-  story toggle hides by its own class, so the town scope's `hidden` no longer
-  shows the hidden story again). v2.1.16 shipped two things together:
+- **LIVE: v2.1.18 / r40** — tag `v2.1.18` at the deployed commit. v2.1.18:
+  a hosted meeting keeps its title and day (the feed's title from the
+  submission's note, YouTube's own `videos.list` when the key is at hand —
+  the pipeline job carries `RECORD_YOUTUBE_API_KEY` too); the pipeline
+  bridges `RECORD_GEMINI_KEY` to the model seam so hosted summaries are the
+  labeled Gemini paragraphs the constitution names; **the reading is
+  drafted** at ingest (`analysis.draft`, specs/24 §4) and shown under the
+  model's name on the meeting page, the front page and in papers; the
+  ledger's summaries row names the earlier desk lane. v2.1.17 was the
+  toggle/scope hot fix. v2.1.16 shipped two things together:
   1. **The front page is the story** (specs/24): two pressed stories behind a
      toggle — *the record, over time* (counted headline and lede, the record
      by the numbers, votes as dots, the six widest threads month by month, the
@@ -59,12 +65,9 @@ state.** Written 2026-09-23, late.
    left it.
 4. **Work the steward queue** meanwhile (3 Boston submissions filed
    2026-09-23; 0 approved).
-5. **A model-drafted analysis** beside the summary (specs/24 §4) — spend and
-   a ledger row in the same commit; the `reading` block is where it renders.
-6. The ledger names Gemini Flash as the hosted summary lane, but the twelve
-   live meetings' summaries are labeled `ai:gpt-4o-mini` (desk-drafted, before
-   the hosted lane). A sentence on `/app/ai` about lanes past and present is
-   his call.
+5. ~~A model-drafted analysis~~ shipped (v2.1.18). The issue-level draft (the
+   arc across meetings) is a follow-on and needs a column on `issues`.
+6. ~~The ledger sentence about the desk lane~~ shipped (v2.1.18).
 7. Still his alone: stored free text beyond title + notes, re-pointing
    sources, spend over $100/mo, paper-as-homepage (declined), brand questions,
    deleting anything, a `record` template for the over-time story.
@@ -83,6 +86,21 @@ state.** Written 2026-09-23, late.
    `web/bake.py`, `web/story.py`, `web/charts.py`, `record/papers.py`,
    `record/press.py`, `record/connectors/youtube.py`), Pages sync with the
    gunzip loop, verify `sw.js`, tag, push.
+
+## Repairing a meeting (a one-off pipeline execution, never from a Mac)
+
+A meeting that landed nameless, undated, or with an extractive summary on
+the hosted lane is repaired in place with the pipeline job's own image and
+secrets — `gcloud run jobs execute record-pipeline --region=us-east1 --wait
+--args='^|^-c|<script>'` — where the script bridges the model key
+(`record.pipeline.bridge_model_key(os.environ, Settings().gemini_key)`),
+asks `record.connectors.youtube.video_meta(video_id, data_api_key())` for
+the title, posting day and length, derives the day with
+`highlighter.insight.meeting_day(title, published)`, re-runs
+`memory.analyze.summary` where `summary_origin == 'extractive'` and
+`memory.analyze.draft` where `analysis.draft` is missing, and upserts the
+row. Then press and carry the edition (§5). The 2026-09-23 run repaired four
+meetings and drafted the reading for fifteen.
 
 ## Verifying locally
 

@@ -337,6 +337,13 @@ def latest(m: dict, base: str = "/app") -> str:
               else "a summary drawn from the tape")
     summary = (f'<p class="fp-lede">{esc(str(m.get("summary") or "")[:600])}</p>'
                f'<p class="decksrc">{origin} — supplements the official record</p>' if m.get("summary") else "")
+    # the reading, drafted (specs/24 §4) — a model's paragraphs under the
+    # model's own name, receipts linked, beside the counted commentary
+    d = an.get("draft") or {}
+    if isinstance(d, dict) and str(d.get("text") or "").strip() and str(d.get("origin") or "").startswith("ai:"):
+        summary += (f'<div class="fp-draft">{charts.receipt_paras(d["text"], href)}</div>'
+                    f'<p class="decksrc">the reading, drafted by a model — {esc(d["origin"])}, labeled — '
+                    'check it against the tape; the counted lines below stand on their own</p>')
     told = []
     told.append(f'The night ran <a href="{href}">{hours_words(dur)}</a>. The analyzer found '
                 f'<a href="{href}">{n_of(len(dec), "decision")}</a>, {n_of(len(qs), "question")} and '

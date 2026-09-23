@@ -50,6 +50,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import shutil
 import sys
 import tempfile
@@ -201,6 +203,42 @@ def _embed(corpus, town: str, meeting_id: str = "",
     return r
 
 
+def plan_from_submission(sub: dict) -> dict:
+    """What the poll already knew about a candidate, carried into the plan.
+
+    The submission's note begins with the feed's title and names the day the
+    town posted the video. A hosted ingest through the caption relay learns
+    no title of its own — a datacenter address is served the watch page
+    without its details — so without this a meeting landed as its video id,
+    undated (four did, 2026-09-23). The title is the feed's; the date is the
+    meeting's own day read from the title, then the posting day."""
+    from highlighter import insight
+    note = str(sub.get("note") or "")
+    title = note.split(" · ")[0].strip() if note else ""
+    if title == "(untitled)":
+        title = ""
+    m = re.search(r"published (\d{4}-\d{2}-\d{2})", note)
+    published = m.group(1) if m else ""
+    date = str(sub.get("date") or "").strip() or (insight.meeting_day(title, published) or "")
+    return {"title": title, "date": date, "published": published}
+
+
+def bridge_model_key(environ, gemini_key: str) -> bool:
+    """The model lane reads GEMINI_API_KEY (czcore.llm); the hosted pipeline
+    carries RECORD_GEMINI_KEY, the embed stage's. Bridge it once, in this
+    process, so a hosted summary and the reading's draft are the labeled
+    Gemini paragraphs the constitution names — until 2026-09-23 they were
+    extractive on the hosted lane while /app/ai said otherwise (a live
+    catch). Any lane already configured wins; nothing is overwritten."""
+    if not gemini_key:
+        return False
+    for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+        if environ.get(k):
+            return False
+    environ["GEMINI_API_KEY"] = gemini_key
+    return True
+
+
 def ingest_one(corpus, sub: dict, workdir: Path, quiet: bool = False) -> dict:
     """One approved submission, all the way to a meeting somebody can read.
 
@@ -213,9 +251,27 @@ def ingest_one(corpus, sub: dict, workdir: Path, quiet: bool = False) -> dict:
     if not quiet:
         print(f"  {label}")
 
+    known = plan_from_submission(sub)
     plan = ingest.resolve_input({
         "url": sub.get("url", ""), "town": sub.get("town", ""),
-        "body": sub.get("body", ""), "date": sub.get("date", "")})
+        "body": sub.get("body", ""), "date": known["date"]})
+    if known["title"] and not plan.get("title"):
+        plan["title"] = known["title"]
+    # YouTube's own details when the poll's key is at hand: the exact title,
+    # the posting day for a title that names no day, the tape's length
+    if plan.get("kind") == "youtube" and plan.get("video_id"):
+        from .connectors import youtube as _yt
+        key = _yt.data_api_key()
+        if key:
+            from highlighter import insight
+            meta = _yt.video_meta(plan["video_id"], key)
+            if meta.get("title"):
+                plan["title"] = meta["title"]
+            if not plan.get("date"):
+                plan["date"] = insight.meeting_day(plan.get("title", ""),
+                                                   meta.get("published", "")) or ""
+            if meta.get("duration"):
+                plan["duration"] = meta["duration"]
 
     # The cheap dedupe tiers, before a job is claimed: the same meeting may have
     # arrived through the poller and through a resident's paste.
@@ -346,6 +402,9 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true",
                     help="print the result as JSON instead of prose")
     args = ap.parse_args(argv)
+
+    from .settings import Settings
+    bridge_model_key(os.environ, Settings().gemini_key)
 
     from .store import PgCorpus
     corpus = PgCorpus(dsn=args.dsn)

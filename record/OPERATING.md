@@ -240,6 +240,22 @@ can only *list* captions for a video the account does not own; the fetch at
 ingest still goes through the caption routes above. A meeting that arrives
 with no words parks in `asr_tasks` for the desk drain, as before.
 
+The pipeline job carries the same secret (`gcloud run jobs update
+record-pipeline … --update-secrets=RECORD_YOUTUBE_API_KEY=youtube-data-api-key:latest`):
+at ingest it asks `videos.list` for a meeting's exact title, posting day and
+length, because the caption relay brings words and nothing else and the
+watch page is walled from the cloud. Without the key the feed's title and
+the day read from it (`record/pipeline.py::plan_from_submission`) stand in.
+
+**The model lane on the hosted pipeline.** `czcore.llm` reads
+`GEMINI_API_KEY`; the pipeline carries `RECORD_GEMINI_KEY` and bridges it
+once at start (`bridge_model_key`), so the hosted summary and the reading's
+draft are the labeled Gemini paragraphs `/app/ai` names. Until 2026-09-23
+they were extractive on the hosted lane. To repair meetings that landed
+nameless or unread, run the recipe in `specs/next-session-prompt.md`
+("Repairing a meeting") as a one-off pipeline execution with overridden
+args — never from a Mac.
+
 ### The nightly edition — automated, once two credentials exist
 
 The freeze diagnosis (specs/23 D2, 2026-09-23) found the missing step: the

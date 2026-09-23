@@ -300,6 +300,12 @@ class TestBakeEdition(unittest.TestCase):
                               "summary": "A budget override was discussed.",
                               "analysis_json": json.dumps({"decisions": [
                                   {"t": 12.0, "text": "override passes", "outcome": "passed"}]})})
+        # vid2 carries the reading's draft — a model's paragraphs under its
+        # own name (specs/24 §4); vid1 carries none, and its plane says so
+        c.upsert_meeting({"id": "vid2", "analysis_json": json.dumps({
+            "decisions": [{"t": 12.0, "text": "override passes", "outcome": "passed"}],
+            "draft": {"text": "The override carried at [0:12] on a 3-0 vote.\n\nWatch the fall budget.",
+                      "origin": "ai:gemini-2.0-flash"}})})
         # a cross-meeting issue by hand (both meetings share "budget override")
         c.upsert_issue({"id": "issue:testville:budget-override", "town": "Testville",
                         "name": "budget override", "status": "active",
@@ -328,6 +334,29 @@ class TestBakeEdition(unittest.TestCase):
 
     def _read(self, rel):
         return json.loads((self.out / rel).read_text())
+
+    def test_the_readings_draft_is_pressed_under_the_models_name(self):
+        """specs/24 §4: a model's paragraphs ride the plane only when a model
+        wrote them, with its label; the meeting page, the front page and the
+        ledger say whose they are and link every receipt into the tape."""
+        v2 = self._read("meetings/vid2.json")["analysis"]["draft"]
+        self.assertEqual(v2["origin"], "ai:gemini-2.0-flash")
+        self.assertIn("carried at [0:12]", v2["text"])
+        self.assertIsNone(self._read("meetings/vid1.json")["analysis"]["draft"])
+        page = (self.out / "m" / "vid2" / "index.html").read_text()
+        self.assertIn('class="card summary draft"', page)
+        self.assertIn("the reading, drafted by a model — ai:gemini-2.0-flash, labeled", page)
+        self.assertIn('<a class="ts" href="#t12">[0:12]</a>', page)
+        self.assertNotIn('class="card summary draft"', (self.out / "m" / "vid1" / "index.html").read_text())
+        home = (self.out / "index.html").read_text()
+        latest = home[home.index('id="latest"'):home.index('class="sp-paths"')]
+        self.assertIn('class="fp-draft"', latest)
+        self.assertIn('<a class="ts" href="/app/m/vid2#t12">[0:12]</a>', latest)
+        self.assertIn("the reading, drafted by a model — ai:gemini-2.0-flash, labeled", latest)
+        ai = (self.out / "ai" / "index.html").read_text()
+        self.assertIn("the reading, drafted", ai)
+        self.assertIn("before that lane existed names the desk model", ai)
+        self.assertIn("ai:gpt-4o-mini", ai)
 
     def test_the_constitution_names_the_standing_rule(self):
         """When the use of the gate changes, /app/ai changes in the same

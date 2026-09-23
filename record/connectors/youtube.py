@@ -428,6 +428,49 @@ def captions_list(video_id: str, key: str, timeout: float = 20.0) -> dict:
     return out
 
 
+_ISO_DUR = re.compile(r"P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?")
+
+
+def iso_seconds(s) -> float:
+    """PT5H4M35S → 18275.0; anything else → 0.0."""
+    m = _ISO_DUR.fullmatch(str(s or "").strip())
+    if not m:
+        return 0.0
+    d, h, mi, se = (int(x or 0) for x in m.groups())
+    return float(d * 86400 + h * 3600 + mi * 60 + se)
+
+
+def video_meta(video_id: str, key: str, timeout: float = 20.0) -> dict:
+    """YouTube's own details for a video — its title, the day it was posted,
+    how long it runs, whose channel — from Data API v3 `videos.list` (one
+    quota unit). A datacenter address is served the watch page without its
+    details, so this is how a hosted ingest learns a meeting's title: four
+    meetings landed as their video id, undated, before it existed
+    (2026-09-23). Returns {} when the API could not answer; never raises;
+    the key never reaches a note or a log."""
+    url = (f"{DATA_API_BASE}/videos?part=snippet,contentDetails"
+           f"&id={urllib.parse.quote(video_id)}&key={urllib.parse.quote(key)}")
+    try:
+        body = _fetch(url, timeout=timeout, cap=MAX_FEED_BYTES,
+                      what="YouTube's video details")
+    except (Throttled, RuntimeError):
+        return {}
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return {}
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list) or not items or not isinstance(items[0], dict):
+        return {}
+    sn = items[0].get("snippet") or {}
+    cd = items[0].get("contentDetails") or {}
+    out = {"title": str(sn.get("title") or "").strip(),
+           "published": str(sn.get("publishedAt") or "").strip(),
+           "uploader": str(sn.get("channelTitle") or "").strip(),
+           "duration": iso_seconds(cd.get("duration"))}
+    return {k: v for k, v in out.items() if v}
+
+
 def captions_probe(video_id: str, timeout: float = 20.0) -> dict:
     """Does this video carry published captions? True, False, or None for
     "could not tell" — the third value is the point (see the page probe).

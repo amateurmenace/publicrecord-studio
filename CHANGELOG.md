@@ -2,6 +2,36 @@
 
 ## unreleased
 
+### A hosted meeting keeps its name, and the reading is drafted — 2026-09-23 (v2.1.18)
+
+The first meetings ingested through the standing pipeline landed as their
+video id, undated: the caption relay brings the words and nothing else, and
+a datacenter address is served the watch page without its details. The poll
+had known each title all along — it is the first thing in every
+submission's note — so the pipeline now carries the feed's title and the
+meeting's own day (read from the title, then the posting day) into the plan,
+and when the poll's key is at hand it asks YouTube's own `videos.list` for
+the exact title, the posting day and the tape's length. The four meetings
+that landed nameless are repaired the same way.
+
+The hosted pipeline's summaries had been extractive while the constitution
+named Gemini: the model seam reads `GEMINI_API_KEY` and the pipeline only
+carried `RECORD_GEMINI_KEY`, the embed stage's. The pipeline now bridges the
+key once, in its own process, so the hosted lane is the labeled Gemini
+lane the page describes — and the ledger's summaries row says plainly that
+a summary pressed before that lane existed names the desk model that
+drafted it.
+
+And the reading is drafted (specs/24 §4, Stephen's yes): three short
+paragraphs per meeting — what it meant, who moved it, what to watch — with a
+timestamp beside every claim, drafted at ingest by the same lane, stored
+beside the counted reading with the model's name, never instead of it.
+They press into the meeting plane only when a model wrote them; the meeting
+page, the front page's latest story and a paper's reading block show them
+under their own label with every receipt a link into the tape; the
+constitution gains their row in the same commit. The live meetings are
+backfilled once, under the spend cap. 597 tests.
+
 ### The toggle and the scope, composed — 2026-09-23 (v2.1.17)
 
 Live at v2.1.16 the front page's two stories stood stacked for a returning

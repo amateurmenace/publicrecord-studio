@@ -70,7 +70,40 @@ def summary(segments: List[dict],
     return extractive_summary(segments), "extractive"
 
 
-def _prompt(segments: List[dict], info: Optional[dict], budget: int = 40000) -> str:
+_DRAFT_SYS = (
+    "You write a short reading of a public civic meeting for residents: what "
+    "it means, who moved it, and what to watch next. Three short paragraphs, "
+    "plain and neutral. Put the [MM:SS] timestamp from the transcript beside "
+    "every claim so a reader can check you. Never invent a vote, a number, or "
+    "a name that is not in the passages; say when the passages do not settle "
+    "a question. This supplements the official record; it does not replace it."
+)
+
+
+def draft(segments: List[dict],
+          info: Optional[dict] = None) -> Tuple[str, str]:
+    """The reading's draft (specs/24 §4) → (text, origin). Generative only:
+    origin 'ai:<model>' when a key is set, ('', 'none') otherwise — never a
+    fallback, never raising. It stands beside the counted reading under its
+    own label, never instead of it."""
+    if not segments or not llm.enabled():
+        return "", "none"
+    try:
+        text = llm.complete(_prompt(segments, info, budget=60000,
+                                    ask="Write the reading: what it means, who "
+                                        "moved it, what to watch — three short "
+                                        "paragraphs with timestamps."),
+                            system=_DRAFT_SYS, max_tokens=700)
+        if text.strip():
+            model = llm.status().get("model", "a cloud model")
+            return text.strip(), f"ai:{model}"
+    except Exception:
+        pass
+    return "", "none"
+
+
+def _prompt(segments: List[dict], info: Optional[dict], budget: int = 40000,
+            ask: str = "Write the summary paragraph.") -> str:
     title = (info or {}).get("title", "")
     lines = [f"[{int(s.get('start', 0) // 60):02d}:{int(s.get('start', 0) % 60):02d}] "
              f"{(s.get('speaker') + ': ') if s.get('speaker') else ''}"
@@ -80,4 +113,4 @@ def _prompt(segments: List[dict], info: Optional[dict], budget: int = 40000) -> 
         stride = max(2, len(body) // budget + 1)
         body = "\n".join(lines[::stride])
     head = f"Meeting: {title}\n\n" if title else ""
-    return f"{head}Transcript passages:\n{body}\n\nWrite the summary paragraph."
+    return f"{head}Transcript passages:\n{body}\n\n{ask}"
