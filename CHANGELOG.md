@@ -38,9 +38,32 @@ there resumes the clip within its bounds, and a trim reaches the clip a
 stop left behind.
 
 The tests now run the real stops. One twin drives the real pagePause and
-pvPause through both load gaps with only the frames stubbed; another runs
+pvPause through both load gaps with the frames and the reel engine stubbed; another runs
 the quote, head and layout renderers; and a mutation pass reverted each
 of this fold's seventeen fixes in turn — every revert fails the suite.
+
+A second review followed — three lenses on this fold, two skeptics on
+every finding: thirteen findings, none refuted, all folded. The
+add-search can no longer be stranded on "searching…" by a query holding
+the word "constructor" (the shard lookup read Object.prototype's; both
+the editor's and the search page's lookups now read own postings only,
+and a lines search that breaks says so instead of "no match"); the
+status line says "searching the tape's lines" and the body "or their
+lines" only when the lines are searched — three characters or more; the
+all-undated digest says what it paints; a document chooser asks once more
+before "didn't load" when the paper's own render cached a failure, and
+only then; the page frame's ▶ never acts on a swapped-out tape's time
+while a switch settles; a load in flight is not a seen silence for either
+engine — both forget the old tape's rest and time the moment a load is
+sent; a trim reaches the clip a stop left behind and its link follows;
+the dead line in the stash branch is gone; paired halves print with a
+gutter; an untitled draft prints "Untitled paper" as the reader's page
+does. And the tests now run what the tokens only named: the editor's
+pair marks at the call site, the print twins and the beforeprint
+re-read, the lines guard, the hold a second press releases, the load's
+forgetting, the settling beat, the trim of a stopped clip; the print
+sheet's assertions are bounded to the print block at both sites that
+read to the end of the file.
 
 ### specs/23 B2, refolded — one engine, held — 2026-09-23 (v2.1.14)
 

@@ -864,9 +864,11 @@
     const edge = x => { if (!x) return x;
       const c = clips.find(y => clipKey(y) === clipKey(x));
       return c && (c.start !== x.start || c.end !== x.end) ? { ...x, start: c.start, end: c.end } : x; };
-    const was = PV.clip;
+    const was = PV.clip, wasLast = PV.last;
     PV.clip = edge(PV.clip); PV.last = edge(PV.last); PV.pending = edge(PV.pending);
-    if (PV.clip !== was) pvShow();
+    // the status line and the open-the-tape link follow the clip a stop
+    // left behind too (a review catch)
+    if (PV.clip !== was || PV.last !== wasLast) pvShow();
   }
   function pvPlay(clip) {
     if (!clip) return;
@@ -910,6 +912,7 @@
       PV.vid = clip.video_id; PV.settling = true;
       setTimeout(() => { PV.settling = false; }, 500);
       pvSend("loadVideoById", [{ videoId: clip.video_id, startSeconds: clip.start }]);
+      PV.state = -1;   // a load in flight is not a seen silence (a review catch)
     } else {
       pvSend("seekTo", [clip.start, true]); pvSend("playVideo");
     }
@@ -1530,6 +1533,7 @@
         if (typeof setTimeout === "function")
           setTimeout(() => { if (REELPLAY) REELPLAY.settling = false; }, 500);
         ytSend("cmd", "loadVideoById", [{ videoId: pv.vid, startSeconds: pv.start }]);
+        YT.state = -1; YT.time = pv.start;   // the load's own first report is the new tape's
       } else if (YT.pending != null) { const p = YT.pending; YT.pending = null; ytSeek(p); }
     }
     if (d.info && typeof d.info.playerState === "number" && d.info.playerState !== YT.state) {
@@ -1549,10 +1553,13 @@
             // on from its clip: where the frame stands inside it; from its
             // start when the frame stands before it; on to the next clip when
             // the frame already stands at its end (the gate never saw it)
+            // — never on a time from the tape a load is swapping out: while
+            // the switch settles the reel simply resumes, and the gate
+            // re-arms after the beat (reelAdvance's own rule; a review catch)
             const c = (REELPLAY.clips || [])[REELPLAY.i];
             const t = typeof d.info.currentTime === "number" ? d.info.currentTime : YT.time;
-            if (c && t >= c.end - 0.12) reelNext();
-            else { if (c && t < c.start - 0.75) reelSeek(c); reelShow(); }
+            if (c && !REELPLAY.settling && t >= c.end - 0.12) reelNext();
+            else { if (c && !REELPLAY.settling && t < c.start - 0.75) reelSeek(c); reelShow(); }
           }
         }
       }
@@ -2559,7 +2566,7 @@
     // start — it is not a seek of the tape the switch abandons
     if (REELPLAY.pending && REELPLAY.pending.vid === vid) {
       REELPLAY.pending.start = c.start;
-      if (typeof YT !== "undefined") { YT.hold = false; YT.pending = null; }
+      if (typeof YT !== "undefined") YT.hold = false;   // the reader asked the page for a tape
       return;
     }
     if (vid === REELPLAY.vid) { ytSeek(c.start); return; }
@@ -2574,6 +2581,10 @@
       if (typeof setTimeout === "function")
         setTimeout(() => { if (REELPLAY) REELPLAY.settling = false; }, 500);
       ytSend("cmd", "loadVideoById", [{ videoId: vid, startSeconds: c.start }]);
+      // a load in flight is not a seen silence, and its first report is the
+      // new tape's: forget the old tape's resting state and time, or a pause
+      // sent in the gap trusts a state the frame is leaving (a review catch)
+      YT.state = -1; YT.time = c.start;
     } else {
       REELPLAY.pending = { vid, start: c.start };   // player not up yet → apply on onReady
     }
@@ -3934,7 +3945,7 @@
     return `<section class="pb-digest">
       <div class="sectionhead"><span class="kicker">what changed — <a href="${BASE}/i/${esc(b.slug)}">${esc(it.name || b.slug)}</a>, ${dated.length ? `the last ${nodes.length === 1 ? "appearance" : nodes.length + " appearances"}` : `${nodes.length === 1 ? "an undated appearance" : nodes.length + " undated appearances"}`}</span></div>
       <div class="pb-dgs">${rows}</div>
-      <p class="pb-chartsrc">computed from the issue’s own timeline when this paper rendered${dated.length ? (undated ? ` — ${undated} undated appearance${undated === 1 ? "" : "s"} not ranked here` : "") : " — none of its appearances is dated, so they stand in the timeline’s own order"} — the full long view reads on the issue’s page</p>
+      <p class="pb-chartsrc">computed from the issue’s own timeline when this paper rendered${dated.length ? (undated ? ` — ${undated} undated appearance${undated === 1 ? "" : "s"} not ranked here` : "") : " — none of its appearances is dated, so its last ones stand here, latest-added first"} — the full long view reads on the issue’s page</p>
     </section>`;
   }
   function renderPaperBlock(b, mby, iby, tried, aux) {
@@ -4342,7 +4353,7 @@
       <input class="cz-edtitle" type="text" maxlength="${PAPER_TITLE_MAX}"
         value="${esc(doc.title)}" placeholder="name your paper"
         aria-label="your paper’s title">
-      <p class="ptitle cz-edtitle-print" aria-hidden="true">${esc(doc.title)}</p>
+      <p class="ptitle cz-edtitle-print" aria-hidden="true">${esc(printTitle(doc.title))}</p>
       <p class="pfrom">your draft, open for editing — drag a block by its
         handle or use its ↑ ↓; ✕ removes it; ＋ adds one at that spot. It lives
         in this browser; share it from the studio panel.</p>
@@ -4357,6 +4368,8 @@
      its four rows, not their words — the paper prints these instead, kept
      in step with every keystroke and re-read on beforeprint */
   const notePrint = text => String(text || "").trim().split(/\n+/).map(t => `<p>${esc(t)}</p>`).join("");
+  // an untitled draft prints what the reader's page prints for it
+  const printTitle = t => String(t || "").trim() || "Untitled paper";
   const edNote = (b, i) => `<div class="pb-note cz-ednotewrap">
       <span class="kicker">the editor’s note</span>
       <textarea class="cz-ednote" data-i="${i}" rows="4" maxlength="${PAPER_NOTE_MAX}"
@@ -4490,7 +4503,7 @@
         const tw = ta.parentElement && $(".cz-ednote-print", ta.parentElement);
         if (tw) tw.innerHTML = notePrint(noteText(ta.value)); });
       const ti = $(".cz-edtitle", el), tw = $(".cz-edtitle-print", el);
-      if (ti && tw) tw.textContent = cut(ti.value, PAPER_TITLE_MAX);
+      if (ti && tw) tw.textContent = printTitle(cut(ti.value, PAPER_TITLE_MAX));
     });
     el.addEventListener("click", e => {
       const b = e.target.closest && e.target.closest("[data-czed]");
@@ -4539,7 +4552,7 @@
       if (t.classList.contains("cz-edtitle")) {
         const d = readPaper();
         d.title = cut(t.value, PAPER_TITLE_MAX);
-        const tw = $(".cz-edtitle-print", el); if (tw) tw.textContent = d.title;
+        const tw = $(".cz-edtitle-print", el); if (tw) tw.textContent = printTitle(d.title);
         if (!savePaper(d)) return;
         retireShortOut(); refreshPaperSummary();
         document.title = `${d.title || "A paper"} — publicrecord.studio`;
@@ -4708,7 +4721,9 @@
     const sets = await Promise.all(terms.map(async t => {
       const c = /^[a-z0-9]$/.test(t[0]) ? t[0] : "_";
       const sh = await getJSON(`${BASE}/search/t-${c}.json`);
-      return new Set(sh && sh[t] ? sh[t] : []);
+      // own, listed postings only — a query holding "constructor" would
+      // otherwise read Object.prototype's and throw (a review catch)
+      return new Set(Array.isArray(sh && sh[t]) && Object.prototype.hasOwnProperty.call(sh, t) ? sh[t] : []);
     }));
     let ids = [...(sets[0] || [])];
     for (let i = 1; i < sets.length; i++) ids = ids.filter(x => sets[i].has(x));
@@ -4727,7 +4742,12 @@
   /* a meeting's documents on demand — the one button becomes one per filing */
   async function docChooser(btn, pid) {
     const url = `${BASE}/meetings/${encodeURIComponent(pid)}.json`;
-    const m = await getJSON(url);
+    // a null the paper's own render cached is not this press's answer: ask
+    // once more before saying "didn't load" — and only then, so a fresh
+    // failure costs one fetch, not two (a review catch)
+    const cached = url in _cache;
+    let m = await getJSON(url);
+    if (!m && cached) { delete _cache[url]; m = await getJSON(url); }
     if (!btn.isConnected) return;
     // a failed load is not kept: the retry below fetches again
     if (!m) delete _cache[url];
@@ -4809,8 +4829,11 @@
         + (ls.length ? ` · ${n(ls.length, "line", "lines")}` : "") + (terms.length ? " match" : "") + dark
       : `no match${dark}`;
     // no verdict while the tape's lines are still being read — a "no match"
-    // announced now would be taken back when they land
-    if (count) count.textContent = (terms.length && !is.length && !ms.length)
+    // announced now would be taken back when they land. The lines are read
+    // only for three characters or more (linesSearch's own gate): "searching"
+    // and "or their lines" are said only then (a review catch)
+    const linesOK = terms.length > 0 && q.value.trim().length >= 3;
+    if (count) count.textContent = (linesOK && !is.length && !ms.length)
       ? "searching the tape’s own lines…" : countLine([]);
     const hit = h => {
       const ref = h.kind === "m" ? { story: "meeting", pid: h.ref } : { story: "issue", slug: h.ref };
@@ -4837,17 +4860,21 @@
            ${n(idx.issues.length, "issue", "issues")}${ls ? " or their lines" : ""} matches “${esc(q.value.trim())}”${esc(dark)}</p>`;
     box.innerHTML = (is.length ? `<span class="cz-edgroup">issues</span>${is.map(hit).join("")}` : "")
       + (ms.length ? `<span class="cz-edgroup">meetings</span>${ms.map(hit).join("")}` : "");
-    if (!terms.length) { if (!ms.length && !is.length) box.innerHTML = nothing(false); return; }
+    if (!linesOK) { if (!ms.length && !is.length) box.innerHTML = nothing(false); return; }
     if (!ms.length && !is.length) box.innerHTML = `<p class="cz-hint cz-edlines-wait">searching the tape’s own lines…</p>`;
-    const ls = await linesSearch(terms, q.value);
+    // a lines search that breaks must not strand the status line on
+    // "searching…" — nor be painted as "no match": the lines were not read
+    let ls = [], broke = false;
+    try { ls = await linesSearch(terms, q.value); } catch { broke = true; }
     const box2 = $(".cz-edhits", slot);
     if (slot._edgen !== gen || !box2) return;   // a newer query painted, or the panel closed
     const wait = $(".cz-edlines-wait", box2); if (wait) wait.remove();
-    if (count) count.textContent = countLine(ls);
+    if (count) count.textContent = broke ? `${countLine([])} — the tape’s lines couldn’t be read` : countLine(ls);
     // appended in place — never a rebuild of the hits already painted, so a
     // reader who has tabbed onto one keeps their place when the lines land
     if (ls.length) box2.insertAdjacentHTML("beforeend", `<span class="cz-edgroup">lines of the tape</span>${ls.map(lineHit).join("")}`);
-    else if (!ms.length && !is.length) box2.innerHTML = nothing(true);
+    else if (!ms.length && !is.length) box2.innerHTML = broke
+      ? `<p class="cz-hint">the tape’s lines couldn’t be read here — the index didn’t answer</p>` : nothing(true);
   }
 
   /* ================= SEARCH ================= */
@@ -5016,7 +5043,9 @@
     const sets = await Promise.all(terms.map(async t => {
       const c = /^[a-z0-9]$/.test(t[0]) ? t[0] : "_";
       const sh = await getJSON(`${BASE}/search/t-${c}.json`);
-      return new Set(sh && sh[t] ? sh[t] : []);
+      // own, listed postings only — a query holding "constructor" would
+      // otherwise read Object.prototype's and throw (a review catch)
+      return new Set(Array.isArray(sh && sh[t]) && Object.prototype.hasOwnProperty.call(sh, t) ? sh[t] : []);
     }));
     let ids = [...(sets[0] || [])];
     for (let i = 1; i < sets.length; i++) ids = ids.filter(x => sets[i].has(x));

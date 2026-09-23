@@ -1064,7 +1064,7 @@ table.twin a{color:var(--accent)}
   html.cz-m-studio .cz-editing .cz-edhead{border-bottom-color:#000}
   html.cz-m-studio .cz-editing .cz-ednote{display:none}
   html.cz-m-studio .cz-editing .cz-ednote-print{display:block}
-  html.cz-m-studio .cz-editing .cz-edrow[data-pair]{display:inline-block;width:48%;vertical-align:top}
+  html.cz-m-studio .cz-editing .cz-edrow[data-pair]{display:inline-block;width:48%;margin:0 1%;vertical-align:top}
   html.cz-m-studio .cz-editing .cz-edrow[data-pair] .cz-edbody{width:auto}
   a{color:#000}
 }

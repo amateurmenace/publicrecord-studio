@@ -692,7 +692,8 @@ class TestBakeEdition(unittest.TestCase):
                     ".pb-lead", ".pb-head", ".pb-pair", ".pb-quote", ".pb-doc",
                     ".pb-digest", ".pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}"):
             self.assertIn(cls, css, f"{cls} missing from the pressed CSS")
-        prn = css[css.index("@media print{"):]
+        prn_start = css.index("@media print{")
+        prn = css[prn_start:css.index("\n}\n", prn_start)]   # the block's own brace, not the file's end
         for rule in (".cz-studio", ".paperbody>*{break-inside:avoid}", 'content:" " attr(href)'):
             self.assertIn(rule, prn, f"the print sheet lost {rule!r}")
         # the make surfaces belong to the offline shell (specs/21 §5: the
@@ -3368,8 +3369,8 @@ class TestPaper(unittest.TestCase):
                       "if (!m) delete _cache[url];",
                       'aria-label="try again — load this meeting’s documents">try again</button>',
                       '(btn.closest(".cz-eddocs") || btn).replaceWith(span);',
-                      '<p class="ptitle cz-edtitle-print" aria-hidden="true">${esc(doc.title)}</p>',
-                      'const tw = $(".cz-edtitle-print", el); if (tw) tw.textContent = d.title;',
+                      '<p class="ptitle cz-edtitle-print" aria-hidden="true">${esc(printTitle(doc.title))}</p>',
+                      'const tw = $(".cz-edtitle-print", el); if (tw) tw.textContent = printTitle(d.title);',
                       "if (tw) tw.innerHTML = notePrint(d.blocks[i].text);",
                       'window.addEventListener("beforeprint", () => {',
                       "const paired = halfPairs(doc.blocks);",
@@ -3389,7 +3390,8 @@ class TestPaper(unittest.TestCase):
         self.assertIn('toast("this browser blocks storage — the change didn’t hold"); return; }', clear)
         self.assertIn("if (raw != null && writePapers(sh))", self.JS)
         css = (REPO / "web" / "static" / "app.web.css").read_text()
-        prn = css[css.index("@media print{"):]
+        prn_start = css.index("@media print{")
+        prn = css[prn_start:css.index("\n}\n", prn_start)]   # the block's own brace, not the file's end
         for rule in ('content:" " var(--site,"") attr(href)',
                      ".pb-dg::after{grid-column:1/-1}",
                      "html.cz-m-studio body,html.cz-m-studio.cz-rail body{padding-left:0 !important}",
@@ -3821,3 +3823,185 @@ class TestStudioFootprint(unittest.TestCase):
             self.assertIn(token, self.JS,
                           f"{token!r} left the painted truth — a control may "
                           "be describing storage again")
+
+
+class TestReviewFoldTwins(unittest.TestCase):
+    """The second review of v2.1.15's fold — three lenses, two skeptics on
+    every finding, thirteen findings, none refuted, all folded. These twins
+    EXECUTE the fixes: a token pin can survive a revert (the lenses' own
+    catch — the editor's pair marks, the print twins, the engines' partial
+    reverts all passed the suite on tokens alone)."""
+
+    JS = (REPO / "web" / "static" / "app.js").read_text()
+    ESC = ('const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, '
+           "c => ({\"&\": \"&amp;\", \"<\": \"&lt;\", \">\": \"&gt;\", '\"': \"&quot;\"})[c]);")
+
+    def node(self, body):
+        import shutil
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node not available")
+        return subprocess.run([node, "-e", body], capture_output=True, text=True)
+
+    def lift(self, pattern):
+        m = re.search(pattern, self.JS, re.S)
+        self.assertTrue(m, f"{pattern!r} not found in the reader — did it move?")
+        return m.group(0)
+
+    def ok(self, r):
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+
+    # -- L1-1: the pair mark, at the call site ------------------------------
+    def test_the_editor_marks_exactly_the_pairs_the_reader_pairs_at_the_call_site(self):
+        """halfPairs had a twin; the statement that USES it did not — marking
+        every half (the v2.1.14 bug) or an off-by-one passed the suite."""
+        self.ok(self.node("\n".join([
+            "const edSlot = i => ''; const withLayoutHTML = h => h;",
+            "const renderPaperBlock = () => 'b'; const paperGone = () => 'g';",
+            "const edRow = (html, b, i, n, pair) => pair ? 'P' : 'x';",
+            "const mby = {}, iby = {}, tried = {}, aux = {};",
+            self.lift(r"  const halfPairs = blocks => \{.+?return s; \};"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const L = s => s.split('').map(c => ({ kind: 'note', layout: c === 'h' ? 'half' : '' }));",
+            "function rowsOf(s) { const doc = { blocks: L(s) }; const n = doc.blocks.length;",
+            self.lift(r'      const paired = halfPairs\(doc\.blocks\);\n      const rows = doc\.blocks\.map\(.+?\.join\(""\) \+ edSlot\(n\);'),
+            "  return rows; }",
+            "if (rowsOf('hhh') !== 'PPx') fail('three halves: the first two pair, the third stands alone — got ' + rowsOf('hhh'));",
+            "if (rowsOf('.h') !== 'xx') fail('a lone half is not marked — got ' + rowsOf('.h'));",
+            "if (rowsOf('.hh.hh') !== 'xPPxPP') fail('pairs anywhere — got ' + rowsOf('.hh.hh'));",
+            "console.log('ok');"])))
+
+    # -- L1-2 + L1-5: the print twins run ------------------------------------
+    def test_the_print_twins_execute(self):
+        """notePrint escapes before the innerHTML write and splits paragraphs;
+        the beforeprint body re-reads the live fields; an untitled draft
+        prints what the reader's page prints for it."""
+        self.ok(self.node("\n".join([
+            self.ESC,
+            "const PAPER_TITLE_MAX = 200; const cut = (s, n) => String(s).slice(0, n); const noteText = s => String(s).trim();",
+            self.lift(r"  const notePrint = [^\n]+\n"),
+            self.lift(r"  const printTitle = [^\n]+\n"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const np = notePrint('<script>alert(1)</script>\\n\\nsecond & third');",
+            "if (np !== '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p><p>second &amp; third</p>') fail('escaped, and split on blank lines: ' + np);",
+            "if (printTitle('') !== 'Untitled paper' || printTitle('  ') !== 'Untitled paper' || printTitle('A') !== 'A') fail('an untitled draft prints Untitled paper');",
+            "const NOTE = { value: 'typed since <render>', parentElement: {} }; const NTW = { innerHTML: 'stale' };",
+            "const TI = { value: 'x'.repeat(300) }; const TTW = { textContent: 'stale' };",
+            "const el = { isConnected: true }; let HOOK = null;",
+            "const $$ = (sel, root) => sel === '.cz-ednote' ? [NOTE] : [];",
+            "const $ = (sel, root) => sel === '.cz-ednote-print' && root === NOTE.parentElement ? NTW : sel === '.cz-edtitle' ? TI : sel === '.cz-edtitle-print' ? TTW : null;",
+            "const window = { addEventListener: (ev, fn) => { HOOK = fn; fn(); } };",
+            self.lift(r'    window\.addEventListener\("beforeprint", \(\) => \{\n.+?\n    \}\);'),
+            "if (NTW.innerHTML !== notePrint(noteText(NOTE.value)) || !NTW.innerHTML.includes('&lt;render&gt;')) fail('the note twin re-reads the live field on beforeprint: ' + NTW.innerHTML);",
+            "if (TTW.textContent !== 'x'.repeat(200)) fail('the title twin re-reads the live field, capped: ' + TTW.textContent.length);",
+            "TI.value = '   '; HOOK(); if (TTW.textContent !== 'Untitled paper') fail('an untitled draft prints Untitled paper on beforeprint too');",
+            "el.isConnected = false; NTW.innerHTML = 'left'; NOTE.value = 'changed'; HOOK(); if (NTW.innerHTML !== 'left') fail('a detached editor is left alone');",
+            "console.log('ok');"])))
+
+    # -- L2-1 + L2-3: the lines search -----------------------------------------
+    def test_a_query_holding_constructor_neither_throws_nor_strands_the_line(self):
+        """`sh[t]` on a plain object read Object.prototype.constructor for the
+        one word that survives lexTerms' lowercase; new Set(Object) threw;
+        the add-search and the search page were left on "searching…"."""
+        self.assertEqual(self.JS.count("Object.prototype.hasOwnProperty.call(sh, t)"), 2,
+                         "the own-postings guard belongs at both shard lookups")
+        self.ok(self.node("\n".join([
+            "const BASE = '/app';",
+            "const getJSON = async u => u.endsWith('meta.json') ? [] : u.endsWith('segs.json') ? [] : { contractor: [1] };",
+            self.lift(r"  async function linesSearch\(terms, q\) \{.+?\n  \}"),
+            "(async () => {",
+            "  let out; try { out = await linesSearch(['constructor'], 'the constructor bid'); }",
+            "  catch (e) { console.log('FAIL threw ' + e.message); process.exit(1); }",
+            "  if (!Array.isArray(out) || out.length) { console.log('FAIL not an empty answer'); process.exit(1); }",
+            "  const own = await linesSearch(['contractor'], 'contractor');",
+            "  if (!Array.isArray(own)) { console.log('FAIL own postings must still read'); process.exit(1); }",
+            "  console.log('ok');",
+            "})();"])))
+        # a broken lines search is said, never painted as "no match"; the
+        # lines gate is one predicate for the status line, the wait, the body
+        for token in ("try { ls = await linesSearch(terms, q.value); } catch { broke = true; }",
+                      "const linesOK = terms.length > 0 && q.value.trim().length >= 3;",
+                      "if (!linesOK) { if (!ms.length && !is.length) box.innerHTML = nothing(false); return; }",
+                      "the tape’s lines couldn’t be read"):
+            self.assertIn(token, self.JS, token)
+
+    # -- L3-2 + L3-4: the load's forgetting, the hold a second press releases --
+    def engine(self, extra):
+        return "\n".join([
+            "const WIN = {}, EL = {}, ELSE = {};",
+            "const document = { activeElement: ELSE };",
+            "let SENT = [], SEEKS = [], CALLS = [];",
+            "const ytSend = (k, f, a) => SENT.push(k === 'listening' ? ['listening'] : [f, a]);",
+            "const sent = f => SENT.filter(x => x[0] === f);",
+            "const ytSeek = t => SEEKS.push(t); const pvPause = () => CALLS.push('pvPause');",
+            "const reelShow = () => CALLS.push('reelShow'); const reelNext = () => CALLS.push('reelNext');",
+            "const followAlong = () => {}, strip = () => {}, tick = () => {}, reelAdvance = () => {};",
+            "const PV = { clip: null, free: false };",
+            "let REELPLAY, YT;",
+            self.lift(r"  const inFrame = [^\n]+"),
+            self.lift(r"  function reelSeek\(c\) \{.+?\n  \}"),
+            self.lift(r"  function onYT\(e\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m, JSON.stringify({ SENT, SEEKS, CALLS, YT, REELPLAY })); process.exit(1); }",
+            "const ev = d => ({ source: WIN, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
+            extra, "console.log('ok');"])
+
+    def test_a_second_press_on_the_stashed_meeting_releases_a_hold_set_between(self):
+        self.assertNotIn('if (typeof YT !== "undefined") { YT.hold = false; YT.pending = null; }', self.JS,
+                         "the stash branch's dead YT.pending = null is gone")
+        self.ok(self.node(self.engine("\n".join([
+            "YT = { win: WIN, el: EL, vid: 'v1', loaded: true, ready: false, time: 0, pending: 10, hold: false, state: -2 };",
+            "REELPLAY = { vid: 'v1', pending: null, clips: [], settling: false };",
+            "reelSeek({ video_id: 'v2', start: 300 });",
+            "YT.hold = true;                       // the stage spoke between the two presses",
+            "reelSeek({ video_id: 'v2', start: 100 });",
+            "if (YT.hold) fail('the reader asked the page for a tape: the hold is released');",
+            "onYT(ev({ event: 'initialDelivery', info: { playerState: -1 } })); onYT(ev({ event: 'onReady' }));",
+            "const l = sent('loadVideoById');",
+            "if (l.length !== 1 || l[0][1][0].startSeconds !== 100 || sent('cueVideoById').length) fail('unheld, the last press LOADS — it is not cued');",
+            "if (YT.state !== -1 || YT.time !== 100) fail('the onReady load forgets the old tape: state -1, time = the start');"]))))
+
+    def test_a_load_in_flight_forgets_the_old_tapes_rest_and_time(self):
+        self.ok(self.node(self.engine("\n".join([
+            "YT = { win: WIN, el: EL, vid: 'v1', loaded: true, ready: true, time: 1500, pending: null, hold: false, state: 2 };",
+            "REELPLAY = { vid: 'v1', pending: null, clips: [], settling: false };",
+            "reelSeek({ video_id: 'v2', start: 300 });",
+            "if (sent('loadVideoById').length !== 1) fail('a cross-meeting cite loads the tape');",
+            "if (YT.state !== -1) fail('a load in flight is not a seen silence: state is -1, not the old rest');",
+            "if (YT.time !== 300) fail('the old tape’s time is forgotten: time = the clip start');"]))))
+        self.assertIn("PV.state = -1;   // a load in flight is not a seen silence", self.JS)
+
+    # -- L3-1: the resume branch waits out the settling beat -----------------------
+    def test_the_page_frame_resume_waits_out_the_settling_beat(self):
+        self.ok(self.node(self.engine("\n".join([
+            "function start(settling, time) {",
+            "  YT = { win: WIN, el: EL, vid: 'v2', loaded: true, ready: true, time: 0, pending: null, hold: false, state: 2 };",
+            "  REELPLAY = { vid: 'v2', pending: null, paused: true, active: false, armed: false, i: 1, settling,",
+            "               clips: [{ video_id: 'v1', start: 40, end: 60 }, { video_id: 'v2', start: 300, end: 320 }] };",
+            "  SENT = []; SEEKS = []; CALLS = [];",
+            "  onYT(ev({ event: 'infoDelivery', info: { playerState: 1, currentTime: time } }));",
+            "}",
+            "start(true, 1500);   // the swapped-out tape's time, inside the beat",
+            "if (CALLS.includes('reelNext') || SEEKS.length || sent('loadVideoById').length) fail('settling: the reel resumes in place — no advance, no seek');",
+            "if (!CALLS.includes('reelShow') || !REELPLAY.active || REELPLAY.paused) fail('settling: the reel is back on, painted');",
+            "start(false, 319.95);",
+            "if (!CALLS.includes('reelNext')) fail('settled, at the clip’s end: on to the next clip');",
+            "start(false, 9);",
+            "if (!SEEKS.includes(300)) fail('settled, before the clip: from its start');",
+            "start(false, 310);",
+            "if (SEEKS.length || CALLS.includes('reelNext')) fail('settled, inside the clip: on from where the frame stands');"]))))
+
+    # -- L3-3: a trim reaches the clip a stop left behind, and repaints ------------
+    def test_a_trim_reaches_the_pending_clip_and_the_one_a_stop_left_behind(self):
+        self.ok(self.node("\n".join([
+            "const clipKey = c => c.pid + '|' + c.kind + '|' + c.t; let SHOWN = 0; const pvShow = () => SHOWN++;",
+            "let PV;",
+            self.lift(r"  function pvRetrim\(clips\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m, JSON.stringify(PV)); process.exit(1); }",
+            "const A = { pid: 'p1', kind: 'vote', t: 100, start: 100, end: 110 };",
+            "PV = { clip: A, pending: A, last: null }; pvRetrim([{ ...A, start: 95 }]);",
+            "if (PV.pending.start !== 95 || PV.clip.start !== 95 || SHOWN !== 1) fail('a clip still loading follows the trim, and the stage repaints');",
+            "PV = { clip: null, pending: null, last: A }; SHOWN = 0; pvRetrim([{ ...A, start: 96 }]);",
+            "if (PV.last.start !== 96 || SHOWN !== 1) fail('the clip a stop left behind follows the trim, and the link repaints');",
+            "SHOWN = 0; pvRetrim([{ ...A, start: 96 }]);",
+            "if (SHOWN !== 0) fail('an unchanged clip repaints nothing');",
+            "console.log('ok');"])))
