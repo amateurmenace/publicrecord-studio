@@ -2692,6 +2692,10 @@
      the empty↔live boundary repaints the row that depends on it (the fix
      re-review's catch: a gate whose truth can change under a keystroke
      needs a repaint on exactly that boundary). */
+  // an untitled paper reads as "Untitled paper" — on the reader's page, in
+  // the editor's print twin, everywhere the title is painted (a re-review
+  // catch: the twin trimmed and the page did not)
+  const printTitle = t => String(t || "").trim() || "Untitled paper";
   const paperHasLive = d => !!(d.title
     || d.blocks.some(b => b.kind !== "note" || b.text.trim()));
   const PAPER_KEY = "cz-paper";        // the one draft this browser kept (P1–P3) — read once, migrated, retired
@@ -3766,7 +3770,7 @@
       return;
     }
     const head = `<header class="phead">
-        <h2 class="ptitle">${esc(doc.title || "Untitled paper")}</h2>
+        <h2 class="ptitle">${esc(printTitle(doc.title))}</h2>
         <p class="pfrom">${from === "draft"
           ? "your draft — it lives in this browser. ✎ open the studio to edit it here; share it from the panel as a link or a file"
           : from === "stored"
@@ -4368,8 +4372,6 @@
      its four rows, not their words — the paper prints these instead, kept
      in step with every keystroke and re-read on beforeprint */
   const notePrint = text => String(text || "").trim().split(/\n+/).map(t => `<p>${esc(t)}</p>`).join("");
-  // an untitled draft prints what the reader's page prints for it
-  const printTitle = t => String(t || "").trim() || "Untitled paper";
   const edNote = (b, i) => `<div class="pb-note cz-ednotewrap">
       <span class="kicker">the editor’s note</span>
       <textarea class="cz-ednote" data-i="${i}" rows="4" maxlength="${PAPER_NOTE_MAX}"

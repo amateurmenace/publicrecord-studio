@@ -3399,7 +3399,7 @@ class TestPaper(unittest.TestCase):
                      '.reelcite[href^="/"]::after',
                      ".cz-editing .cz-ednote{display:none}",
                      ".cz-editing .cz-ednote-print{display:block}",
-                     '.cz-editing .cz-edrow[data-pair]{display:inline-block;width:48%',
+                     '.cz-editing .cz-edrow[data-pair]{display:inline-block;width:48%;margin:0 1%',
                      "html.cz-m-studio .cz-editing .cz-edtitle{display:none}",
                      "html.cz-m-studio .cz-editing .cz-edtitle-print{display:block"):
             self.assertIn(rule, prn, f"the print sheet lost {rule!r}")
@@ -3958,7 +3958,9 @@ class TestReviewFoldTwins(unittest.TestCase):
             "onYT(ev({ event: 'initialDelivery', info: { playerState: -1 } })); onYT(ev({ event: 'onReady' }));",
             "const l = sent('loadVideoById');",
             "if (l.length !== 1 || l[0][1][0].startSeconds !== 100 || sent('cueVideoById').length) fail('unheld, the last press LOADS — it is not cued');",
-            "if (YT.state !== -1 || YT.time !== 100) fail('the onReady load forgets the old tape: state -1, time = the start');"]))))
+            "if (YT.state !== -1) fail('the onReady load forgets the old tape’s rest: state -1');"]))))
+        # (YT.time is set beside it and overwritten by the same message's own
+        # currentTime a few lines on — the state is what the hold reads)
 
     def test_a_load_in_flight_forgets_the_old_tapes_rest_and_time(self):
         self.ok(self.node(self.engine("\n".join([
@@ -4005,3 +4007,48 @@ class TestReviewFoldTwins(unittest.TestCase):
             "SHOWN = 0; pvRetrim([{ ...A, start: 96 }]);",
             "if (SHOWN !== 0) fail('an unchanged clip repaints nothing');",
             "console.log('ok');"])))
+
+    # -- the re-review's coverage gaps: the digest order, the chooser's re-ask --
+    def test_the_all_undated_digest_paints_latest_added_first_and_says_so(self):
+        self.ok(self.node("\n".join([
+            self.ESC,
+            "const BASE = '/app'; const paperGone = w => 'GONE:' + w; const paperBudget = w => 'BUDGET:' + w;",
+            self.lift(r"  function renderDigest\(b, iby, tried\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const iby = { z: { name: 'zoning', timeline: [{ pid: 'a', body: 'B' }, { pid: 'b', body: 'B' }, { pid: 'c', body: 'B' }] } };",
+            "const out = renderDigest({ kind: 'digest', slug: 'z', n: 2 }, iby, { i: new Set() });",
+            "const pids = [...out.matchAll(/href=\"\\/app\\/m\\/([a-z])\"/g)].map(m => m[1]);",
+            "if (pids.join() !== 'c,b') fail('the timeline’s last two, latest-added first — got ' + pids.join());",
+            "if (!out.includes('latest-added first')) fail('the sentence says what is painted');",
+            "if (!out.includes('2 undated appearances')) fail('the kicker counts them as undated');",
+            "console.log('ok');"])))
+
+    def test_the_document_chooser_re_asks_once_only_for_a_cached_null(self):
+        """A null the paper's own render cached is not this press's answer:
+        one re-ask, only then; a fresh failure costs one fetch; a cached
+        good answer costs none; the retry after a failure fetches again."""
+        self.ok(self.node("\n".join([
+            "const BASE = '/app';", self.ESC,
+            "const cut = (s, n) => String(s).slice(0, n);",
+            "let FETCHES = 0, ANSWER = null;",
+            "const fetch = async u => { FETCHES++; return ANSWER ? { ok: true, json: async () => ANSWER } : { ok: false }; };",
+            self.lift(r"  const _cache = \{\};\n"),
+            self.lift(r"  const getJSON = [^\n]+\n"),
+            "const document = { createElement: () => ({ className: '', innerHTML: '' }) };",
+            "const $ = () => null;",
+            "const mkBtn = () => ({ isConnected: true, closest: () => null, replaced: null, replaceWith(s) { this.replaced = s; } });",
+            self.lift(r"  async function docChooser\(btn, pid\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "(async () => {",
+            "  const url = BASE + '/meetings/p1.json';",
+            "  FETCHES = 0; ANSWER = null; let b = mkBtn(); await docChooser(b, 'p1');",
+            "  if (FETCHES !== 1 || !b.replaced.innerHTML.includes('didn’t load') || url in _cache) fail('a fresh failure: one fetch, didn’t load, nothing kept');",
+            "  FETCHES = 0; b = mkBtn(); await docChooser(b, 'p1'); if (FETCHES !== 1) fail('the retry fetches again, once');",
+            "  delete _cache[url]; ANSWER = null; await getJSON(url); FETCHES = 0; ANSWER = { documents: [{ doc_id: 'd1', kind: 'agenda', title: 'T' }] };",
+            "  b = mkBtn(); await docChooser(b, 'p1');",
+            "  if (FETCHES !== 1 || !b.replaced.innerHTML.includes('agenda')) fail('a cached null: one re-ask, and the documents paint');",
+            "  FETCHES = 0; b = mkBtn(); await docChooser(b, 'p1'); if (FETCHES !== 0) fail('a cached good answer costs no fetch');",
+            "  delete _cache[url]; ANSWER = null; await getJSON(url); FETCHES = 0; b = mkBtn(); await docChooser(b, 'p1');",
+            "  if (FETCHES !== 1 || !b.replaced.innerHTML.includes('didn’t load') || url in _cache) fail('a cached null whose re-ask fails: one fetch, didn’t load, nothing kept');",
+            "  console.log('ok');",
+            "})();"])))
