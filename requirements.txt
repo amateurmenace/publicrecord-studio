@@ -1,0 +1,12 @@
+# publicrecord.studio — the server's own bill, and only it (record/Dockerfile
+# is authoritative; this mirrors it for a local venv). No torch, no
+# faster-whisper, no PyAV: the desk stays local-first, and a container that
+# transcribes is a GPU decision nobody has made.
+psycopg[binary,pool]>=3.2
+pgvector>=0.3
+fastapi
+uvicorn[standard]
+google-auth[requests]>=2.30
+numpy
+google-genai>=1.0        # the neural half — absent a key, search stays lexical and says so
+google-cloud-storage>=2.14

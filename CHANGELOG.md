@@ -1,0 +1,1900 @@
+# control-z apps — changelog
+
+## unreleased
+
+### specs/21 P3 — templates, the featured papers, and the radiogroup — 2026-07-22 (v2.1.10) · the spec is DONE
+
+The studio's last owed phase, and the smallest: three ways in, no new
+server surface, no new store surface.
+
+**Templates** — pre-shaped papers the editor starts from, offered only
+while the draft is wholly empty: *the roll calls, watched* anywhere;
+*this issue, watched* on an issue's page; *this meeting, covered* on a
+meeting's. A template writes the same blocks the panel's own buttons
+would — and its note joins **empty**, because the editor's words are
+nobody's to pre-write. It re-checks the draft at the click and asks
+before replacing anything another tab may have typed.
+
+**Featured papers** — the front door: up to three example papers built
+**at press time** from the record's own top issues and votes (the roll
+calls with the record's framing; the loudest issue with its reach; the
+latest meeting with its framing and the recurring topics), pressed as
+ordinary `/app/p` links by a Python twin of the JS codec and **pinned to
+it byte-for-byte by a node parity test** (decode in node, re-encode,
+identical — and v= must equal `paperV`'s own judgement, so every featured
+link travels v=2 the moment it carries a chart). They render in the
+`/app/p` stub's empty state OUTSIDE `#paperbody` (the renderer owns that
+node), stand as plain links with JavaScript off, retire the moment any
+real paper renders, and return when the draft empties. The front page
+says it once, quietly: *papers, pressed from the record*.
+
+**The radiogroup** — the mode control stops pretending to be three
+toggles: `role=radiogroup`, `role=radio` + `aria-checked`, a roving
+tabindex so the control costs a keyboard exactly one stop, and arrow keys
+(Home/End too) that move the choice; modified chords stay the browser's.
+
+Two review passes folded 12 + 3 findings. The review's HIGH was the
+selector the migration orphaned — `.cz-mode[aria-pressed="true"]` styled
+a state the JS no longer writes, so every mode radio painted identical;
+the pair (attribute written, selector styled) is now pinned by a test.
+The re-review then caught the fix stopping one reader short: `toggleRail`
+still consulted storage while its neighbours had learned the painted
+truth — and the honest fix reads BOTH axes off the painted classes,
+because a storage-blocked browser deriving the next rail state from
+storage would collapse once and never expand. Also folded: the featured
+cards' focus ring (a bare `var(--focus-ring)` resolves to `outline:none`
+— the sheet's own documented trap), underlined featline links (ink vs
+slate prose is 2.36:1, under G183's 3:1 for color-alone), and `n_of()` —
+every counted noun the bake prints now survives n=1 ("1 meeting", not
+"1 meetings", on the front rail, the issue page, its description, and
+the graph's tooltips).
+
+903 tests. **specs/21 is done** — P0 (the footprint) → P1 (your paper +
+the store) → P2 (charts + notes) → P3 (the front door and the polish).
+The next room is specs/22, the cutting room
+(`specs/22-cutting-room.md`, drafted and awaiting Stephen's settlement).
+
+### specs/21 P2 — data viz + analyses: charts and notes join your paper — 2026-07-22 (v2.1.9)
+
+A paper can now carry pictures and its editor's own words. **Four chart
+kinds** — votes over time (every roll call the record holds: a filled dot
+passes, a hollow dot fails, a half-tone square is any other outcome the
+record wrote — tabled, tied — with the exact word on the tooltip and the
+table; every dot opens the tape where the vote was taken), an issue's reach
+(its appearances, meeting by meeting), the framing lenses (one meeting, or
+the whole record), and recurring topics — all computed **in the reader's
+browser from the record's own pressed planes**, so a paper cannot assert a
+number the record would not draw. A chart block is an enum and a ref, never
+data. Every chart keeps the rules the baked charts keep: a table twin, a
+receipt under every mark (exposed to assistive tech — role="group", never
+role="img"), and the paper palette, where deep green is measurement and no
+studio hue exists. A new pressed plane carries the roll calls:
+**votes.json** — the meeting pages' own votes restated date-ordered, one
+fetch at any corpus size (officials.json is per-member and deliberately
+different).
+
+**Notes** are the editor's words — the settled posture (checkpointed
+2026-07-22): plain text, 2,000 characters, newlines only, no markdown; the
+client cleans (total), the store refuses (strict, 422 — and its cap counts
+the reader's own UTF-16 units, so a stored note never renders shorter than
+it was stored). The rendered block is labeled **"the editor's note"** out
+loud, because a reader must never mistake an editor's words for the
+record's. Notes travel all three covenant ways — draft, link
+(twice-encoded, so their own commas survive the query-string split), and
+paper.json — plus the share store, as the second and last free text a
+stored paper may carry. Papers carrying P2 kinds travel as **v=2**, so a
+reader still on the shipped v1 shell gets its honest "shared from a newer
+version" message instead of a silently mutilated paper; a stories+reels
+paper still encodes byte-for-byte as P1 did.
+
+The studio panel grows **＋ a note** (a field under its row, saving on
+every keystroke without stealing the caret) and **＋ a chart** (a quiet
+menu offering what the open page can chart plus the record-wide three).
+`cut()` keeps every free-text cap surrogate-safe — a bare slice could
+strand half an emoji and make the encoders throw (a latent P1 crash on the
+title cap, fixed at all four sites, lone surrogates dropped anywhere they
+hide).
+
+Two adversarial review passes: 16 confirmed findings folded (the outcome
+binarization, the AT-invisible receipts, the v=2 gate, the store's honest
+"too large" sentence surfaced instead of "didn't answer", the caret capture
+that had read activeElement after the innerHTML wipe since P1, the twin
+tables' scroll container, the UTF-16 cap), then the focused re-review of
+the fixes caught its one HIGH — the share row's new truth had no repaint
+trigger on the note-emptiness boundary — and that folded too.
+
+### "Our AI Constitution" + the shareable link — 2026-07-21 (v2.1.8)
+
+The constitution takes its proper name — **Our AI Constitution** — in the
+page, the footer, and both buttons. And it gets a direct link made to be
+shared: **publicrecord.studio/constitution** (a root-level redirect in the
+Pages repo, listed in OPERATING §5) with a pressed twin at
+`/app/constitution`; `/app/ai` stays canonical, and the page now states its
+own shareable address.
+
+### The AI constitution + the footer recredit — 2026-07-21
+
+publicrecord grows its disclosure surface: **/app/ai — the AI constitution**.
+Eight articles (values as checkable promises, each with a "check it yourself"
+receipt), a pipeline diagram of where the models sit, and **the ledger** —
+when a model touches the record, whose model it is
+(`gemini-embedding-001` for meaning search; the labeled Gemini lane for
+summaries and issue names; a Whisper-family model on our own hardware only
+when a tape has no captions), where it runs, and what stands without it —
+including the rows where there is **no model at all** (moments, reels, kits,
+papers, the front page) and the desk's **local-only** models
+(civicmedia.studio / Control-Z: your machine, offline, nothing leaves the
+room). Prominently part of the Community AI Project (the toolmaking argument,
+at the record's volume), with resources for going deeper. Native
+interactivity (details/summary, an aria-labeled diagram with the ledger as
+its table twin) — complete with JavaScript off, quiet palette throughout,
+precached for offline reading.
+
+The footer on every page is recredited: *an open source project from
+weird machine and brookline interactive group. this project uses AI in
+accordance with our AI constitution.* The covenant (about) page and the town
+scope (settings) block both carry the button.
+
+### specs/21 P1 — your paper: the curated document + the share store — 2026-07-21
+
+The studio's making surface arrives. A reader curates their **own paper** — a
+document of blocks: stories (a meeting, an issue) and reels — titles it,
+arranges it, and shares it. The paper lives the way a reel lives: in this
+browser (the draft), in its link (the whole paper, URL-encoded), and in a
+`paper.json` file; a **content-addressed share store** adds an optional short
+link. Edition **v2.1.7**, image **r29**.
+
+- **The document model** (`publicrecord.paper/1`) — client-side, one
+  localStorage draft (`cz-paper`). Blocks are refs into the record; the draft
+  carries ride-along display meta, but every traveling form strips to refs, so
+  a paper can never assert a title the record's planes would not.
+- **The panel becomes the editor** — the studio sidebar's "your paper" section
+  grows a title field, the block list with ↑ ↓ ✕ arrange controls, context
+  adds ("＋ this meeting" / "＋ this issue" on their pages, "＋ your reel" when
+  the tray holds clips — a snapshot, so the tray keeps rolling), and the share
+  row (open / copy link / paper.json / short link / clear). Ticking a moment
+  updates the reel count *and* the paper panel live.
+- **`/app/p` — one static stub for every paper** (the `/app/r` pattern; an
+  `emit_stubs` change shared by bake and press). The renderer decodes
+  whichever arrived — `?p=<id>` (the store) → the link form (`?v=1&t=…&b=…`) →
+  the browser's draft — enriches every block from the record's own planes, and
+  renders in the **paper palette**: whatever mode the editor liked, a rendered
+  paper carries zero studio hue (computed-style-verified). Stories whose
+  meeting or issue left the pressing say so in place; reel blocks cite like
+  `/app/r` and play there. JS-off, the stub says honestly what it needs.
+- **Every decoder keeps decodeReel's law** — malformed input degrades to fewer
+  blocks, never a throw; a query that decodes to *nothing* says "this link
+  doesn't carry a readable paper" rather than mislabeling the reader's own
+  draft. Node twins pin the round-trip, the caps, the hostile-input table.
+- **The share store (§6.2, Stephen-approved)** — `POST /api/papers` on
+  record-api validates strictly (the only free text is the title, 200 chars,
+  control-char-free; everything else exact-shaped refs), canonicalizes
+  server-side (times snapped to the tenth-second grid, whole seconds
+  collapsed), and writes once to a private bucket at the SHA-256 of the
+  paper's own bytes — idempotent, read-only on GET, immutable-cacheable, no
+  identity anywhere. No list endpoint, no delete API (takedown is a steward's
+  hand, OPERATING §6). Unset bucket → honest 503; the client fails soft to
+  the full link. The store is additive, never load-bearing: servers vanish,
+  every paper still reads and travels.
+- Tests: 16 store-contract tests (canonical form, refusals, idempotence,
+  endpoints), 7 paper node-twin tests, the pressed-stub test; the reader's
+  API-door guard now names the sanctioned set (search + the store's two
+  touches, each timed and caught).
+
+### specs/21 P0 — the studio: be the editor of your own paper (the footprint shell) — 2026-07-20
+
+The record shipped as a reader; specs/21 lets that reader become an editor. This
+is the shell — three modes the reader controls, and the make-loop that exists
+surfaced inside them. Built entirely by `app.js`, so the pressed pages stay
+byte-for-byte the specs/20 paper (a guard test proves no studio class is ever
+baked).
+
+- **Three modes, one footprint** — a control kept in `localStorage`
+  (`cz-studio-mode`, default **preview**), never a server:
+  - **preview** — a compact, non-blocking pill in the corner: an invitation to
+    edit, the reel count, and a way to dismiss to paper. Quiet (neutrals + deep
+    green); the resident's page stays fully clickable, on the phone and the
+    desktop both.
+  - **studio** — the full left sidebar, and the one place publicrecord's volume
+    goes *up* (the ratified palette lift, §6.1). The paper shifts to become the
+    canvas beside it; a collapse handle rails the sidebar (`cz-studio-rail`).
+  - **paper** — the studio recedes to a single tab; just the quiet specs/20
+    reader, never louder, because it *is* specs/20.
+- **The make-loop, surfaced not rebuilt** — the studio reads the same global
+  `cz-reel` tray the meeting composer fills and shows it live (a count on the
+  preview pill, a play/share/clear panel in studio), updating as you tick
+  moments across meetings, in this tab and across tabs.
+- **The palette amendment (§6.1), bounded and AA** — studio mode borrows
+  civicmedia's purple (`#a855f7`, borders/surfaces) with a darker violet
+  (`#7c3aed`) for text and text-on-purple so every studio control clears WCAG AA
+  4.5:1; bright green (`#22c55e`) as a non-text reel accent. All declared under
+  `html.cz-m-studio` only — they cannot reach the paper, the preview, or the
+  shared masthead. **Zero fuchsia.** The pressed-CSS guard admits the purples
+  *only* in a studio-scoped rule.
+- **Degrades to paper** — JavaScript off, and the reader gets the paper (the
+  studio is script-built). Narrow mobile never shifts the reading — the studio
+  becomes an overlay drawer, preview stays the same small pill. Flat vector (no
+  drop shadows), reduced-motion safe, keyboard-focus managed across mode
+  switches, tab order matches the visual order.
+- **Covenant-clean** — no account, no cookie, no server on the studio path; the
+  mode and the reel live in `localStorage` and the link. Pinned by node twins
+  (`readMode` validation, the make-path-touches-no-server proof) and a
+  paper-is-byte-clean guard.
+
+Resolved with Stephen (2026-07-20): the three-mode shape, the bounded studio
+palette lift, the naming ("your paper" / "the editor" / "edit"), and — for P1 —
+a content-addressed shared-paper store as the default share, with the link + an
+exportable `paper.json` as the covenant substrate. See `specs/21-web-studio.md`
+§6. Two adversarial-review passes (5-lens + a focused re-review of the fixes),
+every confirmed finding folded in. **855 green.**
+
+### specs/20 P2 finished — cross-meeting reels + per-issue RSS; dark mode declined — 2026-07-20
+
+The last of P2 (§7.9), after the kit plane.
+
+- **P2-B — reels span meetings.** A reel was one meeting's moments strung
+  together; now it can hold the turns of an argument as they cross meetings and
+  years, still client-only and still living entirely in its link. One meeting is
+  the exact **v1** link every existing share and kit page already carries; two or
+  more becomes **v2** (`?v=2&c=<pid>:<start>-<end>,…`, each clip prefixed with its
+  meeting). The composer is now one global tray you build across meetings (tick
+  on one, navigate, tick on another — it carries and labels each clip's meeting);
+  the `/app/r` viewer fetches every meeting the reel touches, enriches each clip
+  from its own moments, and plays clip to clip, loading the next meeting's tape
+  with `loadVideoById` when the reel crosses. The cite sheet groups by meeting;
+  reel.json stays single-meeting (the desk render is — cross-meeting rendering is
+  a desk step still to come, and the page says so). v1↔v2 round-trip, the
+  (meeting, kind, time) clip identity, and the tape-switch are pinned by tests
+  run in node. Verified live: a reel of two Brookline meetings, authored in the
+  tray (v1→v2 as it crossed) and played back "4 moments across 2 meetings."
+
+- **P2-C — per-issue RSS in the chrome.** The long-view feed per issue has
+  shipped since R1; now each issue page advertises its own feed in the head
+  (`<link rel="alternate">`, before the firehose), and every feed item carries a
+  `<pubDate>` (a corpus date → RFC-822 midnight UTC, deterministic, no
+  wall-clock) so a reader's client sorts by date.
+
+- **Dark mode — declined for the reader (open Q3).** publicrecord is "ink on
+  white," and that is the brand pillar the paper keeps; the dark/IDE look stays
+  civicmedia / Control-Z's. Resolved as "never for the reader" — revisitable.
+
+### specs/20 P2 — Publisher's reading half: the record presses a kit per meeting — 2026-07-20
+
+The newspaper (P0) and the reel composer (P1) already moved the *reading* halves
+of Memory and Highlighter into the browser. This does the same for **Publisher**:
+`/app/k` — a publish kit for every meeting that has a tape to cut from.
+
+A kit is the clips worth cutting plus draft copy to ship them with — titles, a
+description with chapters, alt text — and every input it needs was already
+pressed (the `moments` plane, the meeting's entities, its summary). So the
+record assembles the kit deterministically, with no model (the press is the one
+pipeline stage that calls no AI), and pages it read-only. The one desk-bound
+step — rendering the clips as video — stays at the desk, and the page says so;
+the emitted `kit.json` is a real Publisher kit a producer downloads and opens
+there to carry on from the draft.
+
+- **The shared writer** (`czcore/kit.py`, new). The pure copy-assembly logic
+  moved out of `publisher/kit.py` into the shared core both the desk and the
+  record import, so one artifact has one writer and the two can't drift.
+  `publisher.kit` imports it back under its old names — the surface is unchanged.
+- **The kit plane** (`web/kit.py`, `web/bake.py`, `record/press.py`).
+  `kit_from_meeting` derives a kit from a pressed meeting; `bake_kits` writes
+  `kits/<pid>.json` + `kits/index.json`. The stage is mirrored into the hosted
+  press, and a new parity test holds the two orchestrations equal.
+- **The reader** (`web/emit.py`, `web/static/app.web.css`). `/app/k` index +
+  a page per kit; the clips deep-link the tape and "play as a reel" hands off to
+  the `/app/r` viewer. Publisher's line on `/app/press` flips from "nothing yet"
+  to the kits — but only in an edition that pressed some, so the door stays
+  honest. Quiet palette, JS-off readable, verified at desktop + 375px.
+- **Guards**. A cross-process idempotence test (two presses under different
+  `PYTHONHASHSEED` must be byte-identical — the determinism the deploy needs);
+  the container's cold-start import check now names `web.bake`/`web.emit`/
+  `web.kit` so a bad import fails the build, not the 3am press.
+
+Reviewed by a five-lens adversarial panel (covenant, idempotence, desk-compat,
+refactor blast radius, brand + a11y); every finding folded in. 847 tests green.
+
+### The moment labels earn their kicker: a word-boundary fix + a higher bar for the paper — 2026-07-20
+
+A moment is only as good as its kind. The shared analyzer matched its keyword
+classes as bare substrings, so the moments plane read a celebration as a
+`DECISION` — "thank you for joining us … staff who have **devoted** three
+decades" (`voted` inside devoted) — and `emotion` / `commotion` as motions,
+`coffee` as a fee, `immigrant` as a grant. And `TENSION` fired on any bare
+"concern" or "problem": "solve problems", "my question **concerns** equity"
+(the verb, not the worry), "there aren't crises" (a negation).
+
+- **The shared fix** (`czcore/moments.py`). `hits_in()` matches word-like
+  keywords on a *leading* word boundary — the convention `insight.FRAMING_LENSES`
+  already uses. "vote" still reaches votes / voted / voting and "unanimous"
+  reaches unanimously, but none reach de**voted** / e**motion** / com**motion**;
+  symbolic keywords (`$`, `[applause]`) keep literal substring matching. A
+  leading boundary is strictly narrower than a substring, so no genuine motion
+  is lost — a correctness fix inherited by `score_segments` and
+  `insight.decisions` / `disagreements` / `dynamics`, so Highlighter, Publisher,
+  and Memory all get it. An adversarial audit of every consumer found it
+  net-positive; two prefixed civic terms worth keeping got their own keywords
+  (`disapprove` / `disapproval`; `unfunded` / `underfunded`).
+
+- **The paper's higher bar** (`web/bake.py`, newspaper-only). Stored decisions
+  are re-validated on the boundary (so the corpus's baked-in substring FPs drop
+  without a re-ingest) and gated for narration — a death ("passed away"), a
+  described process ("submitted … approved by", "sent … for approval"). Soft
+  tension words (concern / problem) have to be *owned* — a felt worry ("I'm
+  concerned about…"), an act of raising it ("express the concern"), an
+  intensifier — while a strong word (oppose / crisis / frustrated) still
+  carries alone; the gate reads the *windowed sentence*, because the ASR splits
+  "but I'm a little / concerned that…" across segments. Pure roll-call mechanics
+  ("want to vote?") stay procedure. Highlighter keeps its fuller recall.
+
+- **Verified.** Reproduced from the 10 real Brookline transcripts (63.9h):
+  ~70 keyword false positives drop and the same number of real questions and
+  decisions rise into the ranked cap. An independent judge panel (one per
+  meeting) graded every removed and added label, and a blast-radius panel
+  audited each shared consumer; their findings drove the narration gate and the
+  keyword restorations. 832 tests green. **Not deployed — pending Stephen's
+  review of the before/after, since it changes every meeting page.**
+
+### The reel composer: specs/20 P1 moves Highlighter's composing half into the browser — 2026-07-20
+
+The rule that governed P0 governs this: reading and composing live in the web;
+only rendering media stays at the desk, and the page says so. Highlighter cuts
+a reel at the desk — this is the *composing* half, in a browser, over the
+`moments` plane P0 already presses. No accounts, no server, no new `/api/`: the
+reel lives in the URL and this browser's localStorage, nowhere else.
+
+- **The composer** (§20.6, P1a). Every Moments card gains a tick into a reel
+  tray: reorder, trim each clip to the transcript's own segment bounds, a live
+  total runtime. Three outputs, in order of covenant-cleanliness — a **share
+  link** (the reel state URL-encoded and versioned, `/app/r?v=1&m=<pid>&c=<t>-<end>,…`,
+  no server); a **cite sheet** (quote · speaker · body · date · deep link per
+  clip, one copy, the shape `copyCite` writes extended to a sequence); and a
+  **`reel.json`** the desk Highlighter opens to render — the one desk-bound
+  step, stated: *"rendering the video needs the desk."* Its clips map straight
+  onto `highlighter/reel.py`'s `render_reel`. The model is per-meeting but
+  shaped so a second meeting's moments slot in (cross-meeting reels stay R3).
+
+- **The viewer** (§20.6/§20.7, P1b). A shared link opens **`/app/r`** — one
+  static stub for every reel — and app.js decodes its state, fetches the
+  meeting's own plane, and plays the sequence through the existing
+  youtube-nocookie facade, seeking clip to clip (on `currentTime ≥ clip.end` →
+  the next clip's start; the seek engine's `armed` gate keeps a stale time
+  report from skipping a clip when the reel order runs backward through the
+  tape). It shows the current clip's quote and the reel as a deep-linked cite
+  list. JS-off, the stub is honest that decoding and playing a reel need
+  JavaScript, and sends the reader to the record.
+
+- **Tests.** The share-link encode/decode round-trip, the cite sheet, the
+  `reel.json` shape, the clip-to-clip seek engine (including the out-of-order
+  guard) — all executed in node against the lifted reader code — plus the
+  `/app/r` stub and its JS-off cite fallback, and the covenant (no server on the
+  reel path). 822 green.
+
+- **Hardened before ship** (an adversarial review pass over the diff, findings
+  verified in node). A clip's identity is now `(kind, time)` — matching the
+  bake's own moment dedup key — so the vote and the tension a contested roll
+  call emits at the same second no longer collide (ticking one had silently
+  toggled the other). The seek engine arms only on a report *inside* the clip
+  and before its end, so two stale time reports during a backward seek can't
+  arm-then-skip a short clip. And two AA gates: the tray's functional labels
+  move off `--text-muted` (2.4:1) to `--text-secondary` (7.2:1), and the moment
+  tick clears the 24px minimum target size.
+
+- **Moments are thoughts now, not fragments** (§20.6 follow-up, edition v2.1.1).
+  A moment was anchored to a single 2–3s ASR segment, so the reel cut off
+  mid-sentence and the plane surfaced procedure ("right, Betsy?", "How we
+  doing?"). `_build_moments` now windows each moment out to the whole sentence
+  around its anchor with a lead-in/lead-out (6–40s, bounded), quotes that full
+  sentence, and gates procedural/short/vocative questions out. The moment gains
+  a `start` (the padded clip open) beside its `t` (the anchor); the reel plays
+  `[start, end]`, the panel still seeks `t`. On the real Brookline meeting this
+  turned 20 mostly-trivial 2s clips into 15 substantive ~17s ones.
+
+- **Tidy.** The coverage-strip label for an undated meeting read `ed`
+  (`"undated"[5:]`); it now reads a dash. Shows only after a re-press.
+
+### The record gets its own face: specs/20 P0 ships the newspaper — 2026-07-19
+
+publicrecord.studio was live wearing the desk's clothes — cream paper, oxblood
+accents, and a sidebar of thirteen locked tool doors given equal billing with
+the record's own surfaces, several showing a demo image the container never
+carried. The brand architecture had since settled: civicmedia is the press;
+publicrecord is the newspaper. This is the paper. All of specs/20 P0, pressed
+from the cloud and served at publicrecord.studio, image `record/api:r21`.
+
+- **The coat** (§20.1). The edition stops borrowing `suite/`'s tokens and takes
+  its own, composed byte-faithfully from `brand/` (the single source now, for
+  this product) — neutrals and deep green only; no cream, oxblood, amber,
+  fuchsia or purple survives the press, and a test proves it. Real Inter and
+  JetBrains Mono, subset-latin woff2 self-hosted under `web/static/fonts/` with
+  their OFL texts (~157 KB, the only new bytes; CSP gains `font-src 'self'`).
+  A nameplate masthead — the publicrecord keycap read byte-equal from
+  `brand/logos`, the mono lockup, the classic double rule — over a folio and
+  the paper's own section line. The thirteen doors leave the masthead.
+
+- **The front page** (§20.2). A lead story (the latest meeting: a big
+  `i.ytimg` still, a mono headline, a deck, its two strongest moments as
+  pull-links into the tape), a briefs column, by-the-numbers (every figure a
+  link), the long view, what-changed, an access ledger that says its zeros out
+  loud, and a roll-calls teaser. Column rules, not boxes; reads linearly with
+  JS off.
+
+- **The moments plane** (§6). `web/bake.py` presses, per meeting, the analyzer's
+  scored moments as one ranked list — VOTE, DECISION, TENSION, QUESTION, each
+  {t, end, kind, score, reason, quote}, scored by `czcore.moments.score_segments`
+  — a pure function of the transcript, so the edition stays byte-idempotent.
+
+- **The meeting page** (§20.3). The Moments panel renders those cards, JS-off,
+  each seeking the tape. A right-margin minimap (a mark per moment, a line at
+  the playhead) and a sticky mini-header arrive as pure enhancement.
+
+- **Search** (§20.4). Instant (debounced, never under three chars), hover peeks
+  (±1 segment from the segs plane already in hand — no extra request), and
+  keyboard paths (j/k/Enter, `/` to focus). The R1.6 live-first/static-always
+  machine is untouched; its degradation proofs still run the real code.
+
+- **The press page + the quiet doors** (§20.5). `/app/press` is one honest page
+  about Civic Media Studio — the tool list, the DMG, the cross-link to
+  communityai.studio. The thirteen `/app/t/<tool>/` URLs survive as CSP-safe
+  redirect stubs into `/app/press#<tool>`; the broken slide images leave the
+  domain structurally (a test proves no pressed file references `site/`).
+
+- **Tombstones** (§20.6, closing R1.7's debt). A steward-forgotten issue's URL
+  renders *"removed from the record by a steward on {date}"* — the date read
+  from the audit ledger (stored state, never a wall clock), so it presses
+  idempotently. `PgCorpus.list_forgotten` reads the audit table; the desk store
+  returns nothing, because it keeps no such ledger.
+
+The covenant holds throughout: readers are uncounted, every page reads with the
+API dark, the bake is byte-idempotent, and the edition stays under its budgets
+(fonts are the only new bytes; thumbnails are remote). 816 tests green.
+
+### The record breathes: R1 closes the switches between deployed and alive — 2026-07-19
+
+The wave-1 backend was proven and inert. This is the run that turned it on, and
+almost everything it fixed was found by running it against the live channels
+rather than by reading — which is the whole argument for walking one meeting end
+to end before turning a nightly poll loose.
+
+- **Hosted ingest carries meetings now** (specs/19 R1.4). `record/pipeline.py`
+  drains the approved queue: a steward's yes → captions-first ingest → embed →
+  issue-assign, calling the same `memory/ingest` the desk calls because it is
+  store-agnostic and the parity suite proves it. The first real meeting —
+  Boston City Council, July 8 — is on the record: 8,040 segments, through the
+  queue with a human in the middle; a second followed, a Brookline Select Board
+  meeting the steward approved himself through the console. Three bugs only a
+  real meeting could show:
+  the meeting shell has to exist before `ingest.run` writes segments (Postgres
+  enforces a foreign key SQLite did not); the embed stage scopes to the one new
+  meeting or a nightly job embeds the whole town and times out; and the link is
+  written before the embed, so a meeting is never live-and-unlinked.
+
+- **Search reads the record two ways at once** (specs/19 R1.6). The reader asks
+  the Studio first and falls back to its own prebuilt index the instant the
+  Studio does not answer — one timed attempt, no retry, and the page stops
+  promising meaning-search the moment it cannot deliver it. Provenance rides
+  every live hit: *word*, *meaning*, *both*, *related*. The wiring that makes
+  this possible is three-sided — the edition names the API it may call, the API
+  names the readers that may call it (CORS, an allowlist, no credentials ever),
+  and both go quiet for a desk edition, which stays byte-identical.
+
+- **The neural half is on** (specs/19 R1.2). The whole record embeds as a Cloud
+  Run job under a hard spend cap that stops before a batch is bought; the ledger
+  proves the $0.66 estimate. Before it ran, a neural query answered `lexical`
+  with the honest line "this corpus has not been embedded yet" — the degradation
+  verified before the thing it degrades to was switched on.
+
+- **Intake is default-deny again** (found by running it). The first hosted poll
+  filed all 45 entries from three channels, PSAs and ribbon cuttings included,
+  because the connector had never called the intake rules — the console's
+  preview was their only caller. Now the poll files what the preview promised:
+  45 polled, 21 filed, the rest excluded or unmatched.
+
+- **Meaning-search stopped scanning the whole table.** At the reader's page size
+  a neural query took 45 seconds because the join blocked the vector index; the
+  ordering now runs in a subquery over segments alone and answers in 0.4s.
+
+- **Nightly, per town, 03:00 and 03:30 America/New_York** (specs/19 R1.5). The
+  poll files submissions; the pipeline ingests what a human approved. Safe to
+  leave alone because the pipeline reads `approved` and nothing else.
+
+- **publicrecord.studio is live** (specs/19 R1.7, by a shortcut). Not the
+  specs/18 site-move — that needs `control-z-tools` made public — but a second,
+  independent GitHub Pages site (`amateurmenace/publicrecord`) with its own CNAME
+  serving the cloud-pressed live-first edition. `control-z.org` never moved and
+  never went dark; both domains were verified serving, in a browser, before and
+  after. The reader at its own address answers a semantic query with meaning
+  chips and keeps reading when the API is stopped.
+
+### 2.0.0: Civic Media Studio — the suite takes its own name — 2026-07-18
+
+A major number because macOS agrees it is one: the bundle identifier moved from
+`org.control-z.suite` to `org.civicmedia.studio`, so this installs beside the
+old app rather than replacing it. The tools are the same tools and the record is
+the same record — what changed is that the work finally has names that say what
+it is to the people it is for.
+
+- **The suite is Civic Media Studio** (civicmedia.studio). Control-Z keeps its
+  own identity inside it — free pro production tools for Resolve, its own site
+  at control-z.org, its own audience who may never touch the rest of the stack.
+  One `brand/` package holds all of it: four brands, their marks, their tokens,
+  and the rules about clearspace and minimum sizes, vendored rather than
+  redrawn per surface.
+
+- **The public record is publicrecord.studio.** The reader's mark, every page
+  title, the RSS feeds and the web manifest carry it now. The edition is
+  branding-only against 1.9.0 — same corpus hash, all 216 issue pages and every
+  deep link untouched, because a resident who cited a timestamp in June should
+  not find a 404 in July.
+
+- **`record/` — the record gets a home of its own** (specs/17 wave 1). A
+  Postgres corpus with pgvector behind the same seam the desk uses, a small
+  service in front of it, nightly connectors, and a steward console behind one
+  Google sign-in. `memory/` is imported, never forked: one interface, two
+  stores, and 83 parity cases that run the hand-audited issue engine against
+  both and prove they agree. Nothing is provisioned; `record/INFRA.md` is the
+  runbook and `docker compose up` is the proof.
+
+- **The drain, and the desk's fifth wave.** A desk can now lend itself to the
+  record (specs/17 §6.4, gated): the meetings without captions queue for any
+  station Mac to transcribe on its own hardware, which is how ASR stays at
+  marginal zero instead of becoming a GPU bill. Plus Rise on the road, the
+  coherence pass across all eight desk pages, and the local Models-page cards
+  for MT and vision.
+
+- **Quiet fixes.** `forget()` and `replace_segments` now take a meeting's issue
+  links with its segments — they never did, so `list_issues` counted ghosts
+  that `issue_appearances` hid, and one issue had two sizes. Public search no
+  longer serves meetings the edition withholds. `mint_from_query` stays inside
+  its own town. And a three-lane merge that git called conflict-free produced a
+  `pyproject.toml` naming a package that no longer exists — valid TOML, broken
+  build, caught before it shipped. **685 tests green.**
+
+### Publicrecord — wave 1: the record moves in (specs/17) — 2026-07-18
+
+The public record has been breathing through one Mac: a steward presses a
+static edition and pushes it. This is the record given a home of its own — a
+Postgres corpus behind the same seam the desk uses, a small service in front of
+it, connectors that watch the towns' own channels, and a steward console behind
+one Google sign-in. Nothing is provisioned yet and no bill has started; all of
+it was built and proven against `docker compose up`, and `record/INFRA.md` is
+the exact runbook for the day that changes.
+
+- **One engine, two stores.** `memory/store.py` was the record and the SQLite
+  file in one object — the merge-never-shrink rule written out longhand three
+  times, bm25's negative score baked into an ORDER BY, the embedding's raw
+  bytes escaping into two consumer modules. `memory/seam.py` now writes down
+  what the engine may assume of a store, and `memory/policy.py` holds the
+  judgement calls. **A store owns dialect; policy owns meaning.** The desk's
+  `Corpus` satisfies the interface without inheriting from it, and every
+  existing test passed without a line edited — that was the constraint, and it
+  is the acceptance test.
+
+- **Publicrecord's store, and the proof it agrees.** `record/store.py` is the
+  same record in Postgres with pgvector. `tests/test_record_store_parity.py`
+  states 73 guarantees once and runs them twice, and most had never been tested
+  anywhere, because they are the failures only a second implementation can
+  expose: bm25 is negative where `ts_rank_cd` is positive (port the ORDER BY
+  across and you get the *worst* matches first, with every rank-derived score
+  silently corrupted); `end` is a reserved word, so even `s.end` will not
+  parse; `UPDATE OR IGNORE` has no Postgres spelling and merge uses it three
+  times. The clincher is the engine test — `issues.discover`, unmodified,
+  finding the same arc across the same meetings on either store.
+
+- **Brookline arrived whole — 16,443 segments, 41 issues, nothing re-derived.**
+  The import transliterates rather than recomputes, because that corpus was
+  hand-audited and re-running the clusterer would produce *a* set of issues
+  rather than *these*. `City Realy` — a caption garble that became a permanent
+  issue id — came across as `City Realy`; it is wrong, and it is the record,
+  and the steward console's rename verb is the tool for it. The import verifies
+  itself: every table counted, vectors re-read bit-for-bit, and the issue
+  rollups diffed between the two stores. It found three real defects doing so,
+  including an `updated_at` assigned twice in one UPDATE — which SQLite forgives
+  and Postgres calls a syntax error.
+
+- **Search that answers in four milliseconds, and says how it found you.**
+  `/api/search` blends words and meaning with the provenance chips intact and
+  the town scope explicit — the desk's search had never taken a town, which is
+  a cross-tenant leak the moment a second town arrives. The neural half is a
+  seam pinned to `gemini-embedding-001` at 768 dimensions, stored *beside* the
+  lexical vector and never instead of it. With no key, search is lexical and
+  the reader is told: *meaning-search needs publicrecord; words still work.*
+
+- **A console with a name against every edit.** The eight curation verbs over
+  HTTP, each inside one transaction and each writing an audit row; a review
+  queue where the public *Add a meeting* finally POSTs — the specs/16 contract
+  shape unchanged — and lands for a steward instead of ingesting blind. With
+  auth unconfigured every steward route returns 503: it **fails closed**, and
+  there is a test per route saying so.
+
+- **The record reads with the lights off.** The reader is static first, so the
+  claim was tested the only way worth testing it: Postgres was stopped, the API
+  returned its honest 503s, and the reader went on searching all 16,443
+  segments and never noticed. The redirect stubs that will point
+  `control-z.org/app/*` at publicrecord are written and deliberately **not run** —
+  redirecting a working edition at a Studio that does not exist yet would break
+  every civic citation minted so far to fix a problem nobody has.
+
+- **Quiet fixes.** `forget()` now clears `issue_segments`; it never did, and
+  `list_issues` counted the orphans while `issue_appearances` hid them, so one
+  issue had two sizes. A submission id built from a URL cannot be a path
+  segment — `/api/steward/submissions/<id>/approve` silently 404'd for exactly
+  the submissions unusual enough to need a human. And the steward console told
+  operators to install `google-auth` when they already had it: the package
+  imports fine and then fails on its *transport*, so the extra names
+  `google-auth[requests]` and the message carries the real error.
+  **648 tests green.**
+
+### 1.9.0: the record, drawn — the desk's analytical eye, in public — 2026-07-18
+
+The public edition could read the record; now it can *see* it. What the desk's
+Highlighter analyzer and Library did for one editor's screen, the web edition
+now does for anyone with a browser — counted from the record's own words, every
+mark a link back to the meeting it came from. And the desk grew its own
+connective tissue: Index now knows what every clip carries, and one queue job
+walks ticked clips through the tools.
+
+- **Every meeting reads like the analyzer now.** A meeting page grew the desk's
+  full read: the **eight civic framing lenses** (financial, safety, community,
+  environmental, legal… counted, not modeled, each with a first-half/second-half
+  drift so a meeting that starts fiscal and ends legal says so), the
+  **questions asked** typed by what they ask about (budget, timeline,
+  accountability, rationale), and the moments of pushback — all computed at
+  press time from the transcript, all readable with JavaScript off.
+
+- **"The record, drawn" — a whole analytics page** (`/app/analytics`). The
+  desk's Library, made static: a civic-framing heatmap (meetings down, lenses
+  across, each cell shaded by its share), the topics that recur across the
+  record, and the names that appear in two or more meetings — every mark opening
+  its meeting.
+
+- **The issue graph** (`/app/graph`). The town's concerns drawn as the network
+  they are: two issues are tied when they share meetings, the tie thickening
+  with every meeting they share, a bigger dot for an issue on more of the
+  record. Hand-laid inline SVG — no library, so the strict CSP holds — with a
+  table twin for JavaScript-off and screen readers. Tap a node to walk its long
+  view.
+
+- **The desk gets what the record got — Index knows what every clip carries.**
+  What Memory did for the town's meetings, Index now does for your footage. A
+  new sidecar law (`czcore/sidecars.py`) is one table of every mark the tools
+  leave beside a source — words, captions, cut, moments, insight, kit, pivot,
+  rescue — and one reader, so any tool can ask "what does this clip already
+  have?" without re-learning eight naming conventions. The Index shelf opens
+  with the library counted in the dashboard grammar — clips, hours, per-kind
+  coverage in each owning tool's accent — and turns the one real gap into one
+  click, *"words for the N without,"* running Scribe's own engine over the
+  wordless as one queue job (silent clips honestly excluded; failures named).
+
+- **The road: ticked clips walk the tools, clip by clip.** Tick clips on the
+  Index shelf, pick stages — words (Scribe) · rescue (Clear at road defaults) ·
+  reframe 9:16 (Pivot) — and one queue job carries each clip through its stages
+  clip-major, so the first is fully finished while the last still waits. The
+  plan rules before any engine runs: no sound → no words, no picture → no
+  reframe, an unplugged drive → never joins, already made → skipped with the
+  reason said; run a finished road twice and the second run is a sentence, not
+  an empty queue. A time-coded search hit finally lands Scribe on the moment.
+
+- **Quiet fixes.** The offline service worker's cache is keyed on the release
+  version as well as the corpus fingerprint, so a new pressing never leaves a
+  returning reader on a stale shell. And a ~7% flake in the job queue's own
+  `test_listeners_fire` (pre-existing, unrelated) is gone — it waited on the
+  job's status, not the listener's own view. **500 tests green.**
+
+### 1.8.0: the record grows teeth — the paper, the votes, and the loop that keeps it fresh — 2026-07-18
+
+The telescope had the meetings. Now it has what was *written* beside what was
+*said*, and *who voted how* — and the public edition closes its loop, so the
+record on the web stays as current as the record at the desk. Said as what a
+resident can now do: read a town's agenda and minutes on the same timeline as
+the tape; see a board's roll call, member by member, each vote a link to the
+second it was cast; and open the record on a phone, offline, and be told when a
+fresher pressing lands.
+
+- **The town's own paper joins the record (Documents, specs/14 №11).** A new
+  `memory/documents.py` pulls a meeting's agendas, minutes, and packets straight
+  from the town's portal (CivicClerk — anonymous, no key), extracts and chunks
+  the text, embeds each chunk, and links it to the same issues the transcript
+  joins — by the same auditable keyword-then-cosine rule. The written record
+  interleaves onto every issue timeline with **page-level citations** ("p. 12"),
+  and every meeting page carries its paper. What a board *voted* on, a resident
+  *spoke* about, and the warrant *wrote down* now sit on one line. (pypdf, pure
+  Python — a town without it loses documents gracefully, nothing else breaks.)
+
+- **The Vote Ledger (specs/14 №12).** Roll calls are read straight off the
+  transcript — verbatim and timestamped, never inferred. Each is stored with its
+  motion, its tally, its outcome, and who said what, and it surfaces two ways: a
+  **per-issue ledger** (the roll calls on this thread) and **The votes**, a
+  per-member accountability page where every cell links to the moment on the
+  tape. Officials only — by *construction*, not by filter: a roll call is the
+  board voting, and the town's own agenda supplies the roster that cleans the
+  ASR's misheard names. Never a stance, never a private citizen — the record's
+  hard non-goals kept. Every surface says: read from the transcript, verify
+  against the official minutes.
+
+- **The web edition breathes (specs/16 wave 2).** **Publish the record** presses
+  the public edition from the desk's Memory page as one job, reports the edition
+  diff (meetings added, issues moved, the fingerprint that changed), and hands
+  the steward the push ritual — the desk never deploys itself. The edition now
+  carries the documents, the roll-call ledgers, and a **The votes** page, all
+  readable with JavaScript off. **Still watching** renders your followed issues
+  and their resurfacings from your own browser (follows live only in
+  localStorage — export and import them as JSON, anti-lock-in even for
+  preferences). And the edition is a **PWA**: a service worker precaches the
+  shell and the meetings you've read, an install manifest makes it a home-screen
+  app, and a quiet banner says *the record refreshed — reload for the new
+  pressing* — all under the same strict, machine-enforced Content-Security-Policy.
+
+- **The record breathes for real.** With eight more Brookline meetings ingested
+  (the corpus is ten now, ~72k spoken moments), a followed issue fired a genuine
+  cross-time **resurfacing** — a later meeting reopened a thread a resident had
+  seen months earlier, and the record woke with a delta that quotes the very
+  beads it woke for, timestamps and all.
+
+- **The last two API doors have local hinges (specs/15).** Interpreter's
+  translation and Narrator's descriptions were the only features that needed a
+  key. Both now try an **on-device model first** and fall back to your key,
+  labeling every track by what actually drew it — `czcore/mt_local.py` runs a
+  CTranslate2 translation model (the seven panel languages; Simple English stays
+  a key-side rewrite, honestly, since it isn't a translation), and
+  `czcore/vision.py` runs an ONNX vision-language model for descriptions. Both
+  are discovered by the shape of a folder in the models directory, spend no API
+  tokens, and add nothing to the AI audit; when no model is installed the status
+  line says exactly so and the key path is unchanged. (The model *cards* — a
+  hosted, hash-pinned bundle — follow, the way the vits-ljs voice card followed
+  its discovery; note the covenant flag: NLLB-200 is non-commercially licensed,
+  so a shipped card is a deliberate licence decision, not a quiet default.)
+
+- **The desk gets what the record got — Index knows what every clip carries.**
+  What Memory did for the town's meetings, Index now does for your footage.
+  A new sidecar law (`czcore/sidecars.py`) is one table of every mark the tools
+  leave beside a source — words, captions, cut, moments, insight, kit, pivot,
+  rescue — and one reader, so any tool can ask "what does this clip already
+  have?" without re-learning eight naming conventions. The catalog reads it: the
+  Index shelf opens with the library counted in the dashboard grammar — clips,
+  hours, per-kind coverage in each owning tool's accent — and turns the one real
+  gap into one click, *"words for the N without,"* running Scribe's own engine
+  over the wordless as one queue job (silent clips honestly excluded — listing
+  them would be lying; failures named).
+
+- **The road: ticked clips walk the tools, clip by clip.** Tick clips on the
+  Index shelf, pick stages — words (Scribe) · rescue (Clear at road defaults) ·
+  reframe 9:16 (Pivot) — and one queue job carries each clip through its stages
+  clip-major, so the first is fully finished while the last still waits. The
+  plan rules before any engine runs: no sound → no words, no picture → no
+  reframe, an unplugged drive → never joins, already made → skipped with the
+  reason said; run a finished road twice and the second run is a sentence, not
+  an empty queue. And a time-coded search hit finally lands Scribe on the
+  moment, instead of dropping the timestamp on the floor.
+
+### The web app — wave 1: the record, open in any browser (specs/16) — 2026-07-18
+
+- **The record steps outside.** A new `web/` package presses the whole
+  corpus into a static edition — `python -m web.bake` reads everything
+  Memory knows and writes JSON, a search index, RSS, caption tracks, and
+  per-page HTML into `site/docs/app/`. No backend, no accounts, no
+  cookies, no analytics, no video rehosting: the covenant, carried
+  outdoors and machine-enforced by a strict Content-Security-Policy on
+  every page. A resident with only a phone can search the record and land
+  in the tape at the cited second; a journalist selects a sentence and
+  **Cites** it with receipts; a screen-reader user reads a meeting as a
+  document, because the transcript *is* the page — every meeting is a
+  complete, readable HTML document with JavaScript switched off.
+- **The whole suite, on one public rail.** The record (Memory) is fully
+  alive — Home is a measured dashboard, search runs in the browser, the
+  long view draws issue timelines exactly as the desk does. Every other
+  tool keeps its seat as a **locked door**: full dignity, a real demo, one
+  plain sentence on why it lives at the desk, and the download — locked
+  like a door, not hidden like a shame. The web app is the product's
+  living tour and the top of the funnel to the desktop app.
+- **Honest by construction.** The embed is a click-to-load facade
+  (nothing plays, no third party sees you, until you tap). Add-a-meeting
+  canonicalizes a pasted link and dedupes against the record — its URL
+  canon is a twin of `memory/ingest.py`, pinned by a golden table that the
+  reader's own JavaScript answers in the test suite. Anti-lock-in is a
+  page element: every meeting downloads as transcript, every timeline as
+  data. The bake is byte-idempotent (dates derived from the corpus, proven
+  by the manifest hash) and fails loud if an edition busts its size
+  budget. Pressed from the real two-meeting Brookline corpus — 30 issues,
+  16k segments, 279 KB gzipped — and walked end to end in a browser.
+
+### 1.7.1: one timeline everywhere, the record drawn readable, and the spend in view — 2026-07-18
+
+- **The reel timeline rides every page.** Moments picked anywhere — the
+  analyzer's grids, the record's search hits, an issue's beads — land on
+  one persistent timeline along the bottom of the screen. Pin it open
+  (📌) and it stays across pages and relaunches; fold it and it waits as
+  a count. Reorder, drop, jump any chip back to its second on the tape,
+  and **▶ Render reel** cuts one montage across every meeting on it —
+  URL sessions fetch only the picked seconds, nothing re-downloads.
+- **The Library moved in, and learned to draw.** The standalone Library
+  page retires; its cross-meeting analytics now live where the work is —
+  at the end of Highlighter's Meeting Analyzer (tonight held against the
+  record) and behind 📊 Analytics on Memory's landing (the whole shelf).
+  Redrawn from scratch: topics as per-1,000-words lines over time,
+  framing as a lens-by-meeting heatmap, recurring names as dot-strips —
+  readable type, room to breathe, a tooltip on every mark, and every
+  mark opens its receipts. The chart colors are the suite's own hues,
+  chroma-lifted and **validated for color-vision safety** (worst
+  adjacent-pair ΔE 24.9, twice the accessibility target); magnitude
+  always rides one violet ramp, identity never repaints. Every receipt
+  carries ▶ (land the tape on the second) and ⊕ (join the reel
+  timeline) — the pictures are doors now, not decoration.
+- **The spend is never a mystery.** Every API call on your key is
+  counted from the provider's own token numbers and attributed to the
+  tool whose job spent it — no tool had to change a line to be counted.
+  Settings grows an **AI audit**: calls, tokens in/out, estimated
+  dollars (labeled estimates; your bill is the truth), the fullest
+  single call as a percent of the model's context window, and a
+  per-tool table. AI surfaces say what each call cost inline (🪙 tokens
+  + window share) the moment it lands.
+- **czcore/llm.py grows the multimodal door.** `complete_vision()` —
+  Narrator's request shape, moved in — so vision drafts ride the same
+  guarded key, the same honest errors, and the same ledger as every
+  text call.
+- **A page can always come home.** A long inner box (a seven-hour
+  transcript is 280k pixels of scroll) used to eat every upward wheel
+  that crossed it. Now an inner scroller owns the wheel only after you
+  step into it; until then the gesture stays with the page. And the
+  footer finally reads **designed** + developed.
+
+### 1.7.0: the wing lands — the record, the languages, the voice — 2026-07-18
+
+Three tools in one release — **Community Memory**, **Community
+Interpreter**, **Community Narrator** — built in parallel on their own
+lanes and merged home together: the biggest single entry since the
+suite began. Said as what a resident can now do: search everything
+your town has said across every read meeting and land the tape on the
+second it was said; follow an issue for years and be told what changed
+the day it comes back; read the meeting in your own language, or in
+plain English; and hear what's on screen described aloud when you
+can't see it. All of it local, labeled, on your own key or none —
+beside the official record, never in its place.
+
+- **Community Memory ships (beta) — the telescope opens.** A meeting's
+  captions come straight in the moment you paste the link (Scribe
+  listens only when a file has no words of its own), the whole corpus
+  is searchable, and every hit is a second to jump to — one search
+  across every meeting, and the video lands on the moment. Every
+  reading shows its receipts and says it's beta.
+- **And the telescope learns to see.** Memory finds the issues that
+  recur across meetings — vision zero, the golf course lighting,
+  short-term rentals — names each from the record's own words, and
+  tracks every appearance. Anchored in the words a meeting actually
+  says, never a guess about anyone's position. Follow a thread (star
+  an issue, or a search) and the record keeps watch: when it resurfaces
+  on a new agenda, Memory tells you what changed since last time — a
+  paragraph, generative with your key, extractive without one. The
+  long view is a line you can walk: an issue's timeline lays every
+  meeting along a time axis, its moments as beads and its votes as
+  milestones, and every one is a second to jump to. Steward-tended,
+  not machine-final: merge two issues, split one that was fused,
+  rename or promote a candidate — the record remembers its own edits.
+  And "still watching" is a plain digest of your threads you can copy
+  anywhere. No email, no account, nothing sent — the covenant, kept.
+- **Community Interpreter ships (beta) — the meeting, carried across.**
+  Open anything Highlighter has read and pick from the seven panel
+  languages — Español, Simple English (plain language, first-class),
+  中文, Português, Kreyòl, Tiếng Việt, Русский. One queue job coalesces
+  the rolling captions into sentence-shaped cues, translates them
+  chunked on your own key with the town's glossary riding every pass
+  (do-not-translate names, vetted civic terms — the Brookline seed
+  ships honestly marked *suggested*), and lands timed .srt + .vtt
+  beside the meeting. Provenance is UI: every track says its model,
+  glossary version and review status on the page and inside the .vtt
+  itself; lines the model dropped stay English and say so. Every line
+  takes one tap to flag into the review queue; a reviewer's correction
+  rewrites the track in place. With the full recording local, tracks
+  ride the player's own caption menu. No key? The page says so in a
+  sentence and still reads existing tracks.
+- **Community Narrator ships (beta) — the picture, spoken.** Audio
+  description for community TV, a thing public access has essentially
+  never had: open a read meeting with its recording and the pass runs
+  in three moves — the pauses and the slides mapped (a [Music] or an
+  applause marker counts as air, because it is; a shot that holds
+  still is a slide, and slides read aloud are the point), each moment
+  drafted by vision on your own key in DCMP style with a lint that
+  names camera-talk, interpretation and past tense instead of trusting
+  the prompt, and every draft waiting on a human accept — nothing
+  unaccepted reaches a track. The render speaks each approved line in
+  a local voice, ducks the program under the narration with a
+  sidechain compressor, and lands four outputs: the mixed program, the
+  mixed audio, a program-length narration track, and a descriptions
+  transcript that always carries every approved description —
+  wall-to-wall programs get the transcript and the extended mode
+  instead of a mix that talks over the meeting, never a silent
+  failure. Provenance rides the page and the files alike: vision
+  model, voice, review status.
+- **The wing speaks with one engine each.** `czcore/mt.py` (cue
+  coalescing, chunked N|-protocol translation, glossary constraints —
+  grown from Highlighter's translate feature) and `czcore/tts.py`
+  (sherpa-onnx VITS voices, found by shape) join the middle of the
+  table — translation and speech for whatever the wing carries across
+  next.
+- **The model store learns that a voice is a directory.** A new
+  `archive_dir` mechanism keeps a whole member folder from a release
+  tarball — manifest-hashed, one auditable line per file, the same
+  pinned-hash covenant as every single-file model — and **vits-ljs**
+  takes its card: Apache-2.0, the public-domain LJSpeech corpus,
+  CMU-lexicon based so no GPL espeak-ng data rides along. Narrator's
+  voice is one click now; any other VITS voice placed by hand still
+  works, found by shape.
+- **Highlighter's record line names the long view.** Beside prior
+  appearances, tonight's topics now show as tracked issues — each
+  pill a door straight into the issue's timeline on the Memory page.
+- **Both lanes' packages join pyproject's truth** (`memory`,
+  `interpreter`, `narrator`, the glossary seeds as package-data), so
+  a frozen or installed suite imports what a dev checkout already
+  found.
+
+### 1.6.0: the wing doubles on paper, and the kit ships itself — 2026-07-17
+- **The wiring is ready for Memory before Memory exists.** Highlighter
+  and Publisher both carry **⬛ Send to the Record** — dashed and honest
+  today ("Community Memory joins in 1.6"), live against the contract
+  route the day lane B's `ready` flips, no further edits needed. Every
+  loaded meeting carries the record line: prior appearances of
+  tonight's topics once the record answers, the promise of it until
+  then. And the chain got its hand-offs: **→ Publish kit** from any
+  read meeting (pill on the loaded view, chip on every library row),
+  publish + rename doors in the Grabber bin.
+- **Publisher is ready.** Clip cards carry real frame thumbnails
+  (retrying once if the first decode is cold), every copy field has a
+  ⧉ copy-to-clipboard button, and the lower-third's two lines are
+  editable per kit with the brand's defaults as placeholders. The
+  format ladder learned the difference between "mp4" and "plays
+  everywhere": h264 preferred explicitly (YouTube ships AV1 inside mp4,
+  which the suite's own frame service can't decode), then any mp4,
+  then anything, remuxed.
+- **The last name tags fall in line** — coming-pages and About carry
+  the Community AI Project tag.
+- **The app says its real name.** The window, tab, brand and serve line
+  all read **Community AI Project** — "the world's most advanced civic
+  media suite" beneath. The rail reorders to the mission: Home, the
+  **Civic Media Suite** on top (all seven squares), then **control-z ·
+  free pro production tools** with the diamonds. BIG Video Grabber
+  signs as **Video Grabber**.
+- **Home runs the line.** The centerpiece is a conveyor: search + fetch
+  → find the moments → make the kit → keep the record — a package rides
+  the dashed belt station to station picking up each stop's color,
+  coming stations stand dashed with their date, and ▶ Run the line
+  drops you at the search desk.
+- **The Grabber becomes the search desk.** One query runs YouTube
+  (newest first) and the CivicClerk portal in parallel — events arrive
+  with video and Zoom links badged, YouTube rows carry → Highlighter
+  and Fetch, fetch-all queues the lot. Direct paste downloads at any
+  quality — and the container promise is real: mp4-family codecs
+  preferred at every rung, lossless remux catching fallbacks, audio-only
+  landing m4a. New: **weekly schedules** ("everything from the last
+  week, every Thursday at nine" — runs while the app is open, catches
+  up on launch, says so), and the **broadcast re-namer** —
+  {title}_{date} patterns to playout-safe names, live preview, sidecars
+  traveling with the file. The bin grew publish and rename doors.
+- **Index opens on the shelf.** The catalog appears on open — newest
+  first, grouped by folder, filter chips (all / with words / missing),
+  thumbs, → Highlighter on every row; typing narrows, clearing brings
+  the shelf back. (The browse lived in the catalog all along; no UI
+  ever called it.)
+- **The finder takes Highlighter's front door** — town + board search
+  first, the paste field second, the drop zone third.
+- **One beautiful face for progress.** czProgress: an accent bar that
+  shimmers while a job finds its feet and fills when it knows its
+  fraction, stage message in mono, a live clock, green on done, the
+  sentence on error — on every Grabber fetch and conform, Index scan,
+  Publisher render and bundle. And the static cache token grew an
+  mtime tail, so an edited file busts the browser mid-version too.
+- **The community wing grows by four, and Home strings the wire.** The
+  Community AI Project specs moved into the repo (specs/12–15: the
+  program plan, Publisher, Memory, Interpreter+Narrator), and all four
+  new tools stand on the community rail — one already filled in, three
+  as honest coming-pages. Home's new centerpiece is **the wire**: two
+  chains showing where one tool hands to the next — *the meeting, start
+  to finish* (Grabber → Highlighter → Publisher → Memory) and *seen and
+  heard by everyone* (Scribe → Interpreter → Narrator) — every step a
+  door, coming steps dashed with their date, and a live-count per chain
+  that flips itself the moment a tool turns real. A second machine
+  builds Memory in parallel; specs/PARALLEL.md is the two-lane law
+  (ownership by file, contracts before code, single-line slots).
+- **Community Publisher ships (beta) — program in, kit out.** Open
+  anything Highlighter can read and the publish kit builds itself:
+  3–5 clip candidates with their reasons on them, cut in 16:9 / 1:1 /
+  9:16 through one ffmpeg graph with captions burned as image strips
+  (the type matches the brand on any ffmpeg build) and Slate's
+  lower-third in the station's colors — bottom-left on widescreen,
+  top-left on square and vertical, scaled to the short edge. Copy
+  arrives extractive and labeled (titles, description with chapter
+  stamps, alt text per clip, newsletter blurb, social drafts); ✨
+  redraft spends the user's own key, takes a producer instruction, and
+  keeps a way back. Renders run as one queue job; export is a named
+  bundle + zip with copy.md, transcript and provenance — nothing left
+  to rename. Brand kit is config in app support (station, accent,
+  third style, voice) — the In-a-Box tenancy pattern. publisher-cli
+  mirrors every move; 13 new tests; proven on the June 18 School
+  Committee record.
+- **The scorer moved to the middle of the table.** Highlighter's
+  moment detection is now `czcore/moments.py` — detection-as-a-service
+  for the whole wing (Publisher's candidates today, Memory's issue
+  inputs next); `highlighter/highlights.py` stays as a re-export shim
+  so every old import and test holds untouched.
+- **Stale JS lost its lease.** Every static include carries
+  `?v={{version}}`, substituted by the server, and the shell ships
+  no-cache — a new build busts the browser's cache by URL, in the app
+  window and the browser alike (the "⌘R after relaunch" ritual,
+  retired).
+
+### 1.5.0: the meeting answers back, and the heavies install themselves — 2026-07-17
+- **The summary writes itself.** Pasting a URL opens a terminal in the
+  hero — the commands named as they run, every job message a line, the
+  cursor blinking until the meeting opens. With a key configured the
+  executive brief is generative on arrival: written on load, cited to
+  the second, every [MM:SS] a clickable pill, cached beside the
+  transcript so one meeting costs one spend. The extractive read stands
+  in until it lands, and stands alone without a key. And the key stays:
+  it persists in app support, and an **OpenAI key now works everywhere
+  an Anthropic one does** — the key's shape picks the provider.
+- **The timeline became an editor.** Every clip on the reel has an edit
+  row: nudge in/out by half-seconds, set playback speed (0.5–2×, atempo
+  keeps the audio honest), check fade for 0.35s in/out — and every
+  choice renders into the export, on both paths (local cut and
+  download-and-stitch). The three sections stopped hiding: Meeting
+  Highlighter, Highlight Video Editor and Meeting Analyzer stack on one
+  page and the anchor pills scroll to them.
+- **Exports let go of your hands.** Queued work gets a toast card in the
+  corner — label, live percent, the message as it changes, green when
+  done — and clicking one opens the Queue, where finished jobs finally
+  show WHERE they landed (every output path, click to Reveal) and the
+  default output folder is yours to change, right there in Settings.
+- **The analyzer reached the web app — and every chart is a door.**
+  People, Places & Things is one clickable card: "clips" opens every
+  mention as a modal (play each, add any or all to the reel), and 🔍
+  Investigate looks a name up in the world — live Google News fetched
+  server-side, Wikipedia inline, maps out to the browser, and a "Your
+  library" tab that searches every other meeting on this machine for
+  the same name. The topic coverage map is a clickable heatmap (topics
+  × twelve slices of the meeting), moments of disagreement list the
+  tension vocabulary with a red edge, question flow gets type chips
+  that open into their questions, speakers open into their own moments,
+  and the transcript can Investigate any selection.
+- **Generate Full Report** writes the AI narrative plus the counted
+  record (decisions, entities, participation, questions) beside the
+  meeting as markdown AND a real PDF — czcore/pdfout, a zero-dependency
+  writer whose text stays selectable. **Translate** ships both ways on
+  your key: the summary inline (and saved), the whole transcript
+  chunked into timed .srt/.txt, ten languages.
+- **Scrubbing stopped waiting.** The 10-second far seek was the frame
+  service JPEG-encoding every frame it walked past on a long-GOP seek;
+  passed frames now cache only within a dozen of the target. A cold far
+  seek on the 5,223-frame test clip answers in 0.07–0.29s.
+- **Stencil answers the click.** A click-preview endpoint runs SAM 2.1's
+  image predictor on the one frame being clicked and the plum matte
+  appears the moment the subject is chosen — ~3s for the first click
+  while the model loads, ~0.7s after. Propagation stays the
+  follow-through, not the reveal. And when torch + SAM 2 are absent,
+  Stencil gates itself center-page: the card names the ~1 GB one-time
+  install and carries the button that performs it (frozen builds get
+  the honest sentence instead of a dead button).
+- **Every optional heavy has a door now.** Settings grew an "optional
+  runtimes" card: Stencil's torch + SAM 2 (pip, Meta's own URL — never
+  the PyPI stranger) and Clear's DeepFilterNet3 voice-isolation binary
+  (downloaded against its published sha256, refused on mismatch), each
+  with installed/missing status, a one-click Install that runs as a
+  queue job with live progress, and a copyable terminal command.
+  Whisper models stay out on purpose: they download themselves in-app.
+- **And the install buttons were then run for real**, in a venv that had
+  neither heavy — which caught the SAM 2 one broken: Meta renamed their
+  package metadata to `sam-2`, so pip discarded our URL pin
+  ("inconsistent name") and went looking for the PyPI stranger instead.
+  Every written copy of the requirement now pins
+  `sam-2 @ git+…` (the import stays `sam2`). Verified end-to-end through
+  the buttons themselves: DFN → sha-matched download → `deep_filter
+  0.5.6` answering; SAM 2 → pip → `import torch, sam2` clean.
+- **Clear's slider grew its own door.** When the DeepFilterNet3 binary
+  is missing, the voice-isolation hint is no longer a wall of install
+  text — it's one sentence and a link that lands on Settings → optional
+  runtimes, scrolled to and lit up. (The old terminal line survives as
+  the link's tooltip.)
+- **The analyzer finished the web app's set** — the three cards that
+  were still deferred, each local and labeled:
+  - **Framing** — eight civic lenses (financial · safety · community ·
+    environmental · legal · equity · infrastructure · process), counted
+    from the meeting's own words with word-boundary vocabularies, each
+    lens carrying its moments (click → play or add to the reel) and a
+    first-half/second-half drift. Live on the March 10 Select Board:
+    financial ×460 rising, community ×137 fading.
+  - **Cross-Reference Network** — entities and recurring keywords that
+    share a sentence get a weighted edge; drag the nodes, hover a name
+    to light its connections, click a line for the moments the two share,
+    click a node for every mention. Honest empty when fewer than three
+    names connect.
+  - **Relevant Documents** — the town's own CivicClerk portal, read
+    around the meeting's date through the Grabber's reader (the title's
+    own date wins over upload date; two half-window queries so a busy
+    civic calendar can't page the nearest days away; shared word-pairs
+    outrank single words so "Select Board" beats half a town of boards).
+    Agendas, packets and minutes arrive as typed rows opening the
+    portal's real PDFs. Verified live: the March 10 session found its
+    own event — Select Board Regular Meeting, 0 days off, agenda +
+    packet + minutes — with the same-day committees beneath it.
+- The word cloud, recurring topics, and the network stopped counting
+  contractions ("we're", "that's") as vocabulary — stopword stems
+  wearing an apostrophe.
+- **The Meeting Library** — a new room in the community rail: every
+  meeting this machine has read, read together. The web app calls this
+  its Knowledge Base and asks a cloud model; here every number is the
+  same counted per-meeting reading the analyzer shows, aggregated in
+  plain code from the sidecars already on disk. Four cards, each a door:
+  - **Framing across meetings** — the eight lenses as a meetings × lens
+    grid (each column a meeting, oldest first; each cell shaded in its
+    lens's color by share), trend chips comparing the library's older
+    half to its newer ("financial framing is rising across meetings ↑"),
+    every cell opening that meeting's moments.
+  - **Entity tracking** — who appears across which meetings and how
+    often; a dot per meeting sized by count, one click traces the name.
+  - **Meeting comparison** — two meetings side by side: duration, pace,
+    decisions with outcomes, questions, tense moments, framing bars, and
+    the topics and names they share (outlined) vs carry alone.
+  - **Discourse analysis** — one term traced through every meeting
+    oldest-first, bars by per-1k-word rate so a seven-hour meeting can't
+    out-shout a one-hour one, with the first moments as receipts and
+    every row opening the meeting in the Highlighter.
+  Sessions that only have captions get read (and cached) on the
+  library's first look; a meeting without words is listed as unread, not
+  invented. Span downloads and rendered reels are outputs, not meetings
+  — filtered by name shape. Verified live on this machine's seven
+  meetings: "override" traced ×49 across 3 of 6 — surging in the March
+  10 Select Board (×45, 0.85/1k words), echoing in the June School
+  Committee.
+- **One person, one row.** Caption misspellings used to split a name
+  across the analyzer and the Library ("Councelor Hamilton" beside
+  "Council Hamilton"). Entity harvesting now folds spellings under a
+  conservative match — same word count, same initials per word, high
+  sequence ratio — so "Mayor Jan" can never join "Mayor Dan". The
+  winning spelling keeps the seat and lists the others (`also`), the
+  Library's tracking folds across meetings too (person↔org may join,
+  since that split IS the caption noise; places stay strict), and the
+  insight cache carries a real version number now so old readings
+  rebuild once.
+- **The Library grew two cards.** **Topic evolution** — each meeting's
+  recurring topics as a grid over time, every cell tracing the term
+  through the full transcripts. And an **AI read across meetings** (BYO
+  key, labeled generative): one button sends the counted digest — dates,
+  lens counts, topics, names, tallies — never a transcript, and the
+  answer names meetings by their dates.
+- **The suite answers deep links now** — `/#kb` opens the Library,
+  `/#clear` opens Clear, and the hash keeps working after load. Small
+  feature, two real uses: rooms are shareable, and the site's slide
+  captures can find them.
+- **The hero carousel shows all thirteen tools** — the five new slides
+  (Highlighter, Grabber, Index, Library, Slate) are the real app,
+  captured headlessly through its own deep links with the pages driven
+  to show their work: the Grabber mid-search on the town portal, Index
+  answering "school committee" with thumbnails, the Library's grids
+  live. make_slides.py owns the capture (suite_slides — needs the dev
+  server and Chrome; skips itself politely without them).
+- **The site tells the truth about what shipped.** control-z.org's
+  suitebar now reads v1.1.0 shipped / v1.5.0 in signing with all ten
+  tools + the Library chipped on it, the six originals flipped to
+  shipped with real download links, and Slate, Community Highlighter,
+  BIG Video Grabber, Index, and the Meeting Library each got a full
+  card — features, quickstart, honest limitations, technical detail.
+- **The civic finder means "latest" now.** Searching a municipality used
+  to ride YouTube's relevance index — a smattering of the town's year.
+  It now asks YouTube's own date-sorted results page ("brookline" leads
+  with the newest School Committee and Select Board meetings), with
+  civic-looking rows stably on top so vlogs sink and boards rise. (The
+  `ytsearchdate` prefix died in the 2026.07 yt-dlp nightlies; the
+  results URL with sp=CAI= is the door that stays open. YouTube's date
+  sort is bucketed — the newest leads, neighbors may swap.)
+- **Stencil stopped asking Metal for a 62 GB buffer.** SAM 2 preloads
+  every frame of a state at its own 1024² working size (~12.6 MB a
+  frame), so a static-camera meeting — one shot, thousands of frames —
+  was one giant refused allocation ("invalid buffer size: 62 GB",
+  measured). Long shots now propagate in 240-frame windows (~3 GB
+  each), chained by every object's last mask; short shots are untouched.
+  Verified on a 576-frame three-window run: seams continuous, masks
+  faithful to what the click selected, and the device cache released
+  between windows.
+- **And the Montage Maker** — a reel cut ACROSS meetings. Every ➕ on a
+  traced moment or a framing cell's list lands in the montage tray;
+  Render stages the work honestly: local meetings cut in place, URL
+  sessions download only the picked seconds (a span already on disk is
+  reused — nothing re-downloads), then one stitch where every clip wears
+  a title card naming its own meeting. Clips from different meetings
+  arrive in different sizes, so the stitch graph now scales everything
+  into the first clip's frame, letterboxed, never stretched (this also
+  hardens the single-meeting path). Verified: a Select Board moment
+  (1080p, fetched by URL) + a School Committee moment (720p, reused from
+  disk) → one 19.28s montage, frame-checked — each card carrying its own
+  meeting's name and the moment's own clock.
+
+### 1.4.0: the web app's three rooms, the two doors out — 2026-07-17
+- **Highlighter wears the web app's exact shape now**: the three sections
+  are **Meeting Highlighter · Highlight Video Editor · Meeting Analyzer**,
+  and the local pick-the-moments button reads **✨ Make Highlight Reel**
+  beside a new **🤖 Make AI Highlight Reel** (BYO key): the model reads
+  the timestamped transcript and proposes moments; every pick is clamped
+  to the meeting's own clock, spans under 3 s are refused, and the origin
+  line says "picks are generative (model, your key) — timestamps
+  validated locally". No key → the button isn't there and nothing changes.
+- **One big Export Video button, two doors out** (the web app's contract,
+  desktop-sized):
+  - **🔗 Share a reel link** — the deployed web player's own URL format
+    (`?mode=play&v=…&clips=start-end,…&titles=…`), built entirely
+    client-side: the clips live in the link, nothing uploads, nothing
+    renders. Verified live: a desktop-built link for the March 10 Select
+    Board reel loaded in the deployed player — title bar, 1/5 counter,
+    Play Reel transport, five progress segments.
+  - **⬇ Download & edit on this computer** — one flow with the progress
+    stated stage by stage: "1 · Download 5 clips from YouTube — ✓ 5 clips
+    landed, only 29s left YouTube" → "2 · Cut the MP4 with ffmpeg (+ title
+    cards)" → "✓ Your video" with a Reveal in Finder button. Spans already
+    on disk skip the download honestly ("nothing re-downloads"). Local
+    files skip straight to the cut. Verified end-to-end: 5 spans → 5 clips
+    → one MP4 with 5 title cards, 36.76 s.
+- **DaVinci Tools** — a new page in the suite rail: the Node Tree
+  PowerGrade, the **Middle Gray Contrast Anchor** (the site's newest
+  tool), and the Fusion Template Pack, each with its size, its guide link
+  on control-z.org, and a Download that lands in ~/Downloads and reveals
+  itself (a dev checkout serves its own bytes; the packaged app fetches
+  the same files from the project's GitHub). The OpenFX installer keeps
+  its own page, cross-linked. ⌘K knows both pages.
+- **The credit footer** — every page now ends with the line that names the
+  makers: design + developed by Stephen Walter (weirdmachine.org) with
+  Brookline Interactive Group, Neighborhood AI, and Claude Code — part of
+  the Community AI Project (communityai.studio).
+- 4 new tests (`test_davinci.py`: the three zips exist in the repo, are
+  actual zips, guides live on control-z.org, raw URL matches the layout).
+  247 pass; the packaging gates remain the signing machine's business.
+
+### 1.3.0: the meeting shows its shape, the reel gets its cards — 2026-07-17
+- **The reel can wear title cards now.** One checkbox in the render panel
+  and every kept moment gets an ink card before it — the meeting's name
+  small, the moment's words big in cream, its timestamp in the brief's
+  green pill. Rendered through Pillow with Slate's font discovery at the
+  output's own size, and ridden into the SAME concat graph as the cuts
+  (`-loop` image inputs + anullsrc silence, every chain normalized to one
+  SAR/pix_fmt/48k-stereo so audio stays locked). Works on both paths —
+  local-file reels and stitched section downloads, where each `[start-end]`
+  clip finds its timeline label by its span. Verified: 5 clips + 5 cards =
+  36.76 s, frame-checked. Context, not decoration; hard cuts stay hard.
+- **The session has a clock now.** The YouTube embed answers the widget
+  "listening" handshake, so URL sessions get what local files always had:
+  a ticking time display, the sparkline playhead, and a **follow-along
+  transcript** — the row being spoken right now carries a green edge, and
+  the *follow* chip scrolls it centered as the meeting plays. Verified
+  live: play on the March 10 session → 0:10.2 on the clock and the active
+  row tracking the speech. Seeks paint immediately instead of waiting for
+  the embed to answer.
+- **Analyze shows the meeting's shape — counted, not modeled.**
+  - **Meeting pace**: words per minute in 50 bins (the recess is visible
+    as a gap in the bars; the March 10 meeting averages 124 wpm).
+  - **Discussion dynamics**: three thin lanes — questions asked, decision
+    words, tension words — from the same keyword classes the scorer shows
+    its reasons with (240 questions counted across that night). Click
+    either chart to jump the player there.
+- **Agenda, when the upload carries one**: yt-dlp chapters, else timestamp
+  lines in the description (the civic upload habit), parsed into a
+  clickable agenda card above search. Two items minimum — one timestamp is
+  a link, not an agenda — and honest absence otherwise. A fresh re-read
+  now MERGES newly scraped fields (title, description) into the session's
+  info instead of keeping the thinner one, and when every caption route is
+  gated but words are already on disk, the message says exactly that:
+  "no caption route today — kept what was already here."
+- **8,363 rows stopped being 16,726 event handlers.** The transcript
+  renders in 400-row chunks between frames and ONE delegated listener owns
+  every keep/seek click. Chart canvases redraw when their tab actually
+  shows (a hidden canvas is 0 px wide — it drew into nothing before) and
+  on resize.
+- **Grabber: a month in one click.** When a CivicClerk search finds more
+  than one video, a "⬇ Fetch all N videos" button queues every fetch at
+  the chosen quality; the bin fills as they land.
+- 8 new tests (`test_meeting_shape.py`: pace bins, dynamics lanes, agenda
+  chapters-beat-description / description fallback / one-timestamp-is-not-
+  an-agenda, title card lands as a real PNG at size). 246 pass; the same 2
+  cv2 packaging gates stand.
+
+### 1.2.0: the meeting reads in seconds, Whisper learns the names — 2026-07-17
+- **URL ingest races the web app now — and the routes race each other.**
+  YouTube links skip the yt-dlp probe entirely (the id is in the URL), the
+  two local caption routes run **concurrently** on threads (first one home
+  wins), the metadata rides free on the watch page the caption fetch
+  already reads (`captions.parse_video_details`; even a *failed* caption
+  fetch hands back the title), and YouTube's empty-200 gate tell breaks
+  straight to the community relay instead of waiting out the other doomed
+  route. Measured on a 7-hour Select Board meeting from a caption-gated IP:
+  **7.4 s** to 8,363 readable segments (the deployed web app, warm, same
+  video: 5.2 s — and the desktop's winning route *was* that relay plus two
+  honest local attempts; ungated or proxied, the watch page wins in ~2 s).
+  **Re-opening a known session: 0.1 s** — a session that's already read
+  answers from disk instead of re-asking YouTube. The job message states
+  the time and the route: "read in 7.1s — 8363 segments, captions via the
+  community service."
+- **Whisper gets the names right now — teach it before it listens.**
+  faster-whisper's `hotwords` ride through the whole stack (`scribe/
+  transcribe.py` → `/api/scribe/transcribe` → both UIs): a comma list of
+  people/places/boards the audio likely carries biases the decoder every
+  window. Highlighter **harvests the list from the meeting itself**
+  (`insight.hotwords()` — entity people first, then places, orgs, names
+  scraped from the title; deduped, capped, cut on a comma) and prefills an
+  editable field: fix "John Vancoyak" to "John VanScoyoc" before Scribe
+  runs and the transcript follows your spelling. Scribe's page grew the
+  same field ("teach it the names"). Both model menus add **large-v3 —
+  most accurate (names)** above turbo; job labels say "names taught."
+- **Downloads say what leaves YouTube.** The Edit panel is now *clips
+  first*: one green button — **"⬇ Download highlight clips (N · Ns)"** —
+  fetches only the kept spans (merged, keyframe-cut, one file per span,
+  named `[start-end].mp4`), with the hint counting what stays behind
+  ("only these spans leave YouTube — 5 clips, 29s of a 3:33.0 meeting").
+  The **full recording is its own explicit button** below a rule, wearing
+  the meeting's duration so nobody grabs 7 hours by accident. Quality
+  applies to every fetch and the ladder grew: best / **4K / 1440p** / 1080p
+  / 720p / **480p / audio-only** (Grabber's fetch menu got the same rungs,
+  and its fetches finally honor a chosen quality instead of always "best").
+  Every highlight row grew a **↓ clip** button — fetch just that span.
+  Landed clips list themselves under the progress line with **Reveal**
+  buttons (`/api/media/reveal` — Finder on the Mac, the file manager
+  elsewhere). Verified live: 5 spans → 5 files, each the span's length.
+- **AI, bring-your-own-key, never the default** (`czcore/llm.py`). Paste
+  an Anthropic key in **Settings → AI** (chmod-600 file, masked to its
+  tail, env `ANTHROPIC_API_KEY` wins over the file, a stray
+  `ANTHROPIC_BASE_URL` alone activates nothing) and Highlighter grows two
+  labeled *generative* buttons: **✨ AI narrative brief** (bulleted, every
+  claim carrying its [MM:SS], rendered as the same clickable pills) and
+  **✨ AI** beside Ask (answers ONLY from the retrieval passages, cites
+  inline, says so when they don't contain the answer). Long meetings
+  stride-sample to fit the budget. Without a key nothing changes anywhere;
+  errors are sentences ("the API key was refused (401) — check it in
+  Settings → AI" — verified live with a fake key). stdlib urllib, zero new
+  dependencies, no key ever ships.
+- **⌘K jumps anywhere.** A command palette over the whole suite — type a
+  few letters of any tool (or Queue, Models, Settings, About), Enter, and
+  you're there. Index rows grew **→ Highlighter** (send any cataloged clip
+  straight to the moments-finder), and Highlighter answers transport keys:
+  space play/pause, ←/→ ±5 s — never while you're typing.
+- 13 new tests (`test_llm_names.py`: key precedence/masking/0600, the
+  stray-base-URL guard, watch-page videoDetails parsing incl. the
+  shape-change case, hotwords harvest/dedupe/cap). 238 pass; the 2
+  standing failures are the known cv2-ffmpeg packaging gates.
+
+### 1.1.0 prep: the icon, the DMG's face, and zero-setup captions — 2026-07-17
+- **The suite has an icon**: a cream caret over the amber z — *control z* as
+  a rebus. `packaging/make_icon.py` renders it (ink squircle, 2× supersample,
+  the suite's own font discovery) and compiles `icon.icns`; the spec wires it
+  onto the .app, and the DMG volume wears it too (the custom-icon Finder bit
+  does NOT survive `hdiutil -srcfolder` — measured — so the script builds RW,
+  sets the bit on the mounted root, converts to UDZO).
+- **Version 1.1.0** in both truths; the spec names the Make-wave packages +
+  Pillow as belt-and-braces hiddenimports.
+- **Community caption service**: when YouTube gates a machine and no proxy is
+  set, Highlighter's ingest falls back to the community-highlighter web app's
+  own public transcript engine (BIG's deployment, its residential proxy
+  behind it). Zero setup for download users, only the public video URL is
+  sent, and one Settings switch turns it off. Credentials never ship — the
+  relay shares the *benefit* of the Webshare account, never the account.
+  Verified end-to-end from a caption-gated IP: 60 segments arrived through
+  the service after both local routes failed honestly. Per-video failures
+  from the service (HTTP-error JSON) are read and relayed as sentences.
+- v1.0.0's release page now explains `realesrgan-x4.onnx` (Rise's model,
+  self-hosted at its pinned URL — users never download it by hand).
+- `packaging/RELEASE-NOTES-1.1.0.md` is written for the signing machine;
+  building/signing/notarizing happens there (this keychain has no identity).
+
+### the Webshare workaround comes to the desktop — 2026-07-17
+- **Why:** YouTube now gates caption/timedtext delivery by IP reputation.
+  Investigated live: the community-highlighter **web app's Webshare
+  residential proxy is active and working** (Render reports proxy_enabled,
+  and a transcript fetch through the deployment succeeds in seconds), while
+  from a bare home IP every yt-dlp caption route is currently walled
+  (android_vr lists no tracks, web wants a PO token, tv trips the DRM
+  experiment) and the raw timedtext URL answers with YouTube's empty-200
+  gate. Video downloads still work; only captions are gated.
+- **`czcore/proxy.py`** — the web app's exact configuration, shared: same
+  env var names (`WEBSHARE_PROXY_USERNAME/PASSWORD/HOST`, one account serves
+  both apps), or a Settings-page file in app support (chmod 600); same URL
+  construction (rotating `-1` session suffix, URL-encoded credentials). The
+  status surface masks the username and never returns the password.
+- **`czcore/captions.py`** — the web app's transcript mechanism in stdlib:
+  watch page → captionTracks → timedtext VTT (manual-English beats auto
+  beats other-language), through the proxy when configured. YouTube's
+  empty-200 is refused as success and named for what it is, with the fix:
+  "Configure your Webshare proxy in Settings → fetch network and retry."
+- Every YouTube-facing yt-dlp call (probe, search, captions, downloads)
+  passes `--proxy` when configured; the nightly self-update never does
+  (that's GitHub, not YouTube). Highlighter's ingest chains: yt-dlp
+  captions → watch-page timedtext (+ proxy) → honest sentence; the job says
+  which path won.
+- **Settings → fetch network**: credential fields, live status ("active
+  (tes…on @ p.webshare.io:80)"), Save/Remove; env-var deployments are
+  reported and locked from UI edits. The yt-dlp chips on Highlighter and
+  Grabber append "· webshare" and say in their tooltip that fetches ride
+  the user's residential pool — covenant: it's the user's own account,
+  user-configured, used only for the fetches they ask for.
+- 13 new tests (URL building/suffix/encoding, env-over-file precedence,
+  masking, captionTracks parsing/ranking, video-id forms). Verified live:
+  config roundtrip through the API and UI, chip state, and the full ingest
+  fallback chain ending in the honest gated-IP sentence from a bare IP.
+
+### Highlighter goes web-app-shaped, the suite goes paper — 2026-07-16
+- **Community Highlighter now mirrors the web app** (community-highlighter
+  v9.5's shape), rebuilt on local reads that say what they are:
+  - **URL sessions**: paste a link → the meeting is *readable before any video
+    downloads* — metadata + captions land in a session folder, preview streams
+    through a YouTube embed (seek/play by postMessage), and a session whose
+    video already sits in the library **borrows the local twin's transcript**
+    instead of re-asking YouTube.
+  - **Executive brief** with clickable green [MM:SS] pills — extractive, the
+    meeting's own sentences, spread across the hour (`highlighter/insight.py`).
+  - **Highlights → timeline editor**: reel-style presets (Decisions, Public
+    comment, Controversial, Budget, Actions, Everything) drive the scorer; the
+    top 5 picks auto-load into a **dark NLE strip** — drag to reorder, trim
+    in/out, per-clip thumbs, prev/play/next transport — inside the light app.
+  - **Search every word** with a 50-bin sparkline, **word cloud** (civic
+    stopwords, top-3 glow), **Analyze** cards: decisions with outcomes,
+    entities (people/places/organizations/money, pattern-harvested), speaker
+    participation bars, question flow typed by its words, recurring topics.
+  - **Ask the meeting** — retrieval, labeled as such: best passages with
+    timestamps + follow-up suggestions; never invents prose.
+  - **Smart downloads**: the full recording at a chosen quality, or **only the
+    kept sections** (`--download-sections` + keyframe cuts, one clip per span)
+    which **stitch** into a reel (`stitch_files`). Transcript exports (.txt,
+    .srt) are built client-side; **Google Translate** button copies the full
+    text and opens the site — the web app's own free path for any language.
+  - Civic **Meeting Finder**: yt-dlp's own ytsearch — no API key.
+- **The suite turned light.** Paper cream chrome (the site's tokens, the web
+  app's cues), ink text, white neo-brutalist cards with offset shadows;
+  media surfaces (viewer, filmstrip, scopes, the NLE strip) stay dark on
+  purpose — footage lives in the dark, the chrome lives on paper. Highlighter
+  wears the web app's brand green (#1E7F63 / #22C55E).
+- **Home says "Make Something."**
+- **Every open-a-clip surface takes a drop now**: drag a file into any
+  viewer (or Clear's waveform, or Highlighter's hero) and it opens; a
+  **Browse…** button sits in the center of every empty state instead of only
+  up in the media bar. In the app window drops carry real paths (pywebview);
+  plain browsers explain themselves instead of failing silently.
+- czcore/ytdlp grew `probe_url` (metadata, no download), `fetch_captions`
+  (transcript-first ingest), `search` (ytsearch), and per-section downloads
+  with multi-file result tracking.
+- Tests: 20 new for the insight engine (extractive brief never paraphrases,
+  entity buckets, question typing, decision outcomes, participation shares,
+  retrieval ask hits and honest misses). Verified live: URL ingest, library
+  twin borrow, section-only download (two spans → two clips) → stitched reel,
+  full local flow (brief/cloud/analyze/ask), light theme across every page.
+
+### the Make wave: four new tools, three doors, an About — 2026-07-16
+- **The suite is ten tools.** Two natives from the long-list spec and the two
+  community apps that grew up at BIG, rebuilt on czcore — same jobs, no cloud,
+  no API keys:
+  - **Community Highlighter** (`highlighter/`) — meeting video becomes text,
+    text becomes the reel. Fetch via the managed **yt-dlp nightly** (a check
+    runs on *every* page open and the chip says what it found); YouTube
+    captions seed the transcript instantly (word timing when YT provides tags),
+    one click upgrades through Scribe's local pass; the scorer marks moments
+    with **its reasons on every pick** (decision/money/community/tension
+    keywords, emphasis, optional room-energy blend); keep/drop paragraphs and
+    render the reel (one ffmpeg concat graph, hardware encode) or leave with a
+    selects EDL through Scribe's own exporter.
+  - **BIG Video Grabber** (`grabber/`) — CivicClerk search for any tenant
+    (Brookline default; every URL-shaped field harvested and labeled, bare
+    `youtubeVideoId`s synthesized into links), fetch through yt-dlp *or* the
+    new **zoomshare resolver**: Zoom and **zoomgov.com** share pages resolved
+    with four plain HTTP requests — the flow the old app drove Puppeteer
+    through, multi-clip aware, every failure a sentence naming the step. Then
+    conform for air: constant-rate pass, shared encoder presets, PCM into mov.
+  - **Index** (`indexer/`, tool id `index`) — the footage librarian. Folders →
+    SQLite catalog (FTS5 with LIKE fallback), incremental rescans, missing
+    drives stay listed and say so; plain-word search returns clips *and
+    time-coded transcript hits* read from Scribe sidecars; selects leave as a
+    **FCPXML stringout** (new `czcore/exports/fcpxml.py` — NTSC-exact
+    rationals, percent-encoded file URLs) or CSV.
+  - **Slate** (`slate/`) — the station graphics kit. The **lower-third maker**
+    renders type at 2× through Pillow and downsamples Lanczos; four styles
+    (bar/block/line/clean), slide/rise/fade with cubic easing, live preview
+    *through the export code path* on an alpha checker with safe-area cages;
+    exports **ProRes 4444 with real alpha**, PNG stills, and animated GIF
+    (labeled honestly: 256 colors, web use). Plus SMPTE bars + 1 kHz tone,
+    a countdown leader with beeps, and a program-slate card.
+- **Home is three doors.** Prep / **Make** / Finish — "What are we creating
+  today?" Grabber joins Prep (footage on its way in); Make holds Highlighter,
+  Index, Slate. The community pair keeps its own rail corner: square glyphs,
+  BIG-blue section header, accent-washed rows — deliberately a little
+  different, same covenant.
+- **About page** — the suite's story, the covenant with meanings, this build's
+  numbers, and the website footer's credits verbatim.
+- **Shared plumbing:** `czcore/ytdlp.py` (nightly manager: GitHub check with
+  60s cooldown, atomic binary replace, offline = a sentence and the old build
+  keeps working; downloads print progress and survive failed caption fetches),
+  `czcore/ffrun.py` (ffmpeg with `-progress` parsing + cancel),
+  `czcore/paths.py` (outputs land in `~/Movies/control-z/<tool>`), four new
+  CLIs, packages/scripts registered, `pillow` added to requirements.
+- **Fixed en route:** reel output paths built with `with_suffix()` could
+  resolve to the *source* filename (`meeting.reel` → `.mp4` strips `.reel`) —
+  outputs are appended now and an equality guard refuses to overwrite the
+  source; sidecar discovery used `glob()` on names carrying `[id]`, which glob
+  reads as a character class and never matches — replaced with `startswith`
+  everywhere; yt-dlp subtitle requests narrowed to `en,en-orig` (asking for
+  `en.*` pulls every translated variant and trips YouTube's 429, which used to
+  kill the whole fetch — a landed video now survives a failed caption).
+- Tests: 42 new (scoring/reel merge sweep/VTT word tags, nightly version
+  compare, CivicClerk parsing incl. zoomgov + bare-id synthesis, zoomshare URL
+  matching, FCPXML rationals/escaping/offsets, catalog search + FTS quoting,
+  lower-third clamping/easing/alpha per style). Verified live end-to-end:
+  real YouTube fetch → caption-seeded transcript; real Brookline zoomgov
+  Select Board recording resolved to its mp4 (ranged probe, 3.99 GB, `ftypmp42`);
+  detect → reel render (hardware h264, audio locked) → selects EDL; Index
+  scan/search/FCPXML on disk; Slate ProRes 4444 (`yuva444p12le`) + PNG + GIF.
+
+### the Fusion template pack — ten setups, paste-tested — 2026-07-16
+- **The pack is now ten templates, and every one has been pasted into a live
+  Fusion comp in free Resolve** (build 21, via the scripting API) — the caveat
+  that said "not yet paste-tested" is gone because the test was actually run.
+  Real mattes drove each one: `depth-cli run` on the Pexels street clip,
+  `stencil-cli run` on the portrait.
+- **The existing five were broken in a way the tests couldn't see, and are
+  rebuilt.** `fog`, `depth-grade` and `haze-light` used a `Bitmap` node to key
+  the matte — but `Bitmap` is not a valid Fusion RegID; Resolve silently turns
+  it into a no-op **Dummy** on paste (no image input, no output), so those three
+  produced *nothing*. The correct node is **`BitmapMask`**. All three now key
+  through BitmapMask, and — because the depth matte is near=white — the fog and
+  haze masks are **inverted** so the *far* end mists/glows, which the old ones
+  got backwards too.
+- **`rack-focus` was wired to an input that isn't there.** Its note said to feed
+  the depth matte into `VariBlur.Blur`; VariBlur's blur-map input is actually
+  **`BlurImage`**, and driving real focus needs a distance-from-plane map, not
+  the raw depth. Replaced the `BrightnessContrast` gain hack with a **`Custom`**
+  node computing `max(abs(depth − focal) − tolerance, 0)` — an animatable focal
+  plane on `NumberIn1`, feeding `VariBlur.BlurImage`.
+- **`depth-grade` shipped masks and no grade.** It was three (Dummy) Bitmaps and
+  a note saying "feed these to a ColorCorrector yourself." Now it's a real
+  paste-and-go tree: three `BitmapMask` bands (near / mid via a subtract / far
+  via invert) each driving its own neutral **`ColorCorrector`**, chained.
+- **`parallax` and the tool ids we *assumed* were wrong turned out fine.**
+  `Displace` (`Type`, `XRefraction`, `YRefraction`) and `VariBlur` are real
+  free-edition nodes with the names we guessed; parallax only needed its
+  displacement source actually connected and subtler default refraction. Logged
+  so the next person doesn't re-audit them.
+- **Five new templates**, built and verified the same way:
+  - **`veil-blur`** (the headline): blur *inside* a Stencil matte with a
+    grow/feather so edges don't leak — plus a **mosaic** variant in the same
+    file, bypassed by default. The mosaic needed a `Scale`-down→`Scale`-up
+    (nearest) pair, **not** two `Transform`s: Fusion concatenates adjacent
+    Transforms into one clean resample, so the block pixelation vanished until
+    Scale (which changes real resolution) forced it. Honest note points at the
+    per-frame check.
+  - **`cutout`** — Stencil ProRes-4444 alpha over a new `Background`, alpha
+    tunable through a `MatteControl` rather than trusted.
+  - **`matte-tune`** — `ErodeDilate` + `Blur` on any matte, with two viewer
+    outputs: the tuned matte alone, and the matte as a red tint over the image
+    (the QC bench the other templates assume).
+  - **`confidence-grain`** — `FastNoise` grain merged (SoftLight) through Hush's
+    clean-confidence **alpha**, so grain lands where the denoiser averaged
+    deepest. Note points at Speak as the better path.
+  - **`social-vertical`** — 9:16 canvas, source full-width on a scaled+blurred
+    backdrop of itself. Tuned the fit once we saw a 16:9 source lands full-width
+    (Size 1.0) in a 1080×1920 comp and the backdrop needs ~3.2× to cover height.
+- Every template: `CZ*` node names, exactly one sticky `Note` naming each wire,
+  nothing auto-gains (grade/tune nodes are neutral, grain sits at Blend 0.35).
+- `depth-cli templates` writes all ten (`--pack depth|stencil|all`, descriptive
+  `cz-depth-` / `cz-stencil-` / `cz-hush-` filename prefixes). The zip is
+  rebuilt by a reproducible `packs/build_zip.py` (byte-stable). Tests extended:
+  per-template balanced braces, expected tool ids present, a `Note` present, and
+  **no Studio-only / `Bitmap`-Dummy tool ids** in any file — plus CLI-writes-ten
+  and zip-lists-ten. 146 green.
+
+### loose ends — 2026-07-16
+- **Speaker labels install themselves now.** Scribe's diarization needed two
+  files fetched by hand — one of them buried in a tarball — and because they
+  weren't in the registry the Models page could delete them but not bring them
+  back. Both are registered, hash-pinned and license-carded like every other
+  model; `czcore.models` learned to keep one named member out of a tarball
+  (by exact name — never a blanket extractall, which lets an archive write
+  where it likes). First use downloads ~44 MB and says whose weights they are.
+- **The depth CLI stopped hoarding frames.** `depth-cli run` held a
+  full-resolution float32 map for every frame of a shot, the same bug the
+  Suite's render had: 845 KB/frame at SD, gigabytes at 4K. It now keeps the
+  model's native 256×256 map like the Suite does — 256 KB/frame regardless of
+  source resolution, so a 659-frame 4K clip holds 165 MB where it used to ask
+  for 21.7 GB.
+- Home's doors split by direction of travel rather than by a timeline the
+  tools don't follow: Prep is footage on its way into your editor (Clear,
+  Stencil, Depth), Finish is the cut coming back out (Pivot, Scribe, Rise).
+
+### suite 0.4.0.dev0 — suite services — 2026-07-16
+- **Install OpenFX page** (specs/08 §5): detects Resolve and
+  /Library/OFX/Plugins, reads installed Hush/Speak versions from their
+  Info.plists, and checks the latest GitHub release on click — one GET to
+  the public API, nothing phones home on its own; prerelease-only repos
+  (Speak beta) resolve via the release list and wear a beta badge. Install
+  downloads the release .pkg to ~/Downloads and opens the system installer
+  (which owns the privileges — the plugins dir is root-owned and the page
+  says so instead of pretending). One-click OFXPluginCacheV2.xml clear for
+  the rescan gotcha; uninstall removes the bundle when the dir is writable
+  and otherwise prints the exact sudo command. Verified against this
+  machine's real state: Resolve found, Hush 3.3.0 → v3.7.0 update offered,
+  Speak not-installed → v0.2.0 beta offered.
+- **Models page**: the czcore registry with license + sha-256-pinned badges
+  and true on-disk sizes, download (through the queue, hash-verified) and
+  remove per model; whisper cache and Stencil runtime status. Verified: yunet
+  removed and re-downloaded with its hash checked. Whisper is the one row the
+  registry doesn't own — faster-whisper fetches those from Hugging Face
+  itself, unpinned, and the page says so rather than implying otherwise.
+- **Settings page**: every cache with its real size and a clear button
+  (all regenerable — the page says nothing here can lose work), job-history
+  clear (active jobs never touched — unit-tested), model store and app-data
+  paths, about block.
+- Queue page grew a "clear finished" button; czcore JobManager grew
+  clear_finished().
+- The rail has no coming-soon states left: v0.4 closes the milestone list
+  short of v1.0 (packaging, signing, notarization, DMG).
+- **v0.2, sound + words.** **Clear**: audio workspace (waveform + amber-on-ink
+  spectrogram with before/after A/B), rescue chain from the CLI's own calls
+  (de-hum auto-detect, de-click, DF3 isolation when the binary exists — honest
+  hint when not, de-ess, loudness presets), video remux against the untouched
+  stream, room-tone generator, and the covenant surfaces: a "what was removed"
+  monitor chip playing the residual, loudness I/peak meters, and a residual
+  by-band null test ("presence band loud = you're eating words"). Verified on
+  synthesized degraded dialogue: found the injected 60 Hz hum + harmonics,
+  repaired the clicks, presence band read −16.5 dB (quiet).
+  **Scribe**: the transcript-first editor — word-click seeks, karaoke follows
+  the audio clock with the caption overlaid on video (current word amber),
+  low-confidence words tinted (proof those), inline segment edits saved to the
+  sidecar, speaker rename everywhere, caption presets, SRT/VTT/TXT/marker-EDL
+  exports, and the pull list → CMX3600 selects EDL in source TC. Verified: two
+  TTS voices separated perfectly, 23 s transcribed in 16 s (base), selects EDL
+  honors embedded TC.
+- **v0.3, the GPU pair.** **Depth**: false-color scrub (source/blend/depth),
+  click-to-probe crosshair reading the local map, histogram with draggable
+  in/out handles, stability meter, matte render (10-bit gray ProRes,
+  edge-guided, temporal EMA with cut resets) through the queue, Fusion
+  template pack writer. Honest note in the UI: scrub previews are per-frame;
+  the render smooths. MiDaS-small fetched hash-verified on first use.
+  **Stencil**: click-to-prompt (⌥-click excludes), SAM 2.1 propagation through
+  the queue, matte tint + onion skin overlays, the confidence-strip QC loop
+  (0.85 threshold line, low frames named), coverage %, post chain
+  (grow/feather/despeckle/temporal majority) and luma / ProRes-4444-alpha
+  exports. The runtime stays an honest optional — the page says exactly what
+  to install when it's missing. The ⌥-click exclude only works at all because
+  of the multi-point prompt fix below: on the old engine every click after the
+  first was silently discarded, so a prompt ending in an exclude produced an
+  empty matte.
+- New engine deps into the venv story: faster-whisper, sherpa-onnx, soundfile,
+  scipy, pyloudnorm (+ torch/sam2 as Stencil's optional heavies).
+- Suite rail: no coming-soon states left among the tools — Install OpenFX,
+  Models, Settings remain v0.4.
+
+### czcore.denoise — the Hush core, ported — 2026-07-16
+- **Pivot and Rise now carry Hush's denoising**, because both make noise
+  worse (punch-ins scale it up; SR models synthesize texture from it).
+  `czcore/denoise.py` is a faithful vectorized port of Hush-OpenNR's
+  `nr_core.h` reference: the noise estimator (fine + coarse |Laplacian| and
+  |temporal diff| medians with Hush's calibration constants, 16-bin
+  brightness gain curve), the hard-knee gated 3-frame temporal merge with
+  Ghost Guard and per-neighbour exposure offsets, the two-scale residual
+  re-measure, and the fine NLM band (bias-corrected, edge-aware Preserve
+  Detail). Hush defaults throughout. Honestly NOT ported (still plugin-only):
+  shift-search motion tracking, firefly zapper, Render Boost, Deep Clean,
+  medium/coarse EQ bands, the refine texture stack — reports say
+  "hush-core", never plain "Hush".
+- Wiring: Rise cleans BEFORE scaling (suite checkbox default on; CLI
+  `--denoise`; preview cleans the patch so the A/B compares scalers on what
+  the render will feed them). Pivot cleans the crop before any scaling with
+  the temporal neighbours cropped at the CURRENT frame's rect — the stack
+  stays registered while the camera path moves (suite checkbox, default
+  off). Both paths use a 1-frame lookahead and put the measured σ in the
+  report.
+- Verified: 9 golden tests (estimator accuracy, +12 dB static-trio PSNR,
+  motion no-ghosting, edge survival, near-identity on clean, determinism);
+  on the real SD test clip the cleaned ×2 output measures ~45% less luma
+  noise (0.39% → 0.22%) and ~54% less chroma than the plain ×2. Cost:
+  ~160 ms/frame SD, ~1.6 s/frame 1080p — roughly halves Rise throughput,
+  named in the UI.
+- Brand line updated everywhere: control-z is "free cleaning, prepping, and
+  finishing tools for DaVinci Resolve" (app rails, tool docstrings, README,
+  pyproject, site templates + rebake).
+
+### suite 0.1.0.dev0 — 2026-07-16
+- **The Suite desktop app lands** (specs/08): one FastAPI + WebSocket server
+  over the existing engines, single-page UI (hand-written HTML/CSS/JS, no
+  framework) in a pywebview window — `python -m suite`, `--serve` for a
+  browser. Grade-room design per spec §6: ink/forest surfaces, cream text,
+  amber for measurements only, per-tool accents, node-wire rail indicator.
+- Shell: rail with honest coming-in-v0.x pages for the four tools not yet
+  moved in, Home with Prep/Finish doors + recents, shared viewer (zoom/pan,
+  A/B wipe, canvas overlays, JKL + arrows; nb_frames metadata treated as an
+  estimate and clamped to the decodable truth), filmstrip, Easy/Studio
+  inspector density remembered per tool, scope rack (histogram + waveform
+  on every image tool).
+- Jobs: czcore.appshell grew a persistent SQLite queue — FIFO worker,
+  cooperative cancel, history survives restarts, jobs killed by a quit are
+  recorded as interrupted. WebSocket events + poll fallback; cross-tool
+  Queue page. The legacy immediate mode is unchanged (pivot micro-UI still
+  green).
+- Frame service: PyAV decode → cached JPEGs at viewer height with prefetch
+  around the playhead; frame indices derived from pts (frame-accurate on
+  CFR, golden-tested against a painted synthetic clip); past-EOF is a 404,
+  never an aliased frame.
+- Export presets in czcore.media: ProRes 422/HQ (hardware
+  `prores_videotoolbox` when present, `prores_ks` fallback), ProRes 4444
+  (+alpha), DNxHR HQX, H.264/HEVC (VideoToolbox, libx264/5 fallback) —
+  every render reports the encoder that actually ran and passes color tags
+  through untouched (and says so). Validated by real encodes.
+- **Pivot moved in fully** (old page prints a retirement note, still works):
+  analyze warms the scrub cache during its own decode pass, path-trace +
+  punch-in scopes, per-shot overrides re-solve in place, render through the
+  export panel, Fusion .setting export. Verified end-to-end on the 4K
+  reference clip: 659/659 frames of ProRes 4444 (ffprobe-counted), bt709
+  tags carried, override → punch verified, 1318-key .setting written.
+- **Rise moved in**: probe + interlace guard (combed sources refused with a
+  sentence; Studio-only bypass), A/B wipe against honest bicubic, detail
+  heatmap = |model − bicubic| with an added-energy readout, model picker
+  showing true on-disk availability, batch → queue. Verified: 96/96-frame
+  batch through hardware ProRes; a 4K job cancelled mid-run removed its
+  partial file. `rise.video.upscale_video` extracted from the CLI (CLI
+  behavior unchanged); `resolve_model("auto")` now falls back to lanczos
+  when the ONNX isn't converted instead of crashing.
+- Tests: 119 green (26 new — job store persistence/cancel/interrupt, frame
+  cache accuracy/EOF/mtime-keying, export preset mapping/alpha honesty).
+- Honest limitations: previews are proxy JPEGs (native-pixel loupe planned),
+  one job runs at a time, jobs are threads not worker processes (isolation
+  arrives before Stencil's propagation), no drag-drop into the webview,
+  headings fall back to system fonts (Space Grotesk/DM Sans not bundled),
+  Windows untested.
+- Trap for the file: FastAPI + `from __future__ import annotations` +
+  a function-local `WebSocket` import makes every /ws connect 403 silently
+  (string annotations resolve against module globals) — keep FastAPI names
+  imported at module level.
+### stencil — 2026-07-16 (bug fix)
+- **Multi-point prompts were broken and silently produced empty mattes.**
+  SAM2's `add_new_points_or_box` defaults to `clear_old_points=True`, so
+  sending one point per call kept only the last — a prompt ending in an
+  exclude point erased the matte entirely (confidence 0.00 on every frame).
+  Points are now grouped by (frame, object) and sent in one call:
+  the same prompt set went 0.00 → **0.98 mean confidence, 0 frames flagged**.
+  Found while re-shooting the site demos; regression test added
+  (`TestPromptGrouping`). The old single-point demo worked by luck.
+
+### site (licensed demo footage) — 2026-07-16
+- **No member footage on the site.** Every published demo frame was re-shot on
+  freely-licensed clips — the previous frames came from private member footage
+  we don't hold public rights to. `site/make_slides.py` documents the
+  licensing rule at the top so this can't regress. Hush's before/after stays
+  its own synthetic validation card.
+- The people-images are Pexels clips chosen so each is also a harder demo, and
+  so the people shown reflect the communities these tools are for (curly-hair
+  portrait for Stencil/Speak, freckled close-up for Rise, city street for
+  Pivot/Depth). The Pexels license asks for no attribution; the footer credits
+  them anyway, because a project about giving work away should say whose work
+  it borrowed. An earlier pass used Tears of Steel (© Blender Foundation,
+  CC-BY 3.0); it now stays in Test Footage as a spare scope-format source and
+  no longer ships.
+- Every frame is still real tool output: Stencil's matte is a genuine SAM 2.1
+  propagation (0.98 confidence), Pivot's box is a genuine solved 9:16 crop,
+  Depth is the shipping engine, Rise is real Real-ESRGAN vs Lanczos.
+- Rise demo re-sourced from an in-focus face crop — the old pair came from a
+  defocused region, so reconstruction read as blur; it now reads sharp AND
+  denoised, which is the actual behavior.
+- Pivot slide centre-crops the 2.4:1 scope frame to a true 16:9 first, so its
+  "16:9 → 9:16" label is literally what's drawn.
+- **Speak is live**: status `beta` (new status tier), real download links to
+  github.com/amateurmenace/Speak v0.2.0, copy/limitations taken from its
+  README (early beta, macOS-only binaries, no preset library yet).
+- Domain cutover: control-z.org released from Hush-OpenNR and claimed by this
+  repo; CNAME is now written by `site/build.py` on every bake so a deploy
+  can't drop it. hush-whitepaper.pdf carried alongside whitepaper.html.
+
+### site (single-page rebuild) — 2026-07-16
+- One-page architecture: tool pages retired; each tool is a homepage section
+  (`#t-<id>`) with its live simulation, feature list, brief how-to, and a
+  `<details>` technical expander (architecture, model card, honest limitations,
+  replaces). Node tree + chips now anchor-jump. Stale pages cleaned at bake.
+- Epic dark hero (white-paper band promoted): philosophy/why + four value
+  cards over live grain; CTA row (suite download, tools, design study).
+- New sections: Downloads (Suite app card, Hush/Speak OpenFX, white paper —
+  carried into the bake from Hush-OpenNR/docs), DaVinci + Premiere guide
+  cards, "Who is this for?" (stations section retired into it), free-toolbox
+  grid on the homepage (9 tools with blurbs/links).
+- Topline: "A Weird Machine project in collaboration with Brookline
+  Interactive Group" (linked). Footer: designed/developed credit (Stephen
+  Walter × Claude Code · 2026), Weird Machine logo, Community AI Project
+  (communityai.studio) + BIG partnership line, MIT license link.
+- specs/08-suite-app.md: the control-z Suite desktop app scoped (architecture,
+  IA, per-tool workspaces, export contract incl. ProRes 4444+alpha, OpenFX
+  installer page, design language, milestones, risks, build-session prompt).
+
+### site (interactive redesign) — 2026-07-16
+- Rebuilt on the Hush site's actual component vocabulary (studied
+  `Hush-OpenNR/site/index.template.html`): Space Grotesk/DM Sans, mono topline,
+  amber-period hero, `.pcard` pair cards, `.feat` chips, dark `.ntree` with
+  animated wire dots + click/keyboard node selection, `.wipe` before/after
+  slider, grain-canvas `.study` bands, auto-cycle-until-click tabs, scroll-
+  animated chart bars, numbered install steps, tipcards. Assets baked base64.
+- Homepage: live Hush wipe in the hero (real footage); the suite as a clickable
+  Resolve-style node tree in true pipeline order (restore→edit→sound→color→
+  deliver, Speak last in color); audience tabs auto-cycle and relight the tree;
+  Hush×Speak pair cards; grain-band covenant; "money undone" animated chart.
+- Per-tool interactive demos, all real data or real math: Hush + Rise wipe
+  sliders (actual outputs), Pivot solver playground (the shipping controller
+  ported to JS — drag the subject), Scribe paper-edit (its own diarized
+  transcript; clicks emit a real CMX3600 EDL), Clear WebAudio room (synthesized
+  hum/room/voice with de-hum, isolate mix-back, and "listen to what's removed"),
+  Depth probe + depth-shaped fog (real engine data), Stencil confidence-strip
+  QC loop, Speak mini node-tree. All verified in-browser.
+
+### site — 2026-07-16
+- control-z.org rebuilt as the suite site per specs/07: Jinja2 bake to
+  `site/docs/`, data-driven from `content/tools.yaml`. Homepage pipeline map
+  (lit/breathing nodes, audience filter chips), tool-page template (verbline,
+  replaces strip, quick start, model card, honest limitations), roadmap
+  (proposed tools live ONLY there), mission/stations/toolbox pages.
+  Not yet deployed: CNAME move + Hush-OpenNR/docs redirects happen at launch.
+
+### stencil 0.1.0.dev0 — 2026-07-16
+- SAM 2.1 video propagation (torch/MPS), prompt-file CLI, matte post chain
+  (temporal majority, grow/feather/despeckle — golden-tested), luma +
+  ProRes 4444 alpha exports, per-frame confidence with low-confidence frame
+  report (the covenant surface). Verified on 4K footage (~2 fps propagation
+  on M1 Max at 720p analysis). Deferred: click UI (v0.2), ONNX diet (v0.3).
+
+### scribe 0.1.0.dev0 — 2026-07-16
+- faster-whisper transcription (word timestamps, VAD), sherpa-onnx
+  diarization (verified: 2-voice test separated perfectly), SRT/VTT with
+  broadcast/social caption presets, TXT, marker EDL (speaker-colored,
+  free-Resolve importable), CMX3600 selects EDL from pull lists. NDF
+  timecode math golden-tested (23.976 drift documented). Deferred: editor
+  UI (the v0.2 centerpiece), FCPXML.
+
+### clear 0.1.0.dev0 — 2026-07-16
+- De-hum (auto 50/60 Hz detect + harmonic notches, >20 dB kill golden-tested),
+  de-click (second-difference detector — IIR ringing bug found and fixed;
+  rarity guard so speech never counts as clicks), DF3 voice isolation via the
+  official deep-filter binary (PyPI package is unmaintained — learned the hard
+  way), room tone (random-phase PSD resynthesis, loop-safe), loudness
+  normalize (BS.1770, refuses to hide peak conflicts), residual export
+  ("listen to what was removed"). Deferred: UI, video remux, Demucs deep
+  mode, nih-plug VST3.
+
+### rise 0.1.0.dev0 — 2026-07-16
+- Real-ESRGAN x4 converted from official BSD-3 weights to our pinned ONNX
+  (rise.convert), tiled inference with seam-free overlap blending
+  (golden-tested vs whole-frame), beats-bicubic golden test, honest lanczos
+  fallback, CLI with interlace guard (refuses combed sources) and flow-gated
+  temporal stabilization. Engine live inside Pivot's --enhance.
+
+### depth 0.1.0.dev0 — 2026-07-16
+- MiDaS-small ONNX backend (MIT) behind a model-agnostic engine (VDA-Small
+  planned), temporal EMA with shot-boundary resets, per-shot robust
+  normalization, He-et-al guided-filter edge-aware upsampling, 10-bit gray
+  ProRes matte export, false-color previews, five-template Fusion pack
+  (fog / rack focus / depth grade / parallax / haze light). Verified on 4K
+  footage. (Pack later paste-tested + rebuilt + grown to ten — see the
+  unreleased entry at the top.)
+
+### pivot 0.2.0.dev0 — 2026-07-16
+- Web UI (czcore.appshell: FastAPI + local page): open clip, analyze with
+  progress, scrub preview with crop overlay + subject dot, path-trace sparkline
+  (targets vs solved path), per-shot mode overrides (re-solve in place),
+  render + Fusion export from the page. Verified end-to-end in a browser.
+- Fusion `.setting` export: animated Crop with one keyframe per frame
+  (czcore.exports.fusion_setting) — the free-Resolve keyframe roundtrip.
+  NEEDS a paste-test in Resolve before release.
+- YOLOX-s person detection (Apache-2.0, hash-pinned), lazy "auto" mode: runs
+  only on frames with no face; per-shot subject falls back face → person.
+- rise.engine seed: frozen upscale API, tiled ONNX runner ready, honest
+  `lanczos` fallback backend (labeled, never claims synthesis). `--enhance`
+  wired into render + UI.
+- Sidecar v1 now stores raw targets per aspect (enables instant re-solve).
+
+### pivot 0.1.0.dev0 — 2026-07-16
+- Path solver (punch/follow, deadzone+hysteresis, lookahead anticipation,
+  jerk-limited motion; overshoot pinned at ≤4·a_max by golden tests) + presets
+  (calm/standard/attentive).
+- Shot detection (adaptive luma-diff, czcore.shots), greedy face tracker
+  (YuNet, MIT, hash-pinned auto-download), per-shot subject selection.
+- Renderer: frame-accurate (EOF flush handled), native-res crops (no silent
+  upscale), audio stream-copy or honest skip, h264/hevc/prores.
+- CLI: analyze / render / auto with per-shot QC report; sidecar JSON v1.
+- Verified end-to-end on 4K ProRes footage (659/659 frames). Known v0.1 limits:
+  faces-only detection (subjects lost when the face is undetectable — persons
+  model lands in v0.2), no y-axis eyeline offset yet, no Fusion export yet.
+
+### czcore 0.1.0.dev0 — 2026-07-16
+- shots (pure cut detector + PyAV diffs), media probe parser, model store with
+  sha256 pinning + license cards. 51 tests green (stdlib-only run).

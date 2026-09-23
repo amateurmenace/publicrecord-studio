@@ -1,0 +1,1125 @@
+/* The record, on paper — publicrecord.studio.
+
+   Ink on white. The tokens above this line (the :root block + the @font-face
+   set) are composed at bake time from brand/ — the single source for the
+   record's face (specs/20 §8). This file only references them. Zero fuchsia,
+   zero purple, zero cream/oxblood/amber: publicrecord is the quietest property
+   and its stylesheet proves it. Deep green (--accent) is the one accent;
+   emerald (--state) is a state light only; the brighter greens live inside
+   measurement graphics as tints. Flat vector — no shadows, radius 0–4px. */
+
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--surface-page);color:var(--text-primary);
+  font:var(--text-md)/var(--leading-body) var(--font-sans);
+  font-feature-settings:"kern";-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+b,strong{font-weight:var(--weight-bold)}
+:focus-visible{outline:2px solid var(--state);outline-offset:2px}
+
+.main{max-width:1180px;margin:0 auto;padding:var(--space-6) var(--space-5) var(--space-8)}
+
+/* ============================ masthead ============================ */
+.masthead{max-width:1180px;margin:0 auto;padding:var(--space-4) var(--space-5) 0}
+.nameplate{text-align:center;border-top:var(--border-w) solid var(--text-primary);
+  border-bottom:4px double var(--text-primary);padding:var(--space-4) 0 var(--space-3)}
+.brand{display:inline-flex;align-items:center;gap:var(--space-3);
+  font-family:var(--font-mono);font-weight:var(--weight-bold)}
+.brand .brandmark{flex:0 0 auto;display:inline-flex;line-height:0}
+.brand .brandmark svg{width:34px;height:34px;display:block}
+.brand .wm{font-size:30px;letter-spacing:-.01em;color:var(--text-primary)}
+.brand .wm .tld{color:var(--text-secondary);font-weight:var(--weight-medium)}
+
+/* the folio — towns · dateline · the covenant's six words */
+.folio{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:var(--space-2) var(--space-4);padding:var(--space-2) 0;
+  font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)}
+.folio .dateline{color:var(--text-secondary)}
+.folio .dateline b{color:var(--text-primary);font-weight:var(--weight-medium)}
+.folio .cov6{color:var(--text-secondary);border-bottom:var(--border-w) solid var(--border-hairline)}
+.folio .cov6:hover{color:var(--accent);border-color:var(--accent)}
+
+/* the section line */
+.sectionnav{display:flex;flex-wrap:wrap;justify-content:center;
+  gap:var(--space-2) var(--space-5);
+  border-top:var(--border-w) solid var(--border-hairline);
+  border-bottom:var(--border-w) solid var(--border-hairline);
+  padding:var(--space-2) 0;margin-top:var(--space-2)}
+.navlink{font-family:var(--font-mono);font-size:var(--text-xs);
+  text-transform:uppercase;letter-spacing:var(--tracking-label);
+  color:var(--text-secondary);padding:2px 0;
+  border-bottom:var(--border-w-strong) solid transparent}
+.navlink:hover{color:var(--text-primary)}
+.navlink.active{color:var(--accent);font-weight:var(--weight-bold);
+  border-bottom-color:var(--accent)}
+
+/* ============================ footer ============================ */
+.foot{max-width:1180px;margin:0 auto;padding:var(--space-5);
+  border-top:var(--border-w-strong) solid var(--text-primary);
+  display:flex;gap:var(--space-2) var(--space-4);flex-wrap:wrap;align-items:center;
+  font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)}
+.foot-mark{display:inline-flex;line-height:0}
+.foot-mark svg{width:18px;height:18px;display:block}
+.foot .cov:hover{color:var(--accent)}
+.foot .scopelink:hover{color:var(--accent)}
+.foot .ed{margin-left:auto;color:var(--text-muted)}
+
+/* ============================ buttons ============================ */
+.btn{display:inline-block;font:var(--weight-medium) var(--text-sm)/1 var(--font-mono);
+  cursor:pointer;background:var(--surface-card);color:var(--text-primary);
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  padding:8px 13px;letter-spacing:.01em}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--text-inverse);border-color:var(--accent)}
+.btn.primary:hover{background:#031d0e;color:var(--text-inverse)}
+
+/* ============================ chips + kickers ============================ */
+/* the kicker — mono overline label opening a section or card */
+.tag{display:block;font-family:var(--font-mono);font-size:var(--text-xs);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-secondary);margin-bottom:var(--space-3);
+  padding-bottom:var(--space-2);border-bottom:var(--border-w) solid var(--border-hairline)}
+.chip{font-family:var(--font-mono);font-size:9px;letter-spacing:.05em;
+  text-transform:uppercase;background:var(--accent);color:var(--text-inverse);
+  padding:2px 6px;border-radius:var(--radius-sm)}
+.hint{color:var(--text-secondary);font-size:var(--text-sm)}
+.kicker{font-family:var(--font-mono);font-size:var(--text-xs);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-secondary)}
+
+/* ============================ cards + rules ============================ */
+.card{background:var(--surface-card);border:var(--border-w) solid var(--border-hairline);
+  border-radius:var(--radius-sm);padding:var(--space-4) var(--space-5);margin-top:var(--space-5)}
+.grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:var(--space-5);align-items:start}
+h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
+  line-height:var(--leading-tight);letter-spacing:-.01em}
+.back{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  text-transform:uppercase;letter-spacing:var(--tracking-label)}
+.back:hover{color:var(--accent)}
+
+/* ============================ scope: folio pills + banner ============================ */
+.scope{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;
+  font-family:var(--font-mono);font-size:var(--text-xs)}
+.scopelabel{letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-muted)}
+.scopenow{color:var(--text-primary);font-weight:var(--weight-medium)}
+.scope.one .scopehint{color:var(--text-muted)}
+.scopetowns{display:flex;gap:var(--space-1);flex-wrap:wrap}
+.scopetown{padding:2px 9px;border-radius:999px;color:var(--text-secondary);
+  border:var(--border-w) solid var(--border-hairline)}
+.scopetown:hover{border-color:var(--accent);color:var(--accent)}
+.scopetown.active{background:var(--accent);border-color:var(--accent);color:var(--text-inverse)}
+.scopetown .scopen{margin-left:5px;color:inherit;opacity:.7}
+
+/* the un-trapping — a slim folio-adjacent line, never a boxed interruption */
+.scopebanner{border-left:var(--border-w-strong) solid var(--accent);
+  background:var(--tint-1);padding:var(--space-2) var(--space-4);
+  margin-bottom:var(--space-4);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4)}
+.scopebanner[hidden]{display:none}
+.scopemsg{font-size:var(--text-sm);color:var(--text-primary)}
+.scopeacts{display:flex;gap:var(--space-2);flex-wrap:wrap}
+.scopeacts .btn{font-size:var(--text-xs);padding:5px 11px}
+
+.scopeline{font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary);margin-top:var(--space-3)}
+.scopeline[hidden]{display:none}
+.bodyfilter{display:flex;gap:6px;flex-wrap:wrap}
+.bodyfilter[hidden]{display:none}
+.bodychip{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);cursor:pointer;
+  padding:4px 10px;border-radius:999px;background:var(--surface-card);
+  color:var(--text-secondary);border:var(--border-w) solid var(--border-hairline)}
+.bodychip:hover{border-color:var(--accent);color:var(--accent)}
+.bodychip.active{background:var(--accent);border-color:var(--accent);color:var(--text-inverse)}
+.bodychip .bn{font-size:9px;opacity:.75;margin-left:4px}
+.bodylist{font-size:var(--text-sm);color:var(--text-secondary)}
+.bodylist[hidden]{display:none}
+.searchfilters{display:flex;gap:var(--space-4);flex-wrap:wrap;margin-top:var(--space-3)}
+.filt{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  display:inline-flex;align-items:center;gap:6px;text-transform:uppercase;
+  letter-spacing:.04em}
+.filt select{font:var(--weight-medium) var(--text-sm)/1 var(--font-sans);padding:6px 9px;
+  border-radius:var(--radius-sm);background:var(--surface-card);color:var(--text-primary);
+  border:var(--border-w) solid var(--border-strong)}
+
+/* ============================ home / front page ============================ */
+.hero h1{font-size:var(--text-display);letter-spacing:-.02em}
+.hero .why{max-width:62ch;color:var(--text-secondary);margin:var(--space-2) 0 var(--space-4);
+  font-size:var(--text-md)}
+.askform{display:flex;gap:var(--space-2);flex-wrap:wrap}
+.askform input{flex:1;min-width:260px;padding:12px 14px;font-size:var(--text-md);
+  font-family:var(--font-sans);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  color:var(--text-primary)}
+.askform input:focus{border-color:var(--accent);outline:none}
+.addline{margin-top:var(--space-2)}
+.addline a{color:var(--accent);font-size:var(--text-sm);font-weight:var(--weight-medium)}
+
+/* by the numbers — a stat band in mono 800 tabular numerals */
+.statband{display:flex;flex-wrap:wrap;gap:0;margin-top:var(--space-5);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm)}
+.statcell{flex:1;min-width:92px;padding:var(--space-3) var(--space-4);
+  border-right:var(--border-w) solid var(--border-hairline)}
+.statcell:last-child{border-right:0}
+.statcell b{display:block;font-family:var(--font-mono);font-weight:var(--weight-black);
+  font-size:28px;line-height:1.05;font-variant-numeric:tabular-nums;color:var(--text-primary)}
+.statcell span{font-size:var(--text-xs);color:var(--text-secondary);
+  font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.04em}
+.statcell:hover b{color:var(--accent)}
+
+/* coverage strip — hand-drawn bars in the tint scale */
+.covstrip{display:flex;align-items:flex-end;gap:6px;height:78px}
+.covbar{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:22px}
+.covbar span{width:100%;max-width:34px;background:var(--accent);display:block}
+.covbar label{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
+
+/* meeting rails (briefs) */
+.mcards{display:grid;gap:var(--space-3)}
+.mcard{display:flex;gap:var(--space-3);align-items:center;background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  padding:var(--space-2)}
+.mcard:hover{border-color:var(--accent)}
+.mcard img{width:96px;height:54px;object-fit:cover;border-radius:var(--radius-sm);
+  background:var(--surface-inverse);flex:0 0 auto;border:var(--border-w) solid var(--border-hairline)}
+.mc-body{min-width:0}
+.mc-body b{display:block;font-family:var(--font-mono);font-size:var(--text-base);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px}
+.mc-meta{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted)}
+.lrows,.rsrows{display:grid;gap:var(--space-2)}
+.lrow,.rsrow{display:block;padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);
+  border:var(--border-w) solid var(--border-hairline);background:var(--surface-card)}
+.lrow b,.rsrow b{font-family:var(--font-mono);font-weight:var(--weight-bold)}
+.lrow:hover,.rsrow:hover{border-color:var(--accent)}
+.lmeta{display:block;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary);margin-top:2px}
+.meters{display:grid;gap:var(--space-2)}
+.meter{display:flex;align-items:center;gap:var(--space-3);font-size:var(--text-sm)}
+.meter>span{flex:0 0 130px}
+.mtrack{flex:1;height:12px;background:var(--tint-1);border-radius:999px;overflow:hidden;
+  border:var(--border-w) solid var(--border-hairline)}
+.mtrack i{display:block;height:100%;background:var(--tint-4)}
+.meter b{flex:0 0 44px;text-align:right;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary)}
+
+/* the front-page search line — understated, a paper's own search */
+.frontsearch{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;
+  margin-top:var(--space-4)}
+.frontsearch input{flex:1;min-width:240px}
+.frontsearch .addline{margin:0}
+
+/* a section head — a kicker over the 2px ink rule that opens a section */
+.sectionhead{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);
+  border-bottom:var(--border-w-strong) solid var(--text-primary);
+  padding-bottom:var(--space-2);margin-bottom:var(--space-3)}
+.seeall{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);
+  text-transform:uppercase;letter-spacing:var(--tracking-label)}
+.seeall:hover{text-decoration:underline}
+
+/* the lead row: the lead story (2fr) beside the briefs column (1fr) */
+.leadrow{display:grid;grid-template-columns:2fr 1fr;gap:var(--space-6);
+  margin-top:var(--space-5);padding-top:var(--space-4);
+  border-top:3px solid var(--accent)}
+.briefscol{border-left:var(--border-w) solid var(--border-hairline);padding-left:var(--space-5)}
+.lead .kicker{display:block;margin-bottom:var(--space-3)}
+.lead-media{display:block;margin-bottom:var(--space-3)}
+.lead-media img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;
+  border:var(--border-w) solid var(--border-hairline);background:var(--surface-inverse)}
+.lead-hl h2{font-family:var(--font-mono);font-weight:var(--weight-black);font-size:30px;
+  line-height:1.12;letter-spacing:-.015em;color:var(--text-primary)}
+.lead-hl:hover h2{color:var(--accent)}
+.lead-meta{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  margin:var(--space-2) 0;display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap}
+.deck{font-size:var(--text-md);color:var(--text-secondary);max-width:60ch;margin:var(--space-2) 0}
+.pulls{margin-top:var(--space-3);display:grid;gap:6px}
+.pulls .kicker{display:block;margin-bottom:2px}
+.pull{display:block;padding-left:var(--space-3);border-left:var(--border-w-strong) solid var(--accent);
+  font-weight:var(--weight-medium);font-size:var(--text-sm);color:var(--text-primary);line-height:1.4}
+.pull:hover{color:var(--accent)}
+.pull .ts{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);margin-right:6px}
+.pull .mk{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--text-muted);margin-right:4px}
+
+/* by the numbers */
+.numbers{margin-top:var(--space-7)}
+.covwrap{margin-top:var(--space-4)}
+.covwrap .kicker{display:block;margin-bottom:var(--space-2)}
+
+/* story rows: two ruled columns */
+.storyrow{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);margin-top:var(--space-7)}
+.story{min-width:0}
+.rsrow .rsdelta{display:block;font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px}
+.rsrow b{font-family:var(--font-mono)}
+
+/* the access ledger */
+.accled{display:grid;gap:var(--space-3)}
+.acc{display:grid;grid-template-columns:110px auto 1fr;gap:var(--space-3);align-items:baseline}
+.acc-l{font-family:var(--font-mono);font-size:var(--text-xs);text-transform:uppercase;
+  letter-spacing:.04em;color:var(--text-secondary)}
+.acc-n{font-family:var(--font-mono);font-weight:var(--weight-black);font-size:var(--text-lg);
+  color:var(--text-primary);font-variant-numeric:tabular-nums}
+.acc-w{font-size:var(--text-sm);color:var(--text-secondary)}
+
+/* the votes teaser */
+.vteasers{display:grid;gap:var(--space-2)}
+.vteaser{display:block;padding:var(--space-2) var(--space-3);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  border-left:var(--border-w-strong) solid var(--accent)}
+.vteaser:hover{background:var(--tint-1)}
+/* one quiet line, after everything the record itself has to say: the papers
+   the press built (specs/21 P3) — the folio's register, no card, no color */
+.featline{font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary);margin:var(--space-6) 0 0;
+  border-top:var(--border-w) solid var(--border-hairline);
+  padding-top:var(--space-3);line-height:var(--leading-body)}
+/* links in prose distinguish themselves by more than color (G183: ink vs
+   slate is 2.36:1) — the underline is the affordance */
+.featline a{color:var(--text-primary);text-decoration:underline;
+  text-underline-offset:2px}
+.featline a:hover{color:var(--accent)}
+.vt-motion{display:block;font-size:var(--text-sm);color:var(--text-primary)}
+.vt-meta{display:block;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary);margin-top:3px}
+
+/* ============================ meeting page ============================ */
+.mhead h1{font-size:26px;margin-top:var(--space-1)}
+.mmeta{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  margin-top:var(--space-1)}
+.chips{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap;margin-top:var(--space-3)}
+.langmenu{font-size:var(--text-sm);color:var(--text-secondary)}
+.langmenu select{font-family:var(--font-sans);font-size:var(--text-sm);padding:5px 8px;
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  background:var(--surface-card)}
+/* media surfaces stay dark, always */
+.player{position:relative;background:var(--surface-inverse);border-radius:var(--radius-sm);
+  overflow:hidden;margin:var(--space-4) 0;aspect-ratio:16/9;display:flex;
+  align-items:center;justify-content:center}
+.player.facade{cursor:pointer}
+.pfacade-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.7}
+.playbtn{position:relative;z-index:1;width:66px;height:66px;border-radius:50%;border:0;
+  background:var(--accent);color:#fff;font-size:24px;cursor:pointer}
+.playbtn:hover{background:var(--state)}
+.phint{position:absolute;bottom:8px;z-index:1;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:#e2e8f0;background:rgba(15,23,42,.72);padding:2px 8px;border-radius:var(--radius-sm)}
+.player.local{aspect-ratio:auto;padding:var(--space-5)}
+.player.local .phint{position:static;background:none;color:#cbd5e1}
+.player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.captionstrip{background:var(--surface-inverse);color:#f1f5f9;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:8px 14px;font-size:var(--text-md);
+  min-height:20px;margin:calc(var(--space-4)*-1) 0 var(--space-4)}
+.captionstrip:lang(zh){font-size:var(--text-md)}
+.summary p{color:var(--text-secondary)}
+.tbar{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);
+  flex-wrap:wrap;margin:var(--space-5) 0 var(--space-2)}
+.dls{display:flex;gap:var(--space-3);flex-wrap:wrap}
+.dl{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  border-bottom:var(--border-w) dotted var(--border-strong)}
+.dl:hover{color:var(--accent);border-color:var(--accent)}
+.transcript{background:var(--surface-card);border:var(--border-w) solid var(--border-hairline);
+  border-radius:var(--radius-sm);padding:var(--space-4) var(--space-5)}
+.seg{padding:3px 0;scroll-margin-top:70px}
+.seg .ts{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);margin-right:7px}
+.seg .spk{display:block;font-size:var(--text-xs);font-weight:var(--weight-medium);
+  color:var(--text-secondary);margin-top:var(--space-2);font-family:var(--font-mono)}
+.seg.now{background:var(--tint-1);border-radius:var(--radius-sm);
+  box-shadow:inset 2px 0 0 var(--accent)}
+.seg.hit{background:var(--tint-2);border-radius:var(--radius-sm)}
+.disclose{font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-3);
+  font-family:var(--font-mono)}
+.citebar{position:fixed;z-index:40;background:var(--surface-inverse);color:var(--text-inverse);
+  border-radius:var(--radius-sm);padding:6px 9px;display:none}
+.citebar button{background:none;border:0;color:var(--text-inverse);cursor:pointer;
+  font:var(--weight-medium) var(--text-xs)/1 var(--font-mono)}
+
+/* the Moments panel — the analyzer's scored read, as cards */
+.mo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+  gap:var(--space-3);margin-bottom:var(--space-3)}
+.moment{display:block;padding:var(--space-3);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);
+  border-left:var(--border-w-strong) solid var(--accent);border-radius:var(--radius-sm)}
+.moment:hover{border-color:var(--accent);background:var(--tint-1)}
+.mo-head{display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:6px}
+.mo-head .ts{font-family:var(--font-mono);font-weight:var(--weight-bold);font-size:var(--text-sm);
+  color:var(--accent)}
+.mo-kind{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:var(--tracking-label);color:var(--text-secondary);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);padding:1px 5px}
+.mo-quote{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-primary);
+  line-height:1.45}
+.mo-foot{display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2)}
+.mo-reason{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  text-transform:capitalize;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mo-score{flex:0 0 56px;height:6px;background:var(--tint-1);border-radius:999px;overflow:hidden;
+  border:var(--border-w) solid var(--border-hairline)}
+.mo-score i{display:block;height:100%;background:var(--tint-4)}
+
+/* the reel composer — a tick on each moment card, a tray below (JS-only) */
+.mo-card{position:relative}
+.mo-card .mo-head{padding-right:72px}                 /* room for the tick */
+.mo-card.in-reel .moment{background:var(--tint-2);border-left-color:var(--state)}
+.mo-tick{position:absolute;top:var(--space-3);right:var(--space-3);z-index:2;
+  font:var(--weight-medium) 10px/1 var(--font-mono);cursor:pointer;
+  background:var(--surface-card);color:var(--text-secondary);
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  /* ≥24px tall meets WCAG 2.5.8 target size, and the button sits over the
+     card's own deep-link anchor so it must be a target in its own right */
+  min-height:24px;padding:6px 8px}
+.mo-tick:hover{border-color:var(--accent);color:var(--accent)}
+.mo-card.in-reel .mo-tick{background:var(--accent);color:var(--text-inverse);
+  border-color:var(--accent)}
+.mo-tick[aria-pressed="true"]::before{content:""}
+
+/* the tray — the reel as a reorderable, trimmable list + the three outputs */
+.reeltray{border-left:var(--border-w-strong) solid var(--accent)}
+.rt-head{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3)}
+.rt-head .tag{flex:1;margin-bottom:var(--space-2)}
+.rt-clear{padding:4px 9px;font-size:var(--text-xs)}
+.rt-clips{display:flex;flex-direction:column;gap:var(--space-2);margin:var(--space-3) 0}
+.rt-clip{display:flex;gap:var(--space-3);align-items:flex-start;
+  padding:var(--space-2) var(--space-3);background:var(--surface-page);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm)}
+.rt-ord{flex:0 0 auto;font-family:var(--font-mono);font-weight:var(--weight-bold);
+  font-size:var(--text-sm);color:var(--accent);min-width:18px}
+.rt-main{flex:1;min-width:0}
+.rt-quote{font-size:var(--text-sm);font-weight:var(--weight-medium);
+  color:var(--text-primary);line-height:1.4}
+.rt-times{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;margin-top:3px}
+.rt-kind{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:var(--tracking-label);color:var(--text-secondary);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);padding:1px 5px}
+.rt-range{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)}
+.rt-range .ts{color:var(--accent)}
+/* the meeting a clip came from, shown once a reel spans meetings (P2-B) */
+.rt-from,.rc-from{display:block;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--accent);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-clip.rt-other{border-left:var(--border-w-strong) solid var(--accent)}
+.reel-now .rn-from{font-family:var(--font-mono);color:var(--accent)}
+.rt-trim{display:flex;gap:4px;align-items:center;margin-top:var(--space-2);flex-wrap:wrap}
+.rt-tl{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:var(--tracking-label);color:var(--text-secondary)}
+.rt-move{flex:0 0 auto;display:flex;gap:4px;align-items:flex-start}
+.rt-b{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);cursor:pointer;
+  background:var(--surface-card);color:var(--text-primary);min-width:26px;
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);padding:6px}
+.rt-b:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.rt-b:disabled{opacity:.4;cursor:default}
+.rt-x:hover{border-color:var(--accent)}
+.rt-out{display:flex;flex-direction:column;gap:var(--space-2);
+  border-top:var(--border-w) solid var(--border-hairline);padding-top:var(--space-3)}
+.rt-share{display:flex;flex-direction:column;gap:4px}
+.rt-url{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  background:var(--surface-page);border:var(--border-w) solid var(--border-hairline);
+  border-radius:var(--radius-sm);padding:7px 9px;width:100%}
+.rt-btns{display:flex;gap:var(--space-2);flex-wrap:wrap}
+
+/* the /app/r viewer — the player, the now-playing line, the cite list */
+.reel h1{font-size:26px;margin-top:var(--space-1)}
+.reel .presslede{max-width:60ch}
+.reel-now{font-family:var(--font-mono);font-size:var(--text-sm);
+  display:flex;gap:var(--space-3);align-items:baseline;flex-wrap:wrap;
+  margin:calc(var(--space-4)*-1) 0 var(--space-4);
+  padding:var(--space-2) var(--space-3);background:var(--tint-1);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm)}
+.reel-now[hidden]{display:none}
+.reel-now .rn-ord{color:var(--accent);font-weight:var(--weight-bold)}
+.reel-now .ts{color:var(--accent)}
+.reel-now .rn-quote{color:var(--text-secondary);flex:1;min-width:0}
+.reelcitelist{display:flex;flex-direction:column;gap:var(--space-2);margin:var(--space-3) 0}
+.reelcite{display:flex;gap:var(--space-3);align-items:flex-start;
+  padding:var(--space-3);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);
+  border-left:var(--border-w-strong) solid var(--accent);border-radius:var(--radius-sm)}
+.reelcite:hover{background:var(--tint-1)}
+.reelcite.on{background:var(--tint-2);border-left-color:var(--state)}
+.reelcite .rc-ord{flex:0 0 auto;font-family:var(--font-mono);font-weight:var(--weight-bold);
+  font-size:var(--text-sm);color:var(--accent);min-width:18px}
+.rc-body{flex:1;min-width:0}
+.rc-quote{display:block;font-size:var(--text-sm);font-weight:var(--weight-medium);
+  color:var(--text-primary);line-height:1.4}
+.rc-meta{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;margin-top:3px}
+.rc-meta .ts{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)}
+.rc-where{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary);
+  margin-bottom:var(--space-3)}
+
+/* /app/p — a rendered paper (specs/21 P1). The quiet palette on purpose:
+   whatever mode the editor liked, a paper READS as the record reads — ink on
+   white, the deep green, and not one studio hue. The cards and cite rows are
+   the record's own classes; only the paper's masthead is new. */
+.paper-page h1{font-size:26px;margin-top:var(--space-1)}
+.paper-page .presslede{max-width:60ch}
+.phead{margin:var(--space-5) 0 var(--space-4);
+  border-bottom:var(--border-w-strong) solid var(--text-primary);
+  padding-bottom:var(--space-3)}
+.ptitle{font-family:var(--font-mono);font-weight:var(--weight-bold);
+  font-size:30px;line-height:var(--leading-tight);margin:0 0 var(--space-2);
+  overflow-wrap:break-word}
+.pfrom{font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary);margin:0}
+.paperbody .mcard{margin:0 0 var(--space-3)}
+.pb-reel{margin:var(--space-5) 0}
+.pb-play{margin:var(--space-3) 0 0}
+.pb-gone{font-size:var(--text-sm);color:var(--text-secondary);
+  background:var(--tint-1);border:var(--border-w) dashed var(--border-strong);
+  border-radius:var(--radius-sm);padding:var(--space-3);margin:0 0 var(--space-3)}
+
+/* /app/p — P2: the editor's own words, and charts computed from the planes.
+   Still the quiet palette on purpose: deep green is measurement (the
+   analytics page's rule), slate is label, and no studio hue reaches a
+   rendered paper (§6.1 — the bound is scoped by construction). */
+.pb-note{margin:var(--space-5) 0;padding:var(--space-3) var(--space-4);
+  background:var(--tint-1);border-left:3px solid var(--accent);
+  border-radius:var(--radius-sm)}
+.pb-note .kicker{display:block;margin-bottom:var(--space-2)}
+.pb-note p{margin:0 0 var(--space-2);max-width:66ch;overflow-wrap:break-word}
+.pb-note p:last-child{margin-bottom:0}
+.pb-note-empty{border-left-style:dashed}
+.pb-chart{margin:var(--space-5) 0}
+.pb-chartsub{font-size:var(--text-sm);color:var(--text-secondary);
+  margin:var(--space-2) 0 var(--space-3);max-width:66ch}
+.pb-chartwrap{overflow-x:auto;padding-bottom:var(--space-1)}
+.pb-chartwrap svg{display:block}
+.pb-chartkey{display:flex;align-items:center;gap:var(--space-2);
+  font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);
+  color:var(--text-secondary);margin:var(--space-2) 0 0}
+.pk-dot{display:inline-block;width:10px;height:10px;border-radius:50%;
+  margin-right:2px}
+.pk-full{background:var(--accent)}
+.pk-hollow{background:var(--surface-card);border:2px solid var(--accent);
+  box-sizing:border-box}
+.pk-other{background:var(--accent);opacity:.5;border-radius:3px}
+.pb-twinwrap{overflow-x:auto}
+.pb-chartsrc{font-size:var(--text-xs);color:var(--text-secondary);
+  margin:var(--space-2) 0 0}
+/* magnitude bars in HTML — labels stay real text at every width. (pb-bar,
+   NOT .lensbar: the meeting page already owns that name for its 9px inline
+   pill, and a later same-specificity rule would squash these rows.) */
+.pb-bars{display:grid;gap:7px;margin:var(--space-2) 0}
+.pb-bar{display:grid;grid-template-columns:minmax(88px,150px) 1fr max-content;
+  gap:var(--space-2);align-items:center;font-size:var(--text-xs)}
+.pb-bar .pb-name{color:var(--text-secondary);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;text-decoration:none}
+.pb-bar a.pb-name:hover{color:var(--accent);text-decoration:underline}
+.pb-bar .pb-track{height:12px;background:var(--tint-1);
+  border-radius:var(--radius-sm);overflow:hidden}
+.pb-bar .pb-fill{display:block;height:100%;background:var(--accent);
+  opacity:.82;border-radius:var(--radius-sm)}
+.pb-bar .pb-n{font-family:var(--font-mono);color:var(--text-primary);
+  white-space:nowrap}
+
+/* /app/p — the featured papers (specs/21 P3): the empty state's front door.
+   Pressed at press time as plain links, rendered outside #paperbody, hidden
+   by the renderer the moment a real paper stands. The paper palette only —
+   mcard's register, and not one studio hue (§6.1). */
+.pfeat{margin:var(--space-6) 0 0}
+.pf-lede{font-size:var(--text-sm);color:var(--text-secondary);max-width:60ch;
+  margin:var(--space-2) 0 var(--space-3)}
+.pf-cards{display:grid;gap:var(--space-3);
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.pf-card{display:block;background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);
+  border-left:var(--border-w-strong) solid var(--accent);
+  border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4);
+  text-decoration:none;color:var(--text-primary)}
+.pf-card b{display:block;font-family:var(--font-mono);font-size:var(--text-base);
+  margin-bottom:var(--space-1)}
+.pf-card:hover b{color:var(--accent);text-decoration:underline}
+/* no :focus-visible rule of its own: the pressed :root emits no --focus-ring,
+   and a more-specific rule naming it would resolve to outline:none and kill
+   the working global ring (the studio block's own documented trap) — the
+   global :focus-visible var(--state) ring covers these cards */
+.pf-sub{display:block;font-size:var(--text-xs);color:var(--text-secondary);
+  line-height:var(--leading-body)}
+
+/* /app/ai — the AI constitution. The record's quiet register throughout:
+   neutrals + deep green, native interactivity (details/summary), the same
+   card grammar as the covenant. Nothing here is louder than the paper. */
+.aipage h1{font-size:26px;margin-top:var(--space-1)}
+.aipage .presslede{max-width:64ch}
+.aiband{display:block;background:var(--surface-card);
+  border:var(--border-w-strong) solid var(--accent);border-radius:var(--radius-sm);
+  padding:var(--space-4) var(--space-5);margin:var(--space-5) 0;
+  text-decoration:none}
+.aiband:hover{background:var(--tint-1)}
+.aiband-kicker{display:block;font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--state);margin-bottom:var(--space-2)}
+.aiband-line{display:block;font-size:var(--text-md);line-height:var(--leading-body);
+  color:var(--text-primary);max-width:70ch}
+.ailist{margin:var(--space-4) 0;padding-left:0;list-style:none;
+  counter-reset:aiart}
+.ailist>li{counter-increment:aiart;position:relative;
+  padding:var(--space-4) var(--space-4) var(--space-4) 56px;
+  background:var(--surface-card);border:var(--border-w) solid var(--border-hairline);
+  border-left:var(--border-w-strong) solid var(--accent);
+  border-radius:var(--radius-sm);margin-bottom:var(--space-3);
+  font-size:var(--text-base);line-height:var(--leading-body)}
+.ailist>li::before{content:counter(aiart,decimal-leading-zero);
+  position:absolute;left:var(--space-4);top:var(--space-4);
+  font:var(--weight-bold) var(--text-sm)/1 var(--font-mono);color:var(--accent)}
+.ailist details{margin-top:var(--space-2)}
+.ailist summary{cursor:pointer;font:var(--weight-medium) var(--text-xs)/1.4 var(--font-mono);
+  color:var(--state);letter-spacing:.02em}
+.ailist summary:hover{text-decoration:underline}
+.ailist details p{margin:var(--space-2) 0 0;font-size:var(--text-sm);
+  color:var(--text-secondary)}
+.aidiagram{display:block;width:100%;height:auto;max-width:760px;
+  margin:var(--space-4) 0;background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm)}
+.aitable-wrap{overflow-x:auto;margin:var(--space-4) 0}
+.aitable{width:100%;min-width:640px;border-collapse:collapse;font-size:var(--text-sm)}
+.aitable th{font:var(--weight-bold) var(--text-xs)/1.4 var(--font-mono);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-secondary);text-align:left;
+  border-bottom:var(--border-w-strong) solid var(--text-primary);
+  padding:var(--space-2) var(--space-3) var(--space-2) 0}
+.aitable td{vertical-align:top;line-height:var(--leading-body);
+  border-bottom:var(--border-w) solid var(--border-hairline);
+  padding:var(--space-3) var(--space-3) var(--space-3) 0}
+.aitable td:first-child{font-weight:var(--weight-bold);color:var(--text-primary)}
+.aip{max-width:64ch;line-height:var(--leading-body)}
+.ailinks{margin:var(--space-3) 0;padding-left:0;list-style:none}
+.ailinks li{padding:var(--space-2) 0;border-bottom:var(--border-w) solid var(--border-hairline);
+  font-size:var(--text-sm);line-height:var(--leading-body)}
+.covai{margin:var(--space-3) 0}
+.foot-credit{font-size:var(--text-xs);color:var(--text-secondary);
+  line-height:1.6;max-width:100%}
+.foot-credit a{color:var(--text-secondary);text-decoration:underline}
+.foot-credit a:hover{color:var(--accent)}
+.scopeai{font-size:var(--text-xs);color:var(--text-secondary);
+  text-decoration:underline;margin-left:var(--space-2)}
+.scopeai:hover{color:var(--accent)}
+
+/* the right-margin minimap — segment density + moment marks (JS-drawn) */
+.minimap{position:fixed;right:10px;top:130px;bottom:96px;width:12px;z-index:15;
+  display:none;background:var(--tint-1);border:var(--border-w) solid var(--border-hairline);
+  border-radius:6px;cursor:pointer}
+.minimap.on{display:block}
+.mm-fill{position:absolute;left:1px;right:1px;background:var(--border-hairline);border-radius:5px}
+.mm-mark{position:absolute;left:-2px;right:-2px;height:3px;background:var(--accent);border-radius:2px}
+.mm-mark.q{background:var(--tint-4)}
+.mm-now{position:absolute;left:-3px;right:-3px;height:2px;background:var(--state)}
+@media (max-width:1320px){.minimap{display:none !important}}
+
+/* the sticky mini-header — appears once the masthead scrolls away */
+.mini-header{position:fixed;top:0;left:0;right:0;z-index:35;
+  background:var(--surface-card);border-bottom:var(--border-w-strong) solid var(--text-primary);
+  transform:translateY(-100%);transition:transform .18s ease;
+  display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-5)}
+.mini-header.on{transform:translateY(0)}
+.mini-header .mh-title{font-family:var(--font-mono);font-weight:var(--weight-bold);
+  font-size:var(--text-sm);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;flex:1;min-width:0}
+.mini-header .mh-now{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent)}
+.mini-header .mh-now[hidden]{display:none}
+.mini-header .btn{flex:0 0 auto}
+@media (prefers-reduced-motion:reduce){.mini-header{transition:none}}
+
+/* ============================ issue / long view ============================ */
+.issue h1{font-size:26px;margin-top:var(--space-1)}
+.idisclose{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-muted);
+  margin-top:var(--space-1)}
+.ichips{display:flex;gap:6px;flex-wrap:wrap;margin:var(--space-3) 0}
+.alias{background:var(--tint-1);border:var(--border-w) solid var(--border-hairline);
+  border-radius:var(--radius-sm);padding:2px 8px;font-size:var(--text-xs);font-family:var(--font-mono)}
+.rel{background:var(--surface-card);border:var(--border-w) solid var(--border-hairline);
+  border-radius:var(--radius-sm);padding:2px 8px;font-size:var(--text-xs);
+  color:var(--text-secondary);font-family:var(--font-mono)}
+.feedlink a{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)}
+.feedlink a:hover{color:var(--accent)}
+.timeline{display:flex;gap:0;overflow-x:auto;padding:var(--space-4) 2px var(--space-1)}
+.tnode{flex:0 0 auto;min-width:230px;max-width:260px;padding:0 var(--space-4);position:relative}
+.tnode::before{content:"";position:absolute;top:7px;left:0;right:0;height:2px;background:var(--border-hairline)}
+.tnode:first-child::before{left:50%}
+.tnode:last-child::before{right:50%}
+.tdot{position:relative;z-index:1;width:13px;height:13px;margin:1px auto var(--space-2);
+  border-radius:50%;background:var(--accent);border:3px solid var(--surface-page)}
+.thead{text-align:center;margin-bottom:var(--space-2)}
+.tdate{display:block;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary)}
+.ttitle{display:block;font-size:var(--text-sm);color:var(--text-secondary);font-family:var(--font-mono)}
+.ttitle:hover{color:var(--accent)}
+.tn{display:block;font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
+.beads{display:flex;flex-direction:column;gap:4px}
+.bead,.milestone{font-size:var(--text-xs);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  padding:5px 8px;line-height:1.4}
+.bead:hover,.milestone:hover{border-color:var(--accent)}
+.milestone{background:var(--tint-1);border-left:2px solid var(--accent)}
+.bead .ts,.milestone .ts{font-family:var(--font-mono);color:var(--accent)}
+.outcome{font-family:var(--font-mono);font-size:9px;background:var(--accent);
+  color:var(--text-inverse);padding:1px 5px;border-radius:var(--radius-sm)}
+
+/* ============================ search ============================ */
+.searchpage h1,.addpage h1,.covpage h1{font-size:28px}
+#results{margin-top:var(--space-4);display:grid;gap:var(--space-2)}
+.sresult{display:block;background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  padding:10px 13px;position:relative}
+.sresult:hover{border-color:var(--accent)}
+.sresult.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.sresult .ts{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--accent);margin-right:7px}
+.sresult .smeta{display:block;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-muted);margin-top:3px}
+mark{background:var(--tint-2);color:inherit;border-radius:2px;padding:0 1px}
+/* provenance: why a moment is in the list. Only the Studio can say — the
+   static index knows one way of finding things and so says nothing, which is
+   why these appear and disappear with the API. Restyled to the record's
+   palette: meaning is deep-green bordered, word is slate, both is deep-green
+   filled, related is dashed. Zero library-violet, zero amber (specs/20 §5). */
+.prov{font:var(--weight-bold) 9px/1 var(--font-mono);text-transform:uppercase;
+  letter-spacing:.03em;padding:2px 5px;border-radius:var(--radius-sm);
+  border:var(--border-w) solid var(--border-strong);color:var(--text-secondary);
+  margin-right:6px;vertical-align:1px}
+.prov-meaning{color:var(--accent);border-color:var(--accent)}
+.prov-both{color:var(--text-inverse);background:var(--accent);border-color:var(--accent)}
+.prov-related{color:var(--text-muted);border-style:dashed}
+/* the live badge — the record is answering from the Studio, not the envelope */
+.live{font:var(--weight-bold) 9px/1 var(--font-mono);text-transform:uppercase;
+  letter-spacing:.03em;color:var(--state)}
+/* the hover peek — ±1 segment of context from the segs plane */
+.peek{position:absolute;z-index:30;left:12px;right:12px;bottom:calc(100% - 2px);
+  background:var(--surface-inverse);color:var(--text-inverse);
+  border-radius:var(--radius-sm);padding:8px 11px;font-size:var(--text-sm);
+  line-height:1.45;display:none}
+.peek b{color:#e2e8f0;font-family:var(--font-mono);font-size:var(--text-xs);font-weight:var(--weight-medium)}
+.sresult:hover .peek,.sresult.sel .peek{display:block}
+.peek .pk-now{color:#fff}
+
+/* ============================ add a meeting ============================ */
+.addpage .why{max-width:62ch;color:var(--text-secondary);margin:var(--space-2) 0 var(--space-4)}
+#addresult{margin-top:var(--space-3)}
+.addhit{background:var(--tint-1);border:var(--border-w) solid var(--accent);
+  border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4)}
+.addcompose{margin-top:var(--space-4);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  padding:var(--space-3) var(--space-4)}
+.composebody{display:grid;gap:var(--space-2);margin-top:var(--space-3)}
+.composebody label{display:grid;gap:3px;font-size:var(--text-xs);color:var(--text-secondary);
+  font-family:var(--font-mono)}
+.composebody input,.composebody textarea{padding:8px 9px;font-family:var(--font-sans);
+  font-size:var(--text-base);border:var(--border-w) solid var(--border-strong);
+  border-radius:var(--radius-sm);background:var(--surface-card)}
+.composeacts{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-2)}
+
+/* ============================ covenant ============================ */
+.covlist{list-style:none;display:grid;gap:var(--space-2);margin:var(--space-4) 0;max-width:72ch}
+.covlist li{padding-left:20px;position:relative}
+.covlist li::before{content:"·";position:absolute;left:6px;color:var(--accent);font-weight:var(--weight-bold)}
+.covpage h2{font-family:var(--font-mono);font-size:var(--text-lg);margin:var(--space-6) 0 0;
+  padding-top:var(--space-4);border-top:var(--border-w) solid var(--border-hairline)}
+.covpage .covwhy{max-width:66ch;color:var(--text-secondary);margin:var(--space-2) 0 0}
+
+/* ============================ the press page (and the quiet doors) ======= */
+.press h1{font-size:28px}
+.press .why{max-width:64ch;color:var(--text-secondary);margin:var(--space-3) 0 var(--space-5);
+  font-size:var(--text-md)}
+.presslede{max-width:64ch;color:var(--text-primary);font-size:var(--text-md);margin:var(--space-3) 0}
+.toollist{display:grid;gap:0;border-top:var(--border-w) solid var(--border-hairline);margin:var(--space-5) 0}
+.toolrow{display:grid;grid-template-columns:150px 1fr;gap:var(--space-4);
+  padding:var(--space-3) 0;border-bottom:var(--border-w) solid var(--border-hairline);
+  align-items:baseline;scroll-margin-top:80px}
+.toolrow:target{background:var(--tint-1)}
+.toolname{font-family:var(--font-mono);font-weight:var(--weight-bold);color:var(--text-primary)}
+.toolname .tverb{display:block;font-weight:var(--weight-regular);font-size:var(--text-xs);
+  color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.toolwhy{color:var(--text-secondary);font-size:var(--text-sm)}
+.toolwhy .liveshere{color:var(--accent);font-weight:var(--weight-medium)}
+.toolwhy .liveshere:hover{text-decoration:underline}
+.presscta{margin-top:var(--space-6);border-top:var(--border-w-strong) solid var(--text-primary);
+  padding-top:var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:center}
+.presscta .hint{font-family:var(--font-mono)}
+
+/* ============================ vote ledger ============================ */
+.ledger .vledger{display:flex;flex-direction:column;gap:var(--space-3)}
+.vrow{border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  overflow:hidden;background:var(--surface-card)}
+.vhead{display:block;padding:9px 12px;background:var(--tint-1);
+  border-bottom:var(--border-w) solid var(--border-hairline);color:var(--text-primary);
+  font-size:var(--text-sm)}
+.vhead:hover{background:var(--tint-2)}
+.vhead .ts{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);color:var(--text-secondary);margin-right:6px}
+.tally{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);padding:1px 5px;margin:0 4px}
+.roll{display:flex;flex-wrap:wrap;gap:6px 12px;padding:9px 12px}
+.rollent{font-size:var(--text-sm);display:inline-flex;align-items:center;gap:5px}
+.rollent a{color:var(--text-primary);border-bottom:var(--border-w) dotted var(--border-strong)}
+.rollent a:hover{color:var(--accent);border-color:var(--accent)}
+/* YES deep-green filled · NO ink outline · ABSTAIN slate — letters always,
+   never colour alone (WCAG, specs/20 §5) */
+.rc{font:var(--weight-bold) 9px/1 var(--font-mono);text-transform:uppercase;
+  letter-spacing:.03em;padding:2px 5px;border-radius:var(--radius-sm);
+  border:var(--border-w) solid var(--border-strong)}
+.rc.y{color:var(--text-inverse);background:var(--accent);border-color:var(--accent)}
+.rc.n{color:var(--text-primary);border-color:var(--text-primary)}
+.rc.a{color:var(--text-secondary);border-color:var(--border-strong)}
+
+/* ============================ the document lane ============================ */
+.docs{display:flex;flex-direction:column;gap:4px;margin-top:6px;padding-left:10px;
+  border-left:2px solid var(--accent)}
+.docn{font-size:var(--text-sm);color:var(--text-primary);font-weight:var(--weight-medium);font-family:var(--font-mono)}
+.docn:hover{color:var(--accent)}
+.cite{display:block;font-size:var(--text-xs);color:var(--text-secondary);margin-left:14px}
+.docrows{display:flex;flex-direction:column;gap:6px}
+.docrow{display:block;padding:8px 11px;background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-left:2px solid var(--accent);
+  border-radius:var(--radius-sm);color:var(--text-primary);font-size:var(--text-sm)}
+.docrow:hover{background:var(--tint-1)}
+.docrow .lmeta{color:var(--text-muted);font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);margin-left:6px}
+.milestone.vote{border-left-color:var(--accent)}
+
+/* ============================ officials ============================ */
+.offgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-4)}
+.offcard{border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  background:var(--surface-card);padding:var(--space-4)}
+.offhead{display:flex;justify-content:space-between;align-items:baseline}
+.offhead b{font:var(--weight-bold) var(--text-md)/1 var(--font-mono)}
+.offhead .lmeta{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);color:var(--text-muted)}
+.offtally{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:var(--space-2) 0}
+.offtot{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);color:var(--text-secondary);margin-left:auto}
+.vcells{display:flex;flex-wrap:wrap;gap:4px}
+.vcell{display:inline-flex;flex-direction:column;align-items:center;gap:1px}
+.vc-date{font:var(--weight-medium) 8px/1 var(--font-mono);color:var(--text-muted)}
+.officials .why,.analytics .why,.graphpage .why,.stillpage .why{max-width:64ch;
+  color:var(--text-secondary);margin:var(--space-2) 0 var(--space-4)}
+
+/* ============================ analytics (the record, drawn) ============== */
+.heatwrap{overflow-x:auto}
+table.heat{border-collapse:collapse;font-size:var(--text-xs);width:100%}
+table.heat th{font:var(--weight-bold) 10px/1 var(--font-mono);text-transform:capitalize;
+  padding:3px 5px;text-align:center;white-space:nowrap;color:var(--text-secondary)}
+table.heat th.fmlbl{text-align:left;text-transform:none}
+table.heat th.fmlbl a{color:var(--text-primary);white-space:nowrap;font-family:var(--font-mono)}
+table.heat th.fmlbl a:hover{color:var(--accent)}
+table.heat td{width:40px;height:26px;text-align:center;
+  font:var(--weight-bold) 10px/1 var(--font-mono);border:var(--border-w) solid var(--surface-page)}
+.trows,.nrows{display:flex;flex-direction:column;gap:3px}
+.trow,.nrow{display:flex;align-items:baseline;gap:var(--space-2);padding:5px 8px;
+  border-radius:var(--radius-sm);color:var(--text-primary);font-size:var(--text-sm)}
+.trow b,.nrow b{font-family:var(--font-mono);font-weight:var(--weight-bold)}
+.trow:hover,.nrow:hover{background:var(--tint-1)}
+.trow .lmeta,.nrow .lmeta{margin-left:auto}
+.nkind{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.nkind.nk-peo{background:var(--accent)}.nkind.nk-pla{background:var(--tint-4)}
+.nkind.nk-org{background:var(--state)}
+
+/* the analyzer's read (framing lenses, questions) */
+.lenses{display:flex;flex-direction:column;gap:6px}
+.lensrow{display:grid;grid-template-columns:110px 1fr 34px 64px;align-items:center;
+  gap:var(--space-2);font-size:var(--text-sm)}
+.lenslabel{font-weight:var(--weight-medium);text-transform:capitalize;font-family:var(--font-mono);
+  font-size:var(--text-xs);color:var(--text-primary)}
+.lensbar{height:9px;background:var(--tint-1);border-radius:999px;overflow:hidden;
+  border:var(--border-w) solid var(--border-hairline)}
+.lensbar i{display:block;height:100%;background:var(--accent)}
+.lensn{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);color:var(--text-primary);text-align:right}
+.lensdrift{font:var(--weight-medium) 10px/1 var(--font-mono);color:var(--text-muted)}
+.qgroups{display:flex;flex-direction:column;gap:var(--space-3)}
+.qgroup .qtype{display:inline-block;font:var(--weight-bold) 10px/1 var(--font-mono);text-transform:uppercase;
+  letter-spacing:.05em;color:var(--accent);margin-bottom:4px}
+.qrow{display:block;padding:4px 8px;border-left:2px solid var(--border-hairline);margin:3px 0;
+  color:var(--text-primary);font-size:var(--text-sm)}
+.qrow:hover{background:var(--tint-1);border-left-color:var(--accent)}
+.qrow .ts{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);color:var(--text-secondary);margin-right:6px}
+
+/* ============================ the issue graph ============================ */
+.graphcard{display:flex;justify-content:center;background:var(--surface-card)}
+.graphsvg{width:100%;max-width:620px;height:auto}
+.graphtwin{margin-top:var(--space-3)}
+.graphtwin summary{cursor:pointer;font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);color:var(--text-secondary)}
+table.twin{border-collapse:collapse;width:100%;margin-top:var(--space-2);font-size:var(--text-sm)}
+table.twin th,table.twin td{text-align:left;padding:5px 8px;border-bottom:var(--border-w) solid var(--border-hairline)}
+table.twin a{color:var(--accent)}
+
+/* ============================ still watching ============================ */
+.stilltools{display:flex;gap:var(--space-2);margin:var(--space-3) 0}
+.watchcard .thead{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3);
+  margin-bottom:var(--space-2)}
+.watchcard .ttitle{font:var(--weight-bold) var(--text-md)/1 var(--font-mono);color:var(--accent)}
+.wlast .beads{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+
+/* ============================ update banner ============================ */
+.updatebar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);
+  background:var(--surface-inverse);color:var(--text-inverse);padding:9px 16px;
+  border-radius:999px;font-size:var(--text-sm);z-index:40;border:var(--border-w) solid var(--accent)}
+.updatebar button{background:none;border:0;color:var(--text-inverse);
+  font:var(--weight-bold) var(--text-sm)/1 var(--font-sans);text-decoration:underline;cursor:pointer;padding:0 0 0 4px}
+
+/* ============================ responsive ============================ */
+@media (max-width:720px){
+  .main{padding:var(--space-4) var(--space-4) var(--space-7)}
+  .masthead{padding:var(--space-3) var(--space-4) 0}
+  .brand{gap:var(--space-2)}
+  .brand .brandmark svg{width:26px;height:26px}
+  .brand .wm{font-size:18px}
+  .sectionnav{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;gap:var(--space-4)}
+  .navlink{white-space:nowrap}
+  .grid2,.leadrow,.storyrow{grid-template-columns:1fr}
+  .briefscol{border-left:0;padding-left:0;border-top:var(--border-w) solid var(--border-hairline);
+    padding-top:var(--space-4);margin-top:var(--space-4)}
+  .toolrow{grid-template-columns:1fr;gap:var(--space-1)}
+  .lead-hl h2{font-size:24px}
+  .acc{grid-template-columns:1fr;gap:2px}
+  .statcell{min-width:calc(50% - 1px);border-bottom:var(--border-w) solid var(--border-hairline)}
+  /* the reel: one column, controls wrap, tap targets stay ≥ their 26px min */
+  .rt-clip{gap:var(--space-2)}
+  .rt-b{min-width:30px;padding:8px 6px}
+  .rt-btns .btn{flex:1;text-align:center}
+  .mo-card .mo-head{padding-right:66px}
+}
+
+/* ============================ reduced motion + print ============================ */
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto !important;
+  animation-duration:.001ms !important;transition-duration:.001ms !important}}
+@media print{
+  .masthead .sectionnav,.foot,.player,.tbar .dls,.chips,.disclose,
+  .scopebanner,.bodyfilter{display:none}
+  body{color:#000;background:#fff}
+  .transcript{border:0;padding:0}
+  .seg .ts{color:#000}
+}
+
+/* the kits — Publisher's reading half (specs/20 §6, §7.9 P2). Quiet like the
+   rest of the record: neutrals + deep green, no new palette. Clips reuse the
+   moment card; only the index grid and the copy blocks are new. */
+.press .eyebrow{margin:var(--space-3) 0 var(--space-1)}
+.kitgrid{display:grid;gap:var(--space-3);
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));margin:var(--space-4) 0}
+/* kit clip cards carry no reel tick — reclaim the room the meeting page holds */
+.press.kit .mo-card .mo-head{padding-right:0}
+.press.kit .kittitles{list-style:none;margin:var(--space-2) 0;padding:0;
+  display:flex;flex-direction:column;gap:var(--space-2)}
+.press.kit .kittitles li{font-family:var(--font-mono);font-size:var(--text-base);
+  color:var(--text-primary);padding:var(--space-2) var(--space-3);
+  background:var(--surface-card);border:var(--border-w) solid var(--border-hairline);
+  border-radius:var(--radius-sm)}
+.press.kit .kitdesc{max-width:70ch;color:var(--text-secondary);
+  font-size:var(--text-base);line-height:var(--leading-body);
+  padding:var(--space-3) var(--space-4);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm)}
+
+/* ================= the studio — the three-mode footprint (specs/21 P0) =========
+   Built entirely by app.js; with these rules removed the page is still the paper.
+   They divide cleanly into layout (the shift that makes room for the sidebar) and
+   the ratified palette lift (§6.1). The lift is scoped to html.cz-m-studio by
+   construction: the purple + bright-green accents are declared on that class and
+   nowhere else, so preview, paper, and the shared masthead/folio/footer never
+   see them, and a page with JS off never enters a mode at all.
+
+   Two purple literals, both studio-scoped and both pinned by a guard test
+   (tests/test_web_bake.py): #a855f7 (civicmedia's --pop-purple) for surfaces and
+   borders, and #7c3aed (violet-600) for text and text-bearing fills — the darker
+   shade clears WCAG AA 4.5:1 where the lighter one would not. No fuchsia, ever.
+   Flat vector throughout — the quiet properties take no drop shadow (branding.md),
+   and neither does the studio. */
+
+/* --- the accents: declared ONLY in studio mode, so they cannot leak (§6.1) --- */
+html.cz-m-studio{
+  --studio-accent:#a855f7;                 /* --pop-purple — surfaces + borders (non-text) */
+  --studio-accent-text:#7c3aed;            /* violet-600 — text + text fills, AA 4.5:1+ */
+  --studio-accent-2:#22c55e;               /* --green-bright — a non-text "reel" accent */
+  --studio-surface:color-mix(in srgb, var(--studio-accent) 5%, var(--surface-card));
+  --sw:min(320px, 32vw);                   /* the sidebar's width == the paper shift */
+}
+html.cz-m-studio.cz-rail{--sw:44px}
+
+/* --- the paper shift: a class on <html>, a padding on <body>. The paper's own
+   DOM never moves; preview and paper add nothing at all. --- */
+html.cz-m-studio body{padding-left:var(--sw)}
+html.cz-m-studio .mini-header{left:var(--sw)}
+html.cz-m-studio .updatebar{left:calc(50% + var(--sw) / 2)}
+
+/* --- the studio element: one <aside>, three presentations --- */
+.cz-studio,.cz-studio *{box-sizing:border-box}
+.cz-studio{position:fixed;z-index:36;left:0;bottom:0;font-family:var(--font-sans)}
+
+/* studio: the full left sidebar */
+html.cz-m-studio .cz-studio{top:0;bottom:0;width:var(--sw);overflow:auto;
+  background:var(--studio-surface);
+  border-right:var(--border-w-strong) solid var(--studio-accent);
+  padding:var(--space-4)}
+html.cz-m-studio.cz-rail .cz-studio{padding:var(--space-3) 0;overflow:visible}
+
+/* preview: a compact, non-blocking pill in the corner — never a card over the
+   reading (the resident's page stays fully clickable, phone and desktop both) */
+html.cz-m-preview .cz-studio{left:var(--space-4);bottom:var(--space-5);width:auto;
+  background:none;border:0;padding:0;max-width:calc(100vw - 2 * var(--space-4))}
+
+/* paper: nothing but a tab, so paper mode is never a trap */
+html.cz-m-paper .cz-studio{left:0;bottom:var(--space-6);width:auto;
+  background:none;border:0;padding:0}
+
+/* the preview pill and the paper tab are fixed to the viewport corner; reserve
+   room at the foot of the page so the footer's own links never sit under them
+   when the reader scrolls all the way down (the paper's DOM is untouched — this
+   is a studio-mode padding that JS-off never applies) */
+html.cz-m-preview body,html.cz-m-paper body{padding-bottom:calc(var(--space-8) + var(--space-3))}
+
+/* which parts show, by mode */
+.cz-tab,.cz-pill,.cz-panel{display:none}
+html.cz-m-paper .cz-tab{display:inline-flex}
+html.cz-m-preview .cz-pill{display:inline-flex}
+html.cz-m-studio .cz-panel{display:block}
+html.cz-m-studio.cz-rail .cz-brand,
+html.cz-m-studio.cz-rail .cz-full,
+html.cz-m-studio.cz-rail .cz-modes{display:none}
+
+/* keyboard-visible focus — the same emerald ring the paper's global rule uses.
+   --focus-ring is a brand token that the pressed :root does not emit, so fall
+   back to --state (green-emerald), which it does; without the fallback these
+   more-specific selectors would resolve to outline:none and silently override
+   the working global :focus-visible ring. */
+.cz-mode:focus-visible,.cz-enter:focus-visible,.cz-hide:focus-visible,
+.cz-tab:focus-visible,.cz-rail-btn:focus-visible,.cz-pill-reel:focus-visible,
+.cz-reelacts .btn:focus-visible,.cz-ptitle:focus-visible,.cz-pact:focus-visible,
+.cz-padds .btn:focus-visible,.cz-pshare .btn:focus-visible,
+.cz-tpls .btn:focus-visible{
+  outline:var(--border-w-strong) solid var(--focus-ring, var(--state));outline-offset:2px}
+
+/* --- preview: the pill --- */
+.cz-pill{align-items:stretch;background:var(--surface-card);
+  border:var(--border-w-strong) solid var(--accent);border-radius:var(--radius-sm);
+  overflow:hidden;max-width:100%}
+.cz-enter{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
+  letter-spacing:.02em;background:none;border:0;color:var(--accent);
+  padding:9px 11px;cursor:pointer;white-space:nowrap}
+.cz-enter:hover{background:var(--accent);color:var(--text-inverse)}
+.cz-pill-reel{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);
+  color:var(--text-secondary);text-decoration:none;padding:9px 10px;white-space:nowrap;
+  border-left:var(--border-w) solid var(--border-hairline);display:flex;align-items:center}
+/* display:flex would defeat the UA [hidden] rule, so the empty-reel segment must
+   be hidden explicitly (the same guard the other toggled elements carry) */
+.cz-pill-reel[hidden]{display:none}
+.cz-pill-reel:hover{color:var(--accent)}
+.cz-hide{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
+  background:none;border:0;border-left:var(--border-w) solid var(--border-hairline);
+  color:var(--text-secondary);padding:9px 10px;cursor:pointer}
+.cz-hide:hover{color:var(--text-primary)}
+
+/* --- the head: brand + the segmented mode control + the collapse handle --- */
+.cz-head{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;
+  margin-bottom:var(--space-3)}
+html.cz-m-studio.cz-rail .cz-head{margin:0;justify-content:center}
+.cz-brand{font:var(--weight-bold) var(--text-sm)/1 var(--font-mono);
+  color:var(--studio-accent-text, var(--accent));letter-spacing:var(--tracking-label)}
+.cz-modes{display:inline-flex;border:var(--border-w) solid var(--border-strong);
+  border-radius:var(--radius-sm);overflow:hidden}
+.cz-mode{font:var(--weight-medium) var(--text-xs)/1 var(--font-mono);
+  padding:6px 9px;background:var(--surface-card);color:var(--text-secondary);
+  border:0;cursor:pointer}
+.cz-mode+.cz-mode{border-left:var(--border-w) solid var(--border-hairline)}
+.cz-mode:hover{color:var(--text-primary)}
+.cz-mode[aria-checked="true"]{background:var(--studio-accent-text, var(--accent));
+  color:var(--text-inverse)}
+.cz-rail-btn{margin-left:auto;font:var(--weight-bold) var(--text-md)/1 var(--font-mono);
+  background:none;border:0;color:var(--text-secondary);cursor:pointer;padding:2px 6px}
+html.cz-m-studio.cz-rail .cz-rail-btn{margin:0}
+.cz-rail-btn:hover{color:var(--studio-accent-text, var(--accent))}
+
+/* --- studio full --- */
+.cz-block{margin-bottom:var(--space-5)}
+.cz-tag{display:block;font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-secondary);margin-bottom:var(--space-2)}
+.cz-hint{font-size:var(--text-sm);color:var(--text-secondary);
+  line-height:var(--leading-body);margin:0}
+.cz-reeln{font:var(--weight-bold) var(--text-md)/1.2 var(--font-mono);
+  color:var(--text-primary);margin:0 0 var(--space-2);
+  border-left:3px solid var(--studio-accent-2);padding-left:var(--space-2)}
+.cz-reeln b{color:var(--accent)}          /* deep green — high contrast, "in the reel" */
+.cz-reelacts{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-2)}
+.cz-reelacts .btn{font-size:var(--text-xs)}
+.cz-cov{font:var(--weight-medium) var(--text-xs)/1.4 var(--font-mono);
+  color:var(--text-secondary);margin:var(--space-5) 0 0;
+  border-top:var(--border-w) solid var(--border-hairline);padding-top:var(--space-3)}
+
+/* --- your paper, in the panel (specs/21 P1) — the arranging surface. The
+   accents stay inside the tokens the studio already declared, so all of this
+   is exactly as bounded as the block above it. --- */
+.cz-ptitle{width:100%;box-sizing:border-box;
+  font:var(--weight-bold) var(--text-md)/1.3 var(--font-mono);  /* 16px: under it, iOS zooms the drawer on focus */
+  color:var(--text-primary);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  padding:7px 9px;margin-bottom:var(--space-3)}
+/* placeholder text is still text — slate clears AA 4.5:1 where muted would not */
+.cz-ptitle::placeholder{color:var(--text-secondary);font-weight:var(--weight-regular)}
+.cz-prow{display:flex;align-items:center;gap:var(--space-2);
+  background:var(--surface-card);border:var(--border-w) solid var(--border-hairline);
+  border-left:var(--border-w-strong) solid var(--studio-accent, var(--border-strong));
+  border-radius:var(--radius-sm);padding:6px 8px;margin-bottom:var(--space-2)}
+.cz-plabel{flex:1;min-width:0;font-size:var(--text-xs);font-weight:var(--weight-medium);
+  color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cz-pacts{display:inline-flex;gap:2px;flex:0 0 auto}
+.cz-pact{font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);background:none;
+  border:0;color:var(--text-secondary);cursor:pointer;padding:7px 7px;
+  min-width:24px;min-height:24px}   /* AA target size — a finger, not a caret */
+.cz-pact:hover{color:var(--studio-accent-text, var(--accent))}
+.cz-pact[disabled]{opacity:.35;cursor:default}
+.cz-padds,.cz-pshare{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.cz-padds{margin:var(--space-2) 0 0}
+.cz-pshare{margin-top:var(--space-3)}
+.cz-padds .btn,.cz-pshare .btn{font-size:var(--text-xs)}
+/* a note's field sits under its row — same typing rules as the title
+   (16px so iOS never zooms the drawer on focus) */
+.cz-pnote{width:100%;box-sizing:border-box;resize:vertical;min-height:64px;
+  font:var(--weight-regular) 16px/1.45 var(--font-sans);
+  color:var(--text-primary);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
+  padding:7px 9px;margin:-2px 0 var(--space-2)}
+.cz-pnote::placeholder{color:var(--text-secondary)}
+.cz-pnote:focus-visible{outline:2px solid var(--focus-ring, var(--state));outline-offset:1px}
+/* the chart menu — quiet until opened; its summary reads as a button */
+.cz-chartadd{display:inline-block}
+.cz-chartadd summary{list-style:none;cursor:pointer;display:inline-block}
+.cz-chartadd summary::-webkit-details-marker{display:none}
+.cz-chartadd summary{font-size:var(--text-xs);font-family:var(--font-mono);
+  font-weight:var(--weight-medium);color:var(--text-primary);
+  background:var(--surface-card);border:var(--border-w) solid var(--border-strong);
+  border-radius:var(--radius-sm);padding:6px 10px}
+.cz-chartadd summary:focus-visible{outline:2px solid var(--focus-ring, var(--state));outline-offset:2px}
+.cz-chartadd[open] summary{border-color:var(--studio-accent-text, var(--accent))}
+.cz-chartmenu{display:flex;flex-wrap:wrap;gap:var(--space-2);
+  margin-top:var(--space-2);padding:var(--space-2);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm)}
+/* templates (P3) — a starting shape, offered only while the draft is empty.
+   The head speaks in cz-tag's register; the buttons are the panel's own. */
+.cz-tpls{display:flex;flex-wrap:wrap;gap:var(--space-2);
+  margin:var(--space-3) 0 0}
+.cz-tplhead{flex:0 0 100%;font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
+  letter-spacing:var(--tracking-label);text-transform:uppercase;
+  color:var(--text-secondary)}
+.cz-tpls .btn{font-size:var(--text-xs)}
+.cz-chartmenu .btn{font-size:var(--text-xs)}
+.cz-pshort-out{font:var(--weight-medium) var(--text-xs)/1.5 var(--font-mono);
+  color:var(--text-secondary);margin:var(--space-2) 0 0;overflow-wrap:anywhere}
+.cz-pshort-out a{color:var(--studio-accent-text, var(--accent))}
+/* the studio's own primary button carries the lift — the paper's .btn is untouched.
+   the darker violet keeps white text at AA 4.5:1 (the lighter --pop-purple would not) */
+html.cz-m-studio .cz-studio .btn.primary{background:var(--studio-accent-text);
+  border-color:var(--studio-accent-text)}
+
+/* --- the paper-mode tab (flat: the ink surface is its own separation) --- */
+.cz-tab{align-items:center;font:var(--weight-bold) var(--text-xs)/1 var(--font-mono);
+  letter-spacing:var(--tracking-label);background:var(--surface-inverse);
+  color:var(--text-inverse);border:0;
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  padding:9px 12px 9px 10px;cursor:pointer}
+.cz-tab:hover{padding-left:14px}
+
+/* --- the toast: position in the stylesheet, not inline, so studio mode can
+   re-centre it over the shifted paper --- */
+.cz-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:41;
+  display:none;background:var(--surface-inverse);color:var(--text-inverse);
+  padding:8px 14px;font:var(--weight-medium) var(--text-xs)/1.35 var(--font-mono);
+  border-radius:var(--radius-sm);max-width:calc(100vw - 2 * var(--space-4))}
+.cz-toast.on{display:block}
+html.cz-m-studio .cz-toast{left:calc(50% + var(--sw) / 2)}
+
+/* --- narrow screens degrade to paper: the studio never shifts the reading. In
+   studio mode it becomes an overlay drawer over the paper (specs/21 §7); preview
+   stays the same small pill, and a collapsed studio stays a slim rail. --- */
+@media (max-width:720px){
+  html.cz-m-studio body{padding-left:0}
+  html.cz-m-studio .mini-header{left:0}
+  html.cz-m-studio .updatebar{left:50%}
+  html.cz-m-studio .cz-toast{left:50%}
+  html.cz-m-studio .cz-studio{width:min(320px, 86vw)}
+  html.cz-m-studio.cz-rail .cz-studio{width:44px}
+}
