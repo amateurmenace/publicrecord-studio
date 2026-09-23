@@ -6,6 +6,7 @@ is taste, presence is contract.
 """
 
 import tempfile
+import importlib.util
 import unittest
 from pathlib import Path
 
@@ -74,6 +75,10 @@ class TestAgenda(unittest.TestCase):
         self.assertEqual(agenda({}), [])
 
 
+@unittest.skipUnless(importlib.util.find_spec("PIL"),
+                     "Pillow is a desk dependency — the hosted record never "
+                     "renders title cards (the covenant keeps rendering at "
+                     "the desk), so the server venv rightly lacks it")
 class TestTitleCard(unittest.TestCase):
     def test_card_png_lands_at_size(self):
         from highlighter.reel import _card_png
