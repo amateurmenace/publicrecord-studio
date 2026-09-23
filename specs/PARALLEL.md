@@ -157,6 +157,14 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 — **publicrecord-studio is the record's dev home; specs/23 A is
+  LIVE (v2.1.11 / r33)**: the front page carries a real door to the making
+  half (`yp-`), every meeting/issue card offers "＋ your paper" in
+  preview/studio, and `/app/p` in the studio is the draft's on-page editor
+  (drag, ↑↓✕, in-place title and notes, an inline add-search over
+  `search/meta.json` + the new `issues/index.json`). Two review folds
+  (23 + 3). 542 tests. control-z's record halves stay frozen history; its
+  ~531-line specs/22 partial is triaged for Phase B, ported as new work.
 - 2026-07-22 (latest) — **specs/21 is DONE: P3 — templates, featured
   papers, the radiogroup — LIVE at v2.1.10 (image r32).** Templates write
   pre-shaped drafts client-side (empty-draft-only, confirm-gated, the note

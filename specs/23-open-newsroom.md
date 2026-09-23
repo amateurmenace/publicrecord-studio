@@ -1,7 +1,10 @@
 # 23 — The open newsroom: the making half, visible and powerful
 
-**Status:** v0.1 · **Stage:** SETTLED (Stephen, 2026-09-23 — all four scope
-answers on the record below) — **Phase A is buildable now.** · **Owner:**
+**Status:** v0.2 · **Stage:** **Phase A SHIPPED + LIVE (v2.1.11 / r33,
+2026-09-23)** — the front door, ＋ your paper on the cards, the on-page
+editor, the teaching draft; SETTLED (Stephen, 2026-09-23 — all four scope
+answers on the record below); **Phase B (the cutting room) is next.** ·
+**Owner:**
 Stephen Walter (Weird Machine) · **Related:** specs/20 (the reader + reels),
 specs/21 (the studio + your paper, shipped whole), specs/22 (the cutting
 room, settled 2026-07-22, partial in control-z's tree), `CLAUDE.md` (the
@@ -58,7 +61,7 @@ broken — everything is undiscoverable.
 
 ## 4. Phasing
 
-**A — the front door + the real editor (v2.1.11/r33).**
+**A — the front door + the real editor (v2.1.11/r33). ✓ SHIPPED + LIVE 2026-09-23** — as specified below, plus a fold of 23 + 3 review findings (CHANGELOG).
 - A1 Front-page section (baked, in `web/emit.py page_home`): kicker
   ("YOUR PAPER — BE THE EDITOR" register), two sentences of benefit copy
   ("the record is raw material… no account, lives in your browser"), a
