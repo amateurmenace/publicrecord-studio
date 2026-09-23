@@ -1,0 +1,72 @@
+# The nightly edition — the step the freeze diagnosis found missing (specs/23
+# D2): the poll files submissions and the pipeline ingests what a steward
+# approved, but nothing pressed the edition or carried it to the Pages repo
+# without a hand. This does both, nightly, after the 03:30 ET ingest — and it
+# stands down, saying so, until Stephen provisions the two credentials it
+# needs (record/OPERATING.md §5 "The nightly edition"). It presses from the
+# cloud, never from a Mac; it touches only app/ in the Pages repo, so the
+# root hand-files (CNAME, index.html, constitution/) survive every run.
+name: nightly edition
+on:
+  schedule:
+    - cron: "30 8 * * *"        # 04:30 America/New_York (EDT) — after the ingest
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write               # Workload Identity Federation, no key files
+jobs:
+  edition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: are the credentials provisioned?
+        id: gate
+        env:
+          WIF: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          SA: ${{ secrets.GCP_PRESS_SERVICE_ACCOUNT }}
+          PAGES: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          if [ -z "$WIF" ] || [ -z "$SA" ] || [ -z "$PAGES" ]; then
+            echo "standing down — GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_PRESS_SERVICE_ACCOUNT and PAGES_TOKEN are not all set (record/OPERATING.md §5)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: google-github-actions/auth@v2
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_PRESS_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+        if: steps.gate.outputs.ready == 'true'
+      - name: press from the cloud
+        if: steps.gate.outputs.ready == 'true'
+        run: gcloud run jobs execute record-press --region=us-east1 --project=publicrecord-studio --wait
+      - name: carry the edition to the Pages repo
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${PAGES_TOKEN}@github.com/amateurmenace/publicrecord.git" pages
+          cd pages
+          gcloud storage rsync -r --delete-unmatched-destination-objects gs://publicrecord-edition/app app
+          # the bucket stores text objects gzipped for the CDN path and this
+          # rsync downloads them raw — decompress in place, or Pages serves
+          # gzip bytes as text (record/OPERATING.md §5)
+          python3 - <<'PY'
+          import gzip, pathlib
+          for p in pathlib.Path("app").rglob("*"):
+              if p.is_file():
+                  b = p.read_bytes()
+                  if b[:2] == b"\x1f\x8b":
+                      p.write_bytes(gzip.decompress(b))
+          PY
+          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "the edition did not change — nothing to carry"; exit 0
+          fi
+          ed=$(python3 -c "import json; m=json.load(open('app/manifest.json')); print(m['version'], m['edition_date'])")
+          git config user.name "record-press"
+          git config user.email "noreply@publicrecord.studio"
+          git add -A
+          git commit -m "Nightly edition: v${ed% *}, record of ${ed#* }"
+          git push

@@ -185,6 +185,28 @@ search. CI (`.github/workflows/ci.yml`) runs the no-Postgres suite on every
 push and pull request; the PG-backed half is proven at the desk before a
 deploy, not in Actions (no database there, on purpose).
 
+### The nightly edition — automated, once two credentials exist
+
+The freeze diagnosis (specs/23 D2, 2026-09-23) found the missing step: the
+poll files submissions nightly and the pipeline ingests what a steward
+approved, but nothing pressed the edition or carried it to the Pages repo
+without a hand — so `edition_date` could not move on its own.
+`.github/workflows/nightly-edition.yml` (in the record's own repository)
+presses from the cloud at 04:30 ET, after the ingest, syncs the bucket into
+`amateurmenace/publicrecord`'s `app/`, decompresses in place, and pushes
+only when the edition changed. It stands down, saying so in its log, until
+three repository secrets exist on `amateurmenace/publicrecord-studio`:
+
+| Secret | What it is |
+|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | the full resource name of a Workload Identity Federation provider trusting this repository (`projects/907309358085/locations/global/workloadIdentityPools/<pool>/providers/<provider>`) — no key file ever leaves GCP |
+| `GCP_PRESS_SERVICE_ACCOUNT` | a service account with `roles/run.developer` on `record-press` (to execute it), `roles/iam.serviceAccountUser` on the job's runtime account, and `roles/storage.objectViewer` on `publicrecord-edition` |
+| `PAGES_TOKEN` | a fine-grained personal access token scoped to the `amateurmenace/publicrecord` repository with *Contents: read and write* — the one thing that can push an edition |
+
+Provisioning these is a spend-free but identity-bearing act, so it is
+Stephen's; until then the manual two-step below still works, and the
+workflow's "standing down" line in the Actions log is the honest state.
+
 ### Refreshing what publicrecord.studio serves
 
 The reader at publicrecord.studio is a **static edition on GitHub Pages** (repo
