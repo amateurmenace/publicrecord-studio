@@ -427,9 +427,11 @@ class TestBakeEdition(unittest.TestCase):
         self.assertTrue((self.out / "m" / "vid1" / "transcript.txt").exists())
 
     def test_issue_timeline(self):
-        # find the issue file
-        files = list((self.out / "issues").glob("*.json"))
-        self.assertTrue(files)
+        # find the issue file — by name, not by directory order: issues/ also
+        # holds index.json (specs/23 A3), and ext4 lists it first where APFS
+        # did not (the first CI run's catch)
+        files = [f for f in (self.out / "issues").glob("*.json") if f.name != "index.json"]
+        self.assertEqual(len(files), 1, [f.name for f in files])
         ij = json.loads(files[0].read_text())
         self.assertEqual(ij["name"], "budget override")
         self.assertEqual(ij["n_meetings"], 2)
