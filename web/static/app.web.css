@@ -1015,12 +1015,14 @@ table.twin a{color:var(--accent)}
   .seg .ts{color:#000}
   /* a rendered paper prints as a paper (specs/23 C2): the nameplate stays,
      the studio and its chrome go, the pressed lede and the reader's
-     controls go, the title runs the page, blocks flow in two columns, a
-     lead and a section head start a fresh line, every citation prints its
-     address so the receipts survive on paper */
+     controls go, the title runs the page, blocks flow in one paged column
+     (two half-width blocks share a row), a lead and a section head start a
+     fresh line, every citation prints its address so the receipts survive
+     on paper */
   .cz-studio,.cz-toast,.pfeat,.paper-page .back,.paper-page .presslede,
   .paper-page .pfrom,.pb-play,.pb-pv,.cz-mk,.graphtwin summary,.rv-take{display:none !important}
-  html.cz-m-studio body{padding-left:0}
+  /* the studio's sidebar shift (and the phone rail's) never reaches paper */
+  html.cz-m-studio body,html.cz-m-studio.cz-rail body{padding-left:0 !important}
   .paper-page h1{display:none}
   .phead{border-bottom:3px solid #000;margin-top:0}
   .ptitle{font-size:34px}
@@ -1034,18 +1036,21 @@ table.twin a{color:var(--accent)}
   .pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}
   .mcard,.pb-note,.pb-quote,.pb-doc,.pb-chart,.pb-reel{border-color:#999;background:#fff}
   .reelcite,.pb-dg{background:#fff;border-color:#999}
-  .reelcite::after,.pb-doc[href]::after,.pb-head a:not([href^="/"])::after{
-    content:" " attr(href);font-family:var(--font-mono);font-size:8pt;color:#444;word-break:break-all;
-    text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
-  /* a relative citation prints whole: the site (a custom property the
-     renderer sets on the paper) + the path — story cards, section heads,
-     pull-quotes and digest rows alike; an address is never upper-cased */
-  .paperbody .mcard[href^="/"]::after,.pb-head a[href^="/"]::after,.pb-quote figcaption a[href^="/"]::after,.pb-dg[href^="/"]::after{
-    content:" " var(--site,"") attr(href);font-family:var(--font-mono);font-size:8pt;color:#444;word-break:break-all;
-    text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
+  /* every citation prints its address on a line of its own, broken only
+     where a whole address cannot fit; a relative one prints whole — the
+     site (a custom property the renderer sets on the paper) + the path —
+     story cards, reel cites, section heads, pull-quotes and digest rows
+     alike; an address is never upper-cased */
+  .pb-doc[href]::after,.pb-head a:not([href^="/"])::after{
+    content:" " attr(href);display:block;font-family:var(--font-mono);font-size:8pt;color:#444;
+    word-break:normal;overflow-wrap:anywhere;text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
+  .reelcite[href^="/"]::after,.paperbody .mcard[href^="/"]::after,.pb-head a[href^="/"]::after,
+  .pb-quote figcaption a[href^="/"]::after,.pb-dg[href^="/"]::after{
+    content:" " var(--site,"") attr(href);display:block;font-family:var(--font-mono);font-size:8pt;color:#444;
+    word-break:normal;overflow-wrap:anywhere;text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
   .pb-dg::after{grid-column:1/-1}
-  .paperbody .mcard{flex-wrap:wrap}
-  .paperbody .mcard::after{flex-basis:100%}
+  .paperbody .mcard,.reelcite{flex-wrap:wrap}
+  .paperbody .mcard::after,.reelcite::after{flex-basis:100%}
   .pb-chartwrap{overflow:visible}
   .pb-chartwrap svg{max-width:100%;height:auto}
   /* the editor prints as the paper it is editing: its chrome goes, its
@@ -1055,7 +1060,7 @@ table.twin a{color:var(--accent)}
   .cz-editing .cz-edbar,.cz-editing .cz-edslot{display:none !important}
   html.cz-m-studio .cz-editing .cz-edrow{border:0;padding:0}
   html.cz-m-studio .cz-editing .cz-edtitle,html.cz-m-studio .cz-editing .cz-edtitle:focus-visible{
-    border:0;padding:0;font-size:34px;outline:0;box-shadow:none}
+    border:0;padding:0;font-size:34px;outline:0;box-shadow:none;caret-color:transparent}
   html.cz-m-studio .cz-editing .cz-edhead{border-bottom-color:#000}
   html.cz-m-studio .cz-editing .cz-ednote{display:none}
   html.cz-m-studio .cz-editing .cz-ednote-print{display:block}
@@ -1253,7 +1258,7 @@ html.cz-m-studio.cz-rail .cz-rail-btn{margin:0}
   letter-spacing:0;color:var(--text-primary);background:var(--surface-card);
   border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
   padding:5px 6px;min-height:24px;max-width:100%;flex:1;min-width:0}
-.cz-shelf .btn{font-size:var(--text-xs);padding:5px 9px}
+.cz-shelf .btn{font-size:var(--text-xs);padding:5px 9px;display:inline-flex;align-items:center;min-height:24px}
 .cz-ptitle{width:100%;box-sizing:border-box;
   font:var(--weight-bold) var(--text-md)/1.3 var(--font-mono);  /* 16px: under it, iOS zooms the drawer on focus */
   color:var(--text-primary);background:var(--surface-card);
@@ -1485,6 +1490,8 @@ html.cz-m-studio .cz-ednote:focus-visible,html.cz-m-studio .cz-edpanel .btn:focu
 .cz-stageacts .btn{font-size:var(--text-xs)}
 .cz-rplay.on{color:var(--studio-accent-text, var(--accent));
   outline:var(--border-w) solid var(--studio-accent, var(--accent));outline-offset:1px;border-radius:var(--radius-sm)}
+/* the focus ring outranks the "previewing" mark (more specific, and later) */
+.cz-rplay.on:focus-visible{outline:var(--border-w-strong) solid var(--focus-ring, var(--state));outline-offset:2px}
 .cz-rplay[disabled]{opacity:.35;cursor:default}
 .cz-stageopen[hidden]{display:none}
 /* a paper's reel rows: the cite stays a link; a ▶ sits beside it as a
@@ -1498,6 +1505,9 @@ html.cz-m-studio .pb-pv{display:inline-flex;align-items:center;justify-content:c
   background:var(--surface-card);color:var(--accent);
   border:var(--border-w) solid var(--accent);border-radius:var(--radius-sm);padding:6px 8px}
 html.cz-m-studio .pb-pv:hover,html.cz-m-studio .pb-pv.on{background:var(--accent);color:var(--text-inverse)}
+/* "previewing" is a ring as well as a fill — a shape that survives forced
+   colors and differs from :hover; the focus ring (next rule) outranks it */
+html.cz-m-studio .pb-pv.on{outline:var(--border-w) solid var(--accent);outline-offset:2px}
 html.cz-m-studio .pb-pv:focus-visible{outline:var(--border-w-strong) solid var(--focus-ring, var(--state));outline-offset:2px}
 
 /* --- the paper-mode tab (flat: the ink surface is its own separation) --- */

@@ -1094,11 +1094,13 @@ def page_paper(manifest, base, featured=None):
     <h1>A paper, edited from the record</h1>
     <p class="presslede">Everyone gets the record; an editor makes it theirs.
       A <b>paper</b> is a front page somebody curated — the stories, reels,
-      charts and notes of the public record they judged worth your attention,
-      arranged and titled. Every story, reel and chart points back into the
-      record itself (a chart is computed in your browser from the record's
-      own planes); a note is the editor's own words, and it is labeled as
-      exactly that.</p>
+      charts, pull-quotes, filings and what-changed digests of the public
+      record they judged worth your attention, arranged, titled, and noted.
+      Every block but a note points back into the record itself: a
+      pull-quote's words are read off the meeting's own transcript, a filing
+      is the meeting's own document, and a chart or a digest is computed in
+      your browser from the record's own planes. A note is the editor's own
+      words, and it is labeled as exactly that.</p>
     <div class="paperbody" id="paperbody">
       <p class="hint">Reading a paper, or editing your own, needs JavaScript:
         a paper lives in the link that brought you here, or in your own
@@ -1115,9 +1117,9 @@ def page_paper(manifest, base, featured=None):
 """
     return shell("Your paper — publicrecord.studio",
                  "A curated front page of the public record — stories, reels, "
-                 "charts and notes an editor arranged; the record's blocks "
-                 "point back into the record, and a note says whose words "
-                 "it is.",
+                 "charts, pull-quotes, filings and digests an editor arranged; "
+                 "the record's blocks point back into the record, and a note "
+                 "says whose words it is.",
                  f"{base}/app/p", body, "", manifest,
                  version=manifest["version"])
 

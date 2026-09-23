@@ -482,10 +482,13 @@
       // disabled — hand focus to the opposite arrow, NEVER the ✕ (the
       // paper panel's rule: a held key must not find delete armed)
       if (t && t.disabled) {
-        const other = focus.act === "up" ? "down" : "up";
-        t = $(`[data-cz="rtact"][data-act="${other}"][data-i="${focus.i}"]`, body);
+        // a ▶ gone disabled (its clip's meeting has no tape) hands focus to
+        // its row's ↗ — never an arrow; an arrow at a pole, to the other
+        t = focus.act === "pvplay"
+          ? $(`.cz-rclip[data-i="${focus.i}"] .cz-rprev`, body)
+          : $(`[data-cz="rtact"][data-act="${focus.act === "up" ? "down" : "up"}"][data-i="${focus.i}"]`, body);
       }
-      if (!t) t = $(".cz-reelacts .btn", body);
+      if (!t || t.disabled) t = $(".cz-reelacts .btn", body);
       if (t) t.focus();
     }
   }
@@ -799,9 +802,19 @@
          Playing a sequence is /app/r's job and stays there.
        · HIDDEN IS SILENT: leaving the studio or collapsing the rail pauses
          the stage; a frame nobody can see must not keep talking. */
-  const PV = { win: null, ready: false, clip: null, armed: false, settling: false,
+  /* the reader's hand is in a frame when the frame holds the focus — a
+     press inside a cross-origin player moves focus to its <iframe> */
+  const inFrame = el => !!el && document.activeElement === el;
+  /* the stage. `hold`: told to be silent and not yet SEEN silent (a paused
+     or cued report) — a play the frame reports meanwhile with no reader's
+     hand in it is its own autoplay landing late, and is silenced again (a
+     pause sent before playback has begun is a no-op to the player).
+     `state`: the frame's last reported playerState; `free`: the reader's
+     own ▶ on the frame, playing the tape outside any clip */
+  const PV = { win: null, el: null, ready: false, clip: null, armed: false, settling: false,
                ended: false, vid: "", pending: null, wired: false,
-               playing: false, stopped: false, watch: 0 };
+               playing: false, paused: false, free: false, stopped: false, blocked: false,
+               hold: false, watch: 0, state: -2, t: 0, last: null };
   const PV_ORIGIN = "https://www.youtube-nocookie.com";
   function pvSend(func, args) {
     if (!PV.win) return;
@@ -813,26 +826,28 @@
   /* the one-engine rule, the page's half: whatever the page player was
      doing stops when the stage speaks */
   function pagePause() {
-    if (typeof YT !== "undefined") {
+    if (typeof YT !== "undefined" && YT.loaded) {
+      // the page is held silent until it is SEEN silent; a player still in
+      // its load gap keeps the place it was asked for (onReady CUES it
+      // there — a seek would play) and so does a stashed cross-meeting cite
+      if (!YT.ready || ![0, 2, 5].includes(YT.state)) YT.hold = true;
       if (YT.win && YT.ready) ytSend("cmd", "pauseVideo", []);
-      // a page player still in its load gap would seek and play on ready —
-      // drop the stashed seek and ask onReady to hush it instead
-      if (YT.loaded && !YT.ready) { YT.pending = null; YT.hush = true; }
     }
-    if (typeof REELPLAY !== "undefined" && REELPLAY && (REELPLAY.active || REELPLAY.pending)) {
-      REELPLAY.pending = null;
-      if (REELPLAY.active) { REELPLAY.active = false; REELPLAY.armed = false;
-        REELPLAY.paused = true; reelShow(); }
+    if (typeof REELPLAY !== "undefined" && REELPLAY && REELPLAY.active) {
+      REELPLAY.active = false; REELPLAY.armed = false;
+      REELPLAY.paused = true; reelShow();
     }
   }
   /* …and the stage's half: idempotent, safe before the stage exists */
   function pvPause() {
-    clearTimeout(PV.watch);
+    clearTimeout(PV.watch); PV.blocked = false;
     // a stop before the frame is ready cannot reach it yet — remember it,
-    // and onReady silences the autoplay the frame was built with
+    // and onReady cues the tape instead of letting it autoplay
     if (!PV.ready && (PV.win || PV.pending || PV.vid)) PV.stopped = true;
+    if ((PV.win || PV.pending) && (!PV.ready || ![0, 2, 5].includes(PV.state))) PV.hold = true;
     if (PV.ready) pvSend("pauseVideo");
-    if (!PV.clip && !PV.pending) { PV.playing = false; return; }
+    const was = PV.free || PV.paused; PV.free = false; PV.paused = false;
+    if (!PV.clip && !PV.pending) { PV.playing = false; if (was) pvShow(); return; }
     PV.last = PV.clip || PV.pending || PV.last;   // the tape the frame still shows
     PV.clip = null; PV.armed = false; PV.ended = false; PV.pending = null; PV.playing = false;
     pvShow();
@@ -844,7 +859,13 @@
     const key = clipKey(PV.clip);
     const c = clips.find(x => clipKey(x) === key);
     if (c && (c.start !== PV.clip.start || c.end !== PV.clip.end)) {
-      PV.clip = { ...PV.clip, start: c.start, end: c.end }; PV.ended = false; pvShow();
+      // the gate follows the new edges. A clip that has PLAYED stays played
+      // (its frame rests paused at the old end — ▶ hears the new cut), a
+      // paused one stays paused: nothing here plays, seeks, or repaints a
+      // state the frame is not in
+      PV.clip = { ...PV.clip, start: c.start, end: c.end };
+      if (PV.pending && clipKey(PV.pending) === key) PV.pending = PV.clip;
+      pvShow();
     }
   }
   function pvPlay(clip) {
@@ -861,16 +882,18 @@
     // the drawer scrolls: a stage below its fold is a sound with no frame
     if (typeof box.scrollIntoView === "function") box.scrollIntoView({ block: "nearest" });
     PV.stopped = false; PV.playing = false; clearTimeout(PV.watch);
+    PV.blocked = false; PV.paused = false; PV.free = false; PV.hold = false;
     PV.clip = clip; PV.armed = false; PV.ended = false;
     // an autoplay the browser refused would read as "previewing" forever:
-    // if no time report lands, say so and hand the reader the frame's own ▶
+    // if no playing report lands, say so and hand the reader the frame's own
+    // ▶ (the first playing report disarms this — pvStarted)
     PV.watch = setTimeout(() => {
-      if (PV.clip && !PV.playing && !PV.ended) { PV.blocked = true; pvShow(); }
+      if (PV.clip && !PV.playing && !PV.paused && !PV.ended) { PV.blocked = true; pvShow(); }
     }, 6000);
     if (!PV.win && !PV.pending) {
       // first use: the frame is built now — this ▶ is the click-to-load
       const ifr = document.createElement("iframe");
-      ifr.className = "cz-stagefr";
+      ifr.className = "cz-stagefr"; PV.el = ifr;
       ifr.allow = "autoplay; encrypted-media; picture-in-picture";
       ifr.title = "the preview — one clip of the tape, in the studio";
       ifr.src = `${PV_ORIGIN}/embed/${encodeURIComponent(clip.video_id)}`
@@ -896,24 +919,79 @@
     if (e.source !== PV.win) return;   // the stage hears only its own frame
     if (!/^https:\/\/(www\.)?youtube(-nocookie)?\.com$/.test(e.origin)) return;
     let d; try { d = JSON.parse(e.data); } catch { return; }
-    if (d.event === "onReady" || d.event === "initialDelivery") {
+    // initialDelivery and onReady land together: the ready work runs ONCE
+    if ((d.event === "onReady" || d.event === "initialDelivery") && !PV.ready) {
       PV.ready = true; pvSend("listening");
-      if (PV.stopped || !PV.clip) { PV.stopped = false; pvSend("pauseVideo"); PV.pending = null; }
-      else if (PV.pending) {
+      if (PV.stopped || !PV.clip) {
+        // stopped before it was ready: CUE the last clip's tape at its start
+        // — a cue replaces the autoplay; a pause before playback is ignored
+        PV.stopped = false; PV.pending = null;
+        const at = PV.last || {};
+        PV.vid = at.video_id || PV.vid;
+        pvSend("cueVideoById", [{ videoId: PV.vid, startSeconds: Math.floor(+at.start || 0) }]);
+      } else if (PV.pending) {
         const c = PV.pending; PV.pending = null;
         if (c.video_id === PV.vid) { pvSend("seekTo", [c.start, true]); pvSend("playVideo"); }
         else pvPlay(c);
       }
     }
-    if (d.info && typeof d.info.playerState === "number") {
-      // the reader pressed play inside the stage's own frame after a stop:
-      // that is the stage speaking, and the page player yields to it
-      if (d.info.playerState === 1 && !PV.clip && PV.last) { PV.clip = PV.last; PV.armed = true; PV.ended = false; pagePause(); pvShow(); }
-      if (d.info.playerState === 0 && PV.clip && !PV.ended) { PV.ended = true; PV.armed = false; pvShow(); }
+    const info = d.info && typeof d.info === "object" ? d.info : null;
+    if (!info) return;
+    if (typeof info.currentTime === "number") PV.t = info.currentTime;
+    if (typeof info.playerState === "number" && info.playerState !== PV.state) {
+      PV.state = info.playerState;
+      if (PV.state === 0 || PV.state === 2 || PV.state === 5) PV.hold = false;   // seen silent
+      pvState(PV.state, PV.t);
     }
-    if (d.info && typeof d.info.currentTime === "number") {
-      if (PV.clip && !PV.playing && d.info.playerState === 1) { PV.playing = true; PV.blocked = false; pvShow(); }
-      pvAdvance(d.info.currentTime);
+    if (typeof info.currentTime === "number") {
+      // a seek inside a tape already playing may never change the reported
+      // state: time moving under a playing state is the preview playing
+      // (never while a tape switch settles: the old tape's stale reports)
+      if (PV.clip && !PV.playing && !PV.paused && !PV.ended && !PV.settling && PV.state === 1) { pvStarted(); pvShow(); }
+      pvAdvance(info.currentTime);
+    }
+  }
+  /* the stage frame's own reports, as transitions: the status line says
+     what the frame is actually doing, and one engine plays at a time */
+  function pvStarted() {
+    clearTimeout(PV.watch);
+    PV.playing = true; PV.paused = false; PV.blocked = false;
+  }
+  function pvState(s, t) {
+    if (s === 1) {
+      if (PV.clip && !PV.ended) {
+        // the preview playing: its first report, a resume after the reader
+        // paused the frame, or the reader's ▶ after a refused autoplay
+        pvStarted(); pagePause(); pvShow(); return;
+      }
+      // held silent and not yet seen silent: a play with no reader's hand
+      // in it is the frame's own autoplay landing late — silenced again
+      if (!PV.free && PV.hold && !inFrame(PV.el)) { pvSend("pauseVideo"); return; }
+      // the reader's own ▶ on the frame: the stage is the engine now
+      PV.hold = false; pagePause();
+      const c = PV.free ? null : (PV.clip || PV.last);
+      if (c && t >= c.start - 0.75 && t < c.end - 0.12) {
+        // inside the clip: the preview goes on, bounded by its gate — never
+        // pre-armed; a report inside the clip arms it
+        PV.clip = c; PV.ended = false; PV.armed = false; PV.free = false; pvStarted();
+      } else if (!PV.free) {
+        // outside it: the tape plays, the status says so, no clip is marked
+        if (PV.clip) PV.last = PV.clip;
+        PV.clip = null; PV.ended = false; PV.armed = false; PV.free = true;
+        PV.playing = false; PV.paused = false; PV.blocked = false;
+      }
+      pvShow(); return;
+    }
+    if (s === 2) {
+      // the reader paused the frame mid-preview (the gate's own stop has
+      // already marked its clip played); a free play paused is a stop
+      if (PV.clip && !PV.ended) { PV.playing = false; PV.paused = true; }
+      PV.free = false; pvShow(); return;
+    }
+    if (s === 0) {
+      // the tape's own end ends the preview, or the frame's free play
+      if (PV.clip && !PV.ended) { PV.ended = true; PV.armed = false; }
+      PV.playing = false; PV.paused = false; PV.free = false; pvShow();
     }
   }
   /* the stage's gate, pure over (state, time): "arm" once a report lands
@@ -928,14 +1006,15 @@
   function pvAdvance(t) {
     const a = pvStep(PV, t);
     if (a === "arm") PV.armed = true;
-    else if (a === "stop") { pvSend("pauseVideo"); PV.armed = false; PV.ended = true; pvShow(); }
+    else if (a === "stop") { pvSend("pauseVideo"); PV.armed = false; PV.ended = true; PV.playing = false; PV.hold = true; pvShow(); }
   }
   function pvShow() {
     const now = $("#cz-stagenow"), open = $(".cz-stageopen");
     const c = PV.clip;
-    const what = !c ? "stopped"
+    const what = !c ? (PV.free ? "playing the tape — from the frame’s own ▶, with no clip’s bounds" : "stopped")
       : PV.ended ? "played"
       : PV.blocked ? "the tape hasn’t started — press ▶ on the frame to play it here"
+      : PV.paused ? "paused on the frame — its ▶ goes on"
       : PV.playing ? "previewing" : "loading the tape…";
     const line = !c ? what : `${what} · ${hms(c.start)}–${hms(c.end)}`
         + (c.quote ? ` · “${cut(String(c.quote), 60)}”` : "")
@@ -1287,7 +1366,10 @@
   }
 
   /* ================= MEETING ================= */
-  let YT = { win: null, loaded: false, ready: false, time: 0, pending: null };
+  // `hold` and `state` mirror the stage's (see PV); `el` is the page's
+  // <iframe>, `vid` the tape it holds (cued or playing)
+  let YT = { win: null, el: null, vid: "", loaded: false, ready: false, time: 0, pending: null,
+             hold: false, state: -2 };
   let MINIMAP = null, STICKY_NOW = null;
   function meeting() {
     const art = $(".meeting"); if (!art) return;
@@ -1398,6 +1480,7 @@
       ifr.addEventListener("load", () => { YT.win = ifr.contentWindow; ytSend("listening"); });
       f.classList.remove("facade"); f.innerHTML = ""; f.appendChild(ifr);
       YT.loaded = true; YT.pending = seekTo != null ? seekTo : YT.pending;
+      YT.el = ifr; YT.vid = vid; YT.hold = false;   // the reader asked for this tape
     } else if (seekTo != null) ytSeek(seekTo);
   }
   function ytSend(kind, func, args) {
@@ -1411,7 +1494,7 @@
   }
   function ytSeek(t) {
     pvPause();   // one engine seeks (specs/23 B2)
-    YT.hush = false;
+    YT.hold = false;
     YT.time = t; strip(t);
     // command-ready only after onReady; a click during the load gap stashes
     // into pending instead of posting into the void (and being lost)
@@ -1425,23 +1508,48 @@
     if (e.source !== YT.win) return;
     if (!/^https:\/\/(www\.)?youtube(-nocookie)?\.com$/.test(e.origin)) return;
     let d; try { d = JSON.parse(e.data); } catch { return; }
-    if (d.event === "onReady" || d.event === "initialDelivery") {
+    // initialDelivery and onReady land together: the ready work runs ONCE —
+    // a second run would fire a stashed seek onto a tape the first switched
+    if ((d.event === "onReady" || d.event === "initialDelivery") && !YT.ready) {
       YT.ready = true; ytSend("listening");
-      // the stage spoke while this player was loading: it stays silent
-      // until the reader asks it to play (one engine seeks — specs/23 B2)
-      if (YT.hush) { YT.hush = false; YT.pending = null; ytSend("cmd", "pauseVideo", []); return; }
-      // a cross-meeting switch requested before the player was ready (a cite
-      // tapped during the load gap) loads now, ahead of any stashed same-tape seek
-      if (REELPLAY && REELPLAY.pending) {
-        const pv = REELPLAY.pending; REELPLAY.pending = null; REELPLAY.settling = true;
+      const pv = REELPLAY && REELPLAY.pending;
+      if (REELPLAY) REELPLAY.pending = null;
+      if (YT.hold) {
+        // the stage spoke while this player was loading: it stays silent
+        // until the reader asks it to play (one engine seeks — specs/23 B2),
+        // CUED where it was asked to be — the place kept, the play dropped
+        const vid = pv ? pv.vid : YT.vid, at = pv ? pv.start : YT.pending;
+        YT.pending = null;
+        if (vid) { YT.vid = vid; ytSend("cmd", "cueVideoById", [{ videoId: vid, startSeconds: +at || 0 }]); }
+        else ytSend("cmd", "pauseVideo", []);
+      } else if (pv) {
+        // a cross-meeting switch requested before the player was ready (a
+        // cite tapped during the load gap) loads now; a stashed same-tape
+        // seek belonged to the tape it abandons
+        YT.pending = null; YT.vid = pv.vid; REELPLAY.settling = true;
         if (typeof setTimeout === "function")
           setTimeout(() => { if (REELPLAY) REELPLAY.settling = false; }, 500);
         ytSend("cmd", "loadVideoById", [{ videoId: pv.vid, startSeconds: pv.start }]);
       } else if (YT.pending != null) { const p = YT.pending; YT.pending = null; ytSeek(p); }
     }
-    // the reader pressed play inside the page's own frame while the stage
-    // was speaking: the page is the engine now, the stage yields
-    if (d.info && d.info.playerState === 1 && PV.clip && !PV.ended) pvPause();
+    if (d.info && typeof d.info.playerState === "number" && d.info.playerState !== YT.state) {
+      YT.state = d.info.playerState;
+      if (YT.state === 0 || YT.state === 2 || YT.state === 5) YT.hold = false;   // seen silent
+      else if (YT.state === 1) {
+        // held silent and not yet seen so: a play with no reader's hand in
+        // it is an autoplay landing late — silenced again
+        if (YT.hold && !inFrame(YT.el)) ytSend("cmd", "pauseVideo", []);
+        else {
+          // a play in the page's own frame: the page is the engine — the
+          // stage yields, and a reel the stage paused goes on from its clip
+          YT.hold = false;
+          if (PV.clip || PV.free) pvPause();
+          if (REELPLAY && REELPLAY.paused) {
+            REELPLAY.paused = false; REELPLAY.active = true; REELPLAY.armed = false; reelShow();
+          }
+        }
+      }
+    }
     if (d.info && typeof d.info.currentTime === "number") {
       YT.time = d.info.currentTime;
       followAlong(YT.time); strip(YT.time); tick(YT.time);
@@ -2444,8 +2552,10 @@
     // stale times for a beat — they belong to another timeline and could arm or
     // skip the new clip — so settle briefly, then let the armed gate re-arm.
     REELPLAY.vid = vid;
+    // the reader asked the page for a tape: it is no longer held silent
+    if (typeof YT !== "undefined") YT.hold = false;
     if (typeof YT !== "undefined" && YT.win && YT.ready) {
-      REELPLAY.settling = true;
+      REELPLAY.settling = true; YT.vid = vid;
       if (typeof setTimeout === "function")
         setTimeout(() => { if (REELPLAY) REELPLAY.settling = false; }, 500);
       ytSend("cmd", "loadVideoById", [{ videoId: vid, startSeconds: c.start }]);
@@ -2559,6 +2669,7 @@
   const PAPER_KEY = "cz-paper";        // the one draft this browser kept (P1–P3) — read once, migrated, retired
   const PAPERS_KEY = "cz-papers";      // the shelf: every paper this browser keeps, and which one is open (C1)
   const PAPERS_MAX = 24;               // papers on one shelf — a browser's worth, not a library's
+  let PAPERS_BLANK = null;             // a fresh reader's unsaved shelf: one id for the page's life
   const PAPER_ID = /^[a-z0-9]{4,12}$/;  // a paper's own id on the shelf — local, never travels
   const PAPER_TITLE_MAX = 200;
   const PAPER_MAX_BLOCKS = 64;
@@ -2608,12 +2719,17 @@
     let sh = null;
     try { sh = JSON.parse(localStorage.getItem(PAPERS_KEY) || "null"); } catch { sh = null; }
     if (!sh || typeof sh !== "object" || !Array.isArray(sh.papers)) {
-      let old = null;
-      try { old = JSON.parse(localStorage.getItem(PAPER_KEY) || "null"); } catch { old = null; }
-      const first = { id: paperId(), ...normalizePaper(old) };
+      let raw = null, old = null;
+      try { raw = localStorage.getItem(PAPER_KEY); } catch { raw = null; }
+      try { old = JSON.parse(raw || "null"); } catch { old = null; }
+      // nothing stored at all: a blank shelf held in memory — a READ mints
+      // and writes nothing for a reader who never makes anything; the first
+      // real save writes the shelf, under this same id
+      const first = { id: raw == null ? (PAPERS_BLANK ||= paperId()) : paperId(), ...normalizePaper(old) };
       sh = { active: first.id, papers: [first] };
-      // the sweep: the old key goes only once the shelf holds its paper
-      if (writePapers(sh)) { try { localStorage.removeItem(PAPER_KEY); } catch { /* private mode */ } }
+      // the sweep: an old draft moves in once, and its key goes only once
+      // the shelf holds it
+      if (raw != null && writePapers(sh)) { try { localStorage.removeItem(PAPER_KEY); } catch { /* private mode */ } }
       return sh;
     }
     const seen = new Set();
@@ -3241,8 +3357,8 @@
   }
   function clearPaper() {
     // the open paper empties and stays on the shelf (delete is its own act)
-    if (!savePaper({ title: "", blocks: [] }))
-      toast("this browser blocks storage — the change didn’t hold");
+    if (!savePaper({ title: "", blocks: [] })) {
+      toast("this browser blocks storage — the change didn’t hold"); return; }
     retireShortOut();
     refreshPaperSummary(); schedulePaperRender();
     toast("draft cleared — the record is untouched");
@@ -4287,6 +4403,7 @@
     if (ae.classList.contains("cz-ednote")) return { act: "note", i: +ae.dataset.i, caret: ae.selectionStart };
     if (ae.classList.contains("cz-edhandle")) return { act: "handle", i: +ae.dataset.i };
     if (ae.classList.contains("cz-edlayout")) return { act: "layout", i: +ae.dataset.i };
+    if (ae.classList.contains("pb-pv")) return { act: "pbpv", key: ae.dataset.pvkey };
     // an open inline add survives the repaint with its query and its caret:
     // the field itself, or one of its hit buttons (focus returns to the field)
     const slot = ae.closest(".cz-edslot");
@@ -4314,6 +4431,7 @@
       : f.act === "note" ? $(`.cz-ednote[data-i="${f.i}"]`, el)
       : f.act === "handle" ? $(`.cz-edhandle[data-i="${f.i}"]`, el)
       : f.act === "layout" ? $(`.cz-edlayout[data-i="${f.i}"]`, el)
+      : f.act === "pbpv" ? $$(".pb-pv", el).find(b => b.dataset.pvkey === f.key)
       : f.act === "add" ? $(`.cz-edadd[data-i="${f.i}"]`, el)
       : $(`[data-czed="${f.act}"][data-i="${f.i}"]`, el);
     // NEVER fall to the destructive ✕: a control that vanished or disabled

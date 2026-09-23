@@ -679,6 +679,9 @@ class TestBakeEdition(unittest.TestCase):
         stub = (self.out / "p" / "index.html").read_text()
         self.assertIn("A paper, edited from the record", stub)
         self.assertIn("needs JavaScript", stub)
+        # C2: the JS-off copy and the description name the ref-only kinds
+        self.assertIn("pull-quotes, filings and what-changed digests", stub)
+        self.assertIn("charts, pull-quotes, filings and digests an editor arranged", stub)
         self.assertIn('href="/app/"', stub)          # the honest fallback
         self.assertIn('id="paperbody"', stub)        # the renderer's mount
         # the paper's own classes ship in the stylesheet the stub loads
@@ -2214,8 +2217,8 @@ class TestCuttingRoom(unittest.TestCase):
                       # trim; the mark is programmatic; a tape-less clip's ▶ is
                       # disabled; the stage opens the studio and the rail first
                       "PV.stopped = true", "if (PV.stopped || !PV.clip)",
-                      "YT.hush = true", "if (YT.hush) {",
-                      "if (d.info && d.info.playerState === 1 && PV.clip && !PV.ended) pvPause();",
+                      "YT.hold = true;", "if (YT.hold) {",
+                      "if (PV.clip || PV.free) pvPause();",
                       "function pvRetrim(clips)", 'b.setAttribute("aria-current", "true")',
                       '${c.video_id ? "" : " disabled"}',
                       'if (shownMode() !== "studio") { writeRail(false); setMode("studio"); }\n    else if (shownRail()) toggleRail();',
@@ -2247,6 +2250,175 @@ class TestCuttingRoom(unittest.TestCase):
         self.assertIn("html.cz-m-studio .pb-pv{display:inline-flex", css)
         pv = css[css.index("html.cz-m-studio .pb-pv{"):css.index("html.cz-m-studio .pb-pv:focus-visible")]
         self.assertNotIn("studio-accent", pv, "the paper's ▶ wears a studio hue")
+
+    def test_one_engine_holds_through_load_gaps_and_the_frames_own_presses(self):
+        """The B2 re-review fold. Both frames are HELD silent after the other
+        engine speaks until they are seen silent (a paused or cued report); a
+        play reported meanwhile with no reader's hand in the frame is an
+        autoplay landing late and is paused again, and a play after that is
+        the reader's own press. A stop before a frame is ready CUES its tape
+        (a pause before playback is ignored by the player). The ready work
+        runs once. The stage's status says what its frame is doing —
+        previewing, paused on the frame, played, playing the tape outside
+        any clip — and a trim never flips a played clip back to previewing.
+        Node twins drive the real functions through each reviewed case."""
+        stage = self.node("\n".join([
+            "const FRAME = { f: 'stage' }, ELSE = { f: 'else' };",
+            "const document = { activeElement: ELSE };",
+            "let SENT = [], PAGEPAUSED = 0;",
+            "const pvSend = (f, a) => SENT.push([f, a]); const sent = f => SENT.filter(x => x[0] === f);",
+            "const pagePause = () => { PAGEPAUSED++; }; const pvPlay = () => {};",
+            "const NOW = { textContent: '' }, OPEN = { href: '', hidden: false };",
+            "const $ = s => s === '#cz-stagenow' ? NOW : s === '.cz-stageopen' ? OPEN : null;",
+            "const $$ = () => []; const hms = t => String(t); const cut = (x, n) => String(x).slice(0, n);",
+            "const clipKey = c => c.pid + '|' + c.kind + '|' + c.t; const BASE = '/app';",
+            "const PV = {};",
+            self.lift(r"  const inFrame = [^\n]+"),
+            self.lift(r"  function pvStep\(pv, t\) \{.+?\n  \}"),
+            self.lift(r"  function pvAdvance\(t\) \{.+?\n  \}"),
+            self.lift(r"  function pvShow\(\) \{.+?\n  \}"),
+            self.lift(r"  function onPV\(e\) \{.+?\n  \}"),
+            self.lift(r"  function pvStarted\(\) \{.+?\n  \}"),
+            self.lift(r"  function pvState\(s, t\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m, JSON.stringify(PV), JSON.stringify(SENT)); process.exit(1); }",
+            "const A = { pid: 'p1', kind: 'cut', t: 100, start: 100, end: 110, video_id: 'v1' };",
+            "function reset(o) { Object.assign(PV, { win: {}, el: FRAME, ready: true, clip: null, armed: false,",
+            "  settling: false, ended: false, vid: 'v1', pending: null, wired: true, playing: false, paused: false,",
+            "  free: false, stopped: false, blocked: false, hold: false, watch: 0, state: 2, t: 0, last: null }, o);",
+            "  SENT = []; PAGEPAUSED = 0; NOW.textContent = ''; document.activeElement = ELSE; }",
+            "const says = w => NOW.textContent.startsWith(w);",
+            # a late autoplay after a stop, no hand in the frame: silenced, the page untouched
+            "reset({ last: A, hold: true, state: 3 }); pvState(1, 101);",
+            "if (!sent('pauseVideo').length || PAGEPAUSED || PV.clip || PV.free) fail('a late autoplay must be paused again, the page left alone');",
+            # the reader's hand in the frame while held: the preview goes on, unarmed
+            "reset({ last: A, hold: true, state: 3 }); document.activeElement = FRAME; pvState(1, 104);",
+            "if (PV.clip !== A || PV.armed || !PV.playing || PAGEPAUSED !== 1 || sent('pauseVideo').length || !says('previewing')) fail('the hand in the frame resumes the preview, unarmed, and the page yields');",
+            # seen silent, then a press: no hand needed; the next report inside arms
+            "reset({ last: A }); pvState(1, 104); pvAdvance(104.5);",
+            "if (PV.clip !== A || !PV.armed) fail('a press after the frame was seen silent resumes the clip; a report inside arms it');",
+            # a press outside the clip: the tape plays, unbounded and said so
+            "reset({ last: A }); pvState(1, 500);",
+            "if (PV.clip || !PV.free || PAGEPAUSED !== 1 || !says('playing the tape')) fail('a press outside the clip is free play, said so, the page yielding');",
+            "pvAdvance(500); if (sent('pauseVideo').length) fail('free play is not gated');",
+            # free play through a buffer, focus elsewhere, crossing the old clip: stays free
+            "reset({ last: A, free: true }); pvState(1, 104);",
+            "if (sent('pauseVideo').length || !PV.free || PV.clip) fail('free play buffering must not be silenced or re-adopted');",
+            # played, the reader's ▶ at the end: free play past the clip
+            "reset({ clip: A, ended: true }); pvState(1, 109.95);",
+            "if (PV.clip || !PV.free || PV.last !== A) fail('▶ after the gate stopped plays on past the clip, as free play');",
+            # played but not yet seen paused: a stale play with no hand is paused again
+            "reset({ clip: A, ended: true, hold: true, state: 1 }); pvState(1, 109.95);",
+            "if (!sent('pauseVideo').length || PV.clip !== A || !PV.ended) fail('the gate\\'s stop holds until it is seen');",
+            # played, scrubbed back in, ▶: the clip again, bounded
+            "reset({ clip: A, ended: true }); pvState(1, 102);",
+            "if (PV.clip !== A || PV.ended || PV.armed || !PV.playing) fail('▶ inside a played clip previews it again');",
+            # the reader pauses mid-preview, then goes on
+            "reset({ clip: A, playing: true, armed: true, state: 1 }); pvState(2, 105);",
+            "if (!PV.paused || PV.playing || !says('paused on the frame')) fail('a pause on the frame is said as such');",
+            "pvState(1, 105); if (PV.paused || !PV.playing || !says('previewing') || PAGEPAUSED !== 1) fail('the frame\\'s ▶ goes on');",
+            # the tape's own end, and the gate's stop
+            "reset({ clip: A, playing: true }); pvState(0, 110);",
+            "if (!PV.ended || PV.playing || !says('played')) fail('the tape\\'s end ends the preview');",
+            "reset({ clip: A, playing: true, armed: true }); pvAdvance(109.9);",
+            "if (!sent('pauseVideo').length || !PV.ended || PV.playing || !PV.hold || !says('played')) fail('the gate stops, holds, and says played');",
+            "reset({ clip: A, blocked: true }); pvShow(); if (!says('the tape hasn’t started')) fail('blocked is said');",
+            # the dispatcher: ready once; a stop before ready CUES the last clip's tape
+            "reset({ ready: false, stopped: true, last: A, state: -2 });",
+            "const ev = d => ({ source: PV.win, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
+            "onPV(ev({ event: 'initialDelivery', info: { playerState: -1 } })); onPV(ev({ event: 'onReady' }));",
+            "const cue = sent('cueVideoById');",
+            "if (cue.length !== 1 || cue[0][1][0].videoId !== 'v1' || cue[0][1][0].startSeconds !== 100 || sent('listening').length !== 1) fail('the ready work runs once and cues the stopped clip');",
+            "if (sent('pauseVideo').length || sent('playVideo').length) fail('a cue, not a pause or a play');",
+            # a message from another frame is not the stage's
+            "reset({ ready: false, clip: A, pending: A, state: -2 }); onPV({ source: {}, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify({ event: 'onReady' }) });",
+            "if (PV.ready || SENT.length) fail('the stage hears only its own frame');",
+            # time moving under a playing state is the preview playing (a seek in a playing tape)
+            "reset({ clip: A, state: 1 }); onPV(ev({ event: 'infoDelivery', info: { currentTime: 104 } }));",
+            "if (!PV.playing || !PV.armed || !says('previewing')) fail('time moving under state 1 is playing');",
+            # a paused or cued report releases the hold
+            "reset({ hold: true, state: 1, last: A }); onPV(ev({ event: 'infoDelivery', info: { playerState: 2 } }));",
+            "if (PV.hold) fail('seen paused releases the hold');",
+            "reset({ hold: true, state: -1, last: A }); onPV(ev({ event: 'infoDelivery', info: { playerState: 5 } }));",
+            "if (PV.hold) fail('seen cued releases the hold');",
+            "console.log('ok');",
+        ]))
+        self.assertEqual(stage.stdout.strip(), "ok", stage.stdout + stage.stderr)
+        page = self.node("\n".join([
+            "const WIN = {}, EL = { f: 'page' }, ELSE = { f: 'else' };",
+            "const document = { activeElement: ELSE };",
+            "let SENT = [], PVPAUSED = 0, SEEKS = [], SHOWN = 0;",
+            "const ytSend = (k, f, a) => SENT.push(k === 'listening' ? ['listening'] : [f, a]);",
+            "const sent = f => SENT.filter(x => x[0] === f);",
+            "const ytSeek = t => SEEKS.push(t); const pvPause = () => { PVPAUSED++; };",
+            "const reelShow = () => { SHOWN++; };",
+            "const followAlong = () => {}, strip = () => {}, tick = () => {}, reelAdvance = () => {};",
+            "const PV = { clip: null, free: false };",
+            "let REELPLAY = null; let YT = {};",
+            self.lift(r"  const inFrame = [^\n]+"),
+            self.lift(r"  function onYT\(e\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m, JSON.stringify(YT), JSON.stringify(SENT)); process.exit(1); }",
+            "function reset(y, r) { YT = Object.assign({ win: WIN, el: EL, vid: 'v1', loaded: true, ready: false,",
+            "  time: 0, pending: null, hold: false, state: -2 }, y); REELPLAY = r || null;",
+            "  SENT = []; PVPAUSED = 0; SEEKS = []; SHOWN = 0; document.activeElement = ELSE; PV.clip = null; PV.free = false; }",
+            "const ev = d => ({ source: WIN, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify(d) });",
+            "const ready = () => { onYT(ev({ event: 'initialDelivery', info: { playerState: -1 } })); onYT(ev({ event: 'onReady' })); };",
+            # held in the load gap: cued at the kept place, never played; ready runs once
+            "reset({ hold: true, pending: 720 }); ready();",
+            "const c1 = sent('cueVideoById');",
+            "if (c1.length !== 1 || c1[0][1][0].videoId !== 'v1' || c1[0][1][0].startSeconds !== 720) fail('a held page is cued where it was asked to be');",
+            "if (SEEKS.length || sent('playVideo').length || YT.pending !== null || sent('listening').length !== 1) fail('once, and no play');",
+            # not held: the stashed seek plays, once
+            "reset({ pending: 30 }); ready(); if (SEEKS.join() !== '30') fail('a stashed seek applies once: ' + SEEKS);",
+            # a cross-meeting switch stashed with a same-tape seek: the switch loads, the seek is dropped
+            "reset({ pending: 100 }, { pending: { vid: 'v2', start: 50 }, settling: false, paused: false, active: true }); ready();",
+            "const l = sent('loadVideoById');",
+            "if (l.length !== 1 || l[0][1][0].videoId !== 'v2' || SEEKS.length || YT.pending !== null || YT.vid !== 'v2') fail('the switch loads once; the abandoned tape\\'s seek is dropped');",
+            # held with a stashed cross-meeting cite: that tape is cued, not loaded
+            "reset({ hold: true, pending: 100 }, { pending: { vid: 'v2', start: 50 }, paused: true });  ready();",
+            "const c2 = sent('cueVideoById');",
+            "if (c2.length !== 1 || c2[0][1][0].videoId !== 'v2' || c2[0][1][0].startSeconds !== 50 || sent('loadVideoById').length || REELPLAY.pending || YT.vid !== 'v2') fail('a held page cues the stashed cite\\'s tape');",
+            # a late autoplay while held, no hand: paused again, the stage untouched
+            "reset({ ready: true, hold: true, state: 3 }); PV.clip = { x: 1 };",
+            "onYT(ev({ event: 'infoDelivery', info: { playerState: 1 } }));",
+            "if (sent('pauseVideo').length !== 1 || PVPAUSED || !YT.hold) fail('a late autoplay of a held page is paused again');",
+            # seen paused: the hold goes; then the reader's own press makes the page the engine
+            "onYT(ev({ event: 'infoDelivery', info: { playerState: 2 } })); if (YT.hold) fail('seen paused releases the hold');",
+            "REELPLAY = { paused: true, active: false, armed: true }; SENT = [];",
+            "onYT(ev({ event: 'infoDelivery', info: { playerState: 1 } }));",
+            "if (sent('pauseVideo').length || PVPAUSED !== 1) fail('the reader\\'s press on the page: the stage yields');",
+            "if (REELPLAY.paused || !REELPLAY.active || REELPLAY.armed || SHOWN !== 1) fail('a reel the stage paused goes on from its clip');",
+            # held, but the hand is in the page frame: the reader's press, at once
+            "reset({ ready: true, hold: true, state: 3 }); PV.clip = { x: 1 }; document.activeElement = EL;",
+            "onYT(ev({ event: 'infoDelivery', info: { playerState: 1 } }));",
+            "if (sent('pauseVideo').length || YT.hold || PVPAUSED !== 1) fail('the hand in the page frame is the reader\\'s press');",
+            # another frame's message is not the page player's
+            "reset({}); onYT({ source: {}, origin: 'https://www.youtube-nocookie.com', data: JSON.stringify({ event: 'onReady' }) });",
+            "if (YT.ready || SENT.length) fail('the page hears only its own frame');",
+            "console.log('ok');",
+        ]))
+        self.assertEqual(page.stdout.strip(), "ok", page.stdout + page.stderr)
+        for token in ("const inFrame = el => !!el && document.activeElement === el;",
+                      "if (!PV.free && PV.hold && !inFrame(PV.el)) { pvSend(\"pauseVideo\"); return; }",
+                      "if (YT.hold && !inFrame(YT.el)) ytSend(\"cmd\", \"pauseVideo\", []);",
+                      "if ((d.event === \"onReady\" || d.event === \"initialDelivery\") && !YT.ready) {",
+                      "if ((d.event === \"onReady\" || d.event === \"initialDelivery\") && !PV.ready) {",
+                      "PV.blocked = false; PV.paused = false; PV.free = false; PV.hold = false;",
+                      "clearTimeout(PV.watch); PV.blocked = false;",
+                      "if (typeof YT !== \"undefined\") YT.hold = false;",
+                      "YT.el = ifr; YT.vid = vid; YT.hold = false;",
+                      "? $(`.cz-rclip[data-i=\"${focus.i}\"] .cz-rprev`, body)",
+                      "if (!t || t.disabled) t = $(\".cz-reelacts .btn\", body);",
+                      "if (ae.classList.contains(\"pb-pv\")) return { act: \"pbpv\", key: ae.dataset.pvkey };"):
+            self.assertTrue(token in self.JS, f"{token!r} drifted — the B2 re-review fold was reverted")
+        retrim = self.JS[self.JS.index("function pvRetrim(clips)"):self.JS.index("function pvPlay(clip)")]
+        self.assertNotIn("PV.ended = false", retrim, "a trim must never flip a played clip back to previewing")
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        for rule in (".cz-rplay.on:focus-visible{outline:var(--border-w-strong) solid var(--focus-ring, var(--state))",
+                     "html.cz-m-studio .pb-pv.on{outline:var(--border-w) solid var(--accent)"):
+            self.assertIn(rule, css)
+        # the focus ring outranks each mark: it comes later at equal specificity
+        self.assertLess(css.index(".cz-rplay.on{"), css.index(".cz-rplay.on:focus-visible{"))
+        self.assertLess(css.index("html.cz-m-studio .pb-pv.on{outline"), css.index("html.cz-m-studio .pb-pv:focus-visible{"))
 
     def test_the_cutting_markers_are_present(self):
         """The drift guard: the pieces the stylesheet, the hydrators and the
@@ -2936,6 +3108,7 @@ class TestPaper(unittest.TestCase):
             self.lift(r"  const PAPER_KEY = .+?;"),
             self.lift(r"  const PAPERS_KEY = .+?;"),
             self.lift(r"  const PAPERS_MAX = .+?;"),
+            self.lift(r"  let PAPERS_BLANK = .+?;"),
             self.lift(r"  const PAPER_ID = .+?;"),
             self.lift(r"  const paperId = .+?;"),
             self.lift(r"  function readPapers\(\) \{.+?\n  \}"),
@@ -2946,6 +3119,14 @@ class TestPaper(unittest.TestCase):
             self.lift(r"  function switchPaper\(id\) \{.+?\n  \}"),
             self.lift(r"  function deletePaper\(\) \{.+?\n  \}"),
             "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            # a fresh browser: a READ writes nothing (no id minted into storage
+            # for a reader who never makes anything) and keeps one id
+            "const fresh1 = readPapers(), fresh2 = readPapers();",
+            "if (Object.keys(STORE).length) fail('a read must write nothing: ' + JSON.stringify(STORE));",
+            "if (fresh1.active !== fresh2.active || fresh1.papers.length !== 1) fail('one blank paper, one id, for the page');",
+            "savePaper({ title: 'first save', blocks: [] });",
+            "if (JSON.parse(STORE['cz-papers']).active !== fresh1.active) fail('the first save writes the shelf under the same id');",
+            "for (const k of Object.keys(STORE)) delete STORE[k];",
             # the old draft migrates once
             "STORE['cz-paper'] = JSON.stringify({ title: 'mine', blocks: [{kind:'note',text:'kept'}] });",
             "let p = readPaper();",
@@ -3060,15 +3241,25 @@ class TestPaper(unittest.TestCase):
                       "(opens in a new tab)"):
             self.assertTrue(token in self.JS, f"{token!r} drifted — the C fold was reverted")
         self.assertTrue("docChooserHTML" not in self.JS)   # the dead second chooser is gone
+        # part 3: a clear that did not hold says only that; a read writes nothing
+        clear = self.JS[self.JS.index("function clearPaper()"):]
+        clear = clear[:clear.index("\n  }\n")]
+        self.assertIn('toast("this browser blocks storage — the change didn’t hold"); return; }', clear)
+        self.assertIn("if (raw != null && writePapers(sh))", self.JS)
         css = (REPO / "web" / "static" / "app.web.css").read_text()
         prn = css[css.index("@media print{"):]
         for rule in ('content:" " var(--site,"") attr(href)',
                      ".pb-dg::after{grid-column:1/-1}",
+                     "html.cz-m-studio body,html.cz-m-studio.cz-rail body{padding-left:0 !important}",
+                     "word-break:normal;overflow-wrap:anywhere",
+                     '.reelcite[href^="/"]::after',
                      ".cz-editing .cz-ednote{display:none}",
                      ".cz-editing .cz-ednote-print{display:block}",
                      '.cz-editing .cz-edrow[data-layout="half"]{display:inline-block;width:48%'):
             self.assertIn(rule, prn, f"the print sheet lost {rule!r}")
         self.assertIn(".cz-ednote-print{display:none}", css)
+        self.assertNotIn("word-break:break-all", prn)       # an address breaks only when it must
+        self.assertIn(".cz-shelf .btn{font-size:var(--text-xs);padding:5px 9px;display:inline-flex;align-items:center;min-height:24px}", css)
         self.assertIn('html.cz-m-studio .cz-edrow[data-layout="half"] .cz-edbody{width:50%', css)
         self.assertIn(".pb-quote figcaption{", css)
         self.assertNotIn(".pb-quote cite", css)
@@ -3099,6 +3290,7 @@ class TestPaper(unittest.TestCase):
             self.lift(r"  const PAPER_KEY = .+?;"),
             self.lift(r"  const PAPERS_KEY = .+?;"),
             self.lift(r"  const PAPERS_MAX = .+?;"),
+            self.lift(r"  let PAPERS_BLANK = .+?;"),
             self.lift(r"  const PAPER_ID = .+?;"),
             self.lift(r"  const paperId = .+?;"),
             self.lift(r"  function readPapers\(\) \{.+?\n  \}"),
