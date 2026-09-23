@@ -14,8 +14,9 @@ this file is the state.** Written 2026-09-23 at the end of the day.
   editor (A), the cutting room and its preview stage (B, B2), the rich tier —
   a shelf of papers, layouts, pull-quote / filing / digest refs, print (C).
   `main` = what is live, plus docs.
-- **READY, NOT DEPLOYED: branch `fold-v2.1.15`** (`b3f9a04` the code,
-  `93e32f6` its changelog entry). It folds a focused re-review of v2.1.14's
+- **READY, NOT DEPLOYED: branch `fold-v2.1.15`** — two commits on top of
+  `main` (`git log --oneline main..fold-v2.1.15`): the code fold, then its
+  changelog entry. It folds a focused re-review of v2.1.14's
   two folds: fourteen findings (twelve distinct), all folded — live print
   twins for the editor's note and title; halves painted at half width only
   where the reader's page pairs them; the add-search's lines appended in
@@ -35,8 +36,8 @@ this file is the state.** Written 2026-09-23 at the end of the day.
 1. `git fetch && git checkout fold-v2.1.15`; run the suite
    (`.venv/bin/python -m unittest discover -s tests -t . -q` → 560; the
    Postgres-backed tests skip without `RECORD_TEST_PG_DSN` — none of them
-   cover what this fold touches). Read `git show b3f9a04`.
-2. If credits allow, a lean adversarial review of `b3f9a04` (three lenses,
+   cover what this fold touches). Read the fold: `git show fold-v2.1.15~1`.
+2. If credits allow, a lean adversarial review of that commit (three lenses,
    ≤ 5 findings each, two skeptics per finding). Verifiers read the working
    tree — don't edit it while they run — and they share the Browser pane, so
    stay out of the pane until they finish. Fold what they confirm, then
