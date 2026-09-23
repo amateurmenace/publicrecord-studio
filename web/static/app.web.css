@@ -422,23 +422,32 @@ h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
    paper). The transcript's tick hides until its row is hovered or focused
    (thousands of rows — quiet is load-bearing), but a pressed tick stays. */
 .seg{position:relative}
+/* the rows make room for their ticks only once the ticks exist (the class
+   is the hydrator's) — JS-off, the row is exactly as pressed */
+#transcript.cz-cuttable .seg{padding-right:52px}
 .seg-tick{position:absolute;top:2px;right:0;z-index:2;
   font:var(--weight-medium) 11px/1 var(--font-mono);cursor:pointer;
   background:var(--surface-card);color:var(--text-secondary);
   border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
   min-width:24px;min-height:24px;padding:4px 7px;
-  opacity:0;transition:opacity .12s}
+  opacity:0;transition:opacity .12s;user-select:none}
+/* the glyph lives in the stylesheet, so a citation dragged across rows
+   never carries a column of ＋ and ✓ */
+.seg-tick::before,.stick::before,.btick::before{content:attr(data-g)}
 .seg:hover .seg-tick,.seg:focus-within .seg-tick,
 .seg-tick.on,.seg-tick:focus-visible{opacity:1}
+/* a screen that cannot hover cannot reveal — the ticks simply show, so a
+   thumb never lands on a control it could not see */
+@media (hover:none){.seg-tick{opacity:1}}
 .seg-tick:hover{border-color:var(--accent);color:var(--accent)}
 .seg-tick.on{background:var(--accent);color:var(--text-inverse);border-color:var(--accent)}
 @media (prefers-reduced-motion: reduce){.seg-tick{transition:none}}
 /* a search hit's tick rides beside its row — the row is an anchor, so the
    button is a positioned sibling in a wrapper, never a nested control */
 .swrap{position:relative}
-.swrap .sresult{display:block}
+.swrap .sresult{display:block;padding-right:76px}   /* room for the tick */
 .stick{position:absolute;top:var(--space-2);right:var(--space-2);z-index:2;
-  font:var(--weight-medium) 10px/1 var(--font-mono);cursor:pointer;
+  font:var(--weight-medium) 10px/1 var(--font-mono);cursor:pointer;user-select:none;
   background:var(--surface-card);color:var(--text-secondary);
   border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
   min-height:24px;padding:6px 8px}
@@ -448,8 +457,8 @@ h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
 .btick{font:var(--weight-medium) 11px/1 var(--font-mono);cursor:pointer;
   background:var(--surface-card);color:var(--text-secondary);
   border:var(--border-w) solid var(--border-strong);border-radius:var(--radius-sm);
-  min-width:24px;min-height:24px;padding:4px 7px;margin-left:2px;
-  vertical-align:middle}
+  min-width:24px;min-height:24px;padding:4px 7px;margin:-2px 0 2px;
+  align-self:flex-start;user-select:none}   /* a chip under its bead, not a bar */
 .btick:hover{border-color:var(--accent);color:var(--accent)}
 .btick.on{background:var(--accent);color:var(--text-inverse);border-color:var(--accent)}
 .rt-x:hover{border-color:var(--accent)}
@@ -497,6 +506,8 @@ h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
   display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center}
 .rv-take[hidden]{display:none}
 .rv-take .btn{font-size:var(--text-xs)}
+.rv-take-t{flex:0 0 100%}
+.rv-take:focus-visible{outline:var(--border-w-strong) solid var(--focus-ring, var(--state));outline-offset:2px}
 
 /* /app/p — a rendered paper (specs/21 P1). The quiet palette on purpose:
    whatever mode the editor liked, a paper READS as the record reads — ink on

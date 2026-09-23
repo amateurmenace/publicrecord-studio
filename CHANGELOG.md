@@ -48,7 +48,24 @@ adapted to phase A's editor and panel, guarded (the byte-clean sweep now
 covers `seg-tick`, `btick`, `stick`, `data-czcut`, the panel tray and the
 viewer's chooser; the reel-path scan now checks the one raw fetch stays
 on the edition), twin-tested (`parseSegTimes`, `stepEdge`, the segment
-tick's bounds, the mid-fetch race, `takeMerge`). REVIEW_LINE_B
+tick's bounds, the mid-fetch race, `takeMerge`). A five-lens adversarial
+pass confirmed fifteen findings, every one folded: a transcript tick press
+bubbled into the seek handler and started the tape; a taken reel collapsed
+distinct cuts into one identity; anywhere-cuts were relabelled as the
+nearest scored moment on `/app/r`, in papers and when taken (cuts now
+quote their own line off the tape); the new tray engine no-op'd in a
+storage-blocked browser (it reads the composer's copy there); a meeting-
+tray press moved focus into the panel; hit and bead clips carried no
+tape, date or length and could end past the tape; bead ticks painted as
+full-width bars; the ticks covered the words they cut and were blind
+targets on touch; cross-page trims snapped at the wrong grain; a failed
+transcript fetch was remembered as no bounds; the tick glyphs rode into
+citations; label-in-name; a two-hour tape was thousands of new tab stops
+(the ticks left the tab order; `c` on a row's time link cuts it); the
+last clip's ✕ and the `/app/r` chooser dropped focus to the body;
+`decodeReel` threw on a bad escape. The fold's own re-read caught one
+more: a second press on a hit's tick during its plane fetch would have
+doubled the clip. 548 tests.
 
 ### specs/23 A — the open newsroom: the front door + the real editor — 2026-09-23 (v2.1.11)
 

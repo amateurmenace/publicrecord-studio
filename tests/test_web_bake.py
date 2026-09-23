@@ -2051,29 +2051,34 @@ class TestCuttingRoom(unittest.TestCase):
             "const REEL_KEY = 'cz-reel';",
             "let toasts = [];",
             "const toast = m => toasts.push(m);",
-            "function writeTray(clips) { store = clips; }",
-            "const CREEL = { pid: 'vidX', segs: [0.9, 10.9, 20.9],",
+            "function writeTray(clips) { store = clips; CREEL.clips = clips; }",
+            "const CREEL = { pid: 'vidX', segs: [0.9, 10.9, 20.9], clips: [],",
             "  meta: { duration: 300, video_id: 'vX', title: 'Select Board',",
             "          body: 'Board', town: 'Testville', date: '2026-03-10' } };",
+            "const getJSON = async () => null;",
             "const row = { dataset: { t: '10.9' },",
             "  querySelector: () => ({ textContent: '  the override passes  ' }) };",
             "const btn = { dataset: { czcut: 'segment' }, closest: () => row };",
-            self.lift(r"  function toggleCut\(b\) \{.+?\n  \}"),
+            self.lift(r"  const trayClips = .+?;"),
+            self.lift(r"  const cutKey = .+?;"),
+            self.lift(r"  async function toggleCut\(b\) \{.+?\n  \}"),
             "function fail(m){ console.log('FAIL', m); process.exit(1); }",
-            "toggleCut(btn);",
+            "(async () => {",
+            "await toggleCut(btn);",
             "if (store.length !== 1) fail('tick did not cut: ' + JSON.stringify(store));",
             "const c = store[0];",
             "if (c.start !== 10.9 || c.end !== 20.9) fail('bounds ' + c.start + '-' + c.end);",
             "if (c.kind !== 'segment') fail('kind ' + c.kind);",
             "if (c.quote !== 'the override passes') fail('quote ' + JSON.stringify(c.quote));",
             "if (c.pid !== 'vidX' || c.mtitle !== 'Select Board') fail('meta lost');",
-            "toggleCut(btn);",
+            "await toggleCut(btn);",
             "if (store.length !== 0) fail('second press did not remove');",
             # the LAST row: no next bound → 12s window, capped by the tape
             "row.dataset.t = '20.9';",
-            "toggleCut(btn);",
+            "await toggleCut(btn);",
             "if (store[0].end !== 32.9) fail('last-row end ' + store[0].end);",
             "console.log('ok');",
+            "})();",
         ])
         r = self.node(body)
         self.assertEqual(r.returncode, 0,
@@ -2109,7 +2114,8 @@ class TestCuttingRoom(unittest.TestCase):
             "  }",
             "  return dir === '+' ? Math.min(dur, t + 2) : Math.max(0, t - 2);",
             "}",
-            self.lift(r"  async function trayAct\(i, act\) \{.+?\n  \}"),
+            self.lift(r"  const trayClips = .+?;"),
+            self.lift(r"  async function trayAct\(i, act, origin\) \{.+?\n  \}"),
             "function fail(m){ console.log('FAIL', m); process.exit(1); }",
             "(async () => {",
             "  await trayAct(0, 's-');",   # pressed on A at index 0
@@ -2173,7 +2179,9 @@ class TestCuttingRoom(unittest.TestCase):
                       # the tray's outputs offered from the panel
                       'data-rv="mine"', "function takeReel(", "function takeMerge(",
                       'data-cz="reelcite"', 'data-cz="reeljson"',
-                      "const trayMeta = reelMeta"):
+                      "const trayMeta = reelMeta",
+                      # a transcript tick is a press, never a seek (a pane catch)
+                      'if (e.target.closest("[data-czcut]")) return;'):
             self.assertIn(token, self.JS, f"{token!r} drifted in app.js")
         # the panel's reel block offers file-into-paper right where the tray is
         panel = self.JS[self.JS.index("function refreshReelSummary("):

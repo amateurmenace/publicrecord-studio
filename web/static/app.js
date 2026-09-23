@@ -384,10 +384,15 @@
     const body = $(".cz-reelbody", STUDIO), mini = $(".cz-pill-reel", STUDIO);
     if (!body) return;
     if (!n) {
+      // the keyboard was on the last clip's control? land on the block's
+      // own head (never <body>) — the emptied tray's one certain element
+      const had = body.contains(document.activeElement)
+        || (focus && focus.act);
       body.innerHTML = `<p class="cz-hint">No clips yet. Tick a moment or any
         transcript line on a meeting page, a search hit, or an issue’s bead —
         they gather here as a reel, across meetings if you like.</p>`;
       if (mini) { mini.hidden = true; mini.removeAttribute("href"); mini.textContent = ""; }
+      if (had) { const tag = body.previousElementSibling; if (tag) { tag.tabIndex = -1; tag.focus(); } }
       return;
     }
     // the storage-event path repaints with no focus arg — if the keyboard
@@ -1203,6 +1208,9 @@
     const tr = $("#transcript"); if (!tr) return;
     tr.addEventListener("click", e => {
       const seg = e.target.closest(".seg"); if (!seg) return;
+      // a row's cut tick is the reel's press, not a seek: ticking five rows
+      // must not load the tape and jump five times (a pane catch)
+      if (e.target.closest("[data-czcut]")) return;
       if (e.target.closest("a.ts") || !e.target.closest("a")) {
         e.preventDefault();
         const t = +seg.dataset.t;
@@ -1366,7 +1374,11 @@
     for (const part of (p.get("c") || "").split(",")) {
       let pid = m, range = part;
       const colon = part.indexOf(":");
-      if (colon > 0) { pid = decodeURIComponent(part.slice(0, colon)).trim(); range = part.slice(colon + 1); }
+      if (colon > 0) {
+        // a malformed escape in a v2 pid drops the clip, never the reel
+        try { pid = decodeURIComponent(part.slice(0, colon)).trim(); } catch { continue; }
+        range = part.slice(colon + 1);
+      }
       const seg = range.split("-");
       if (seg.length !== 2) continue;
       const start = parseFloat(seg[0]), end = parseFloat(seg[1]);
@@ -1565,7 +1577,7 @@
      pressed pages carry none of it, and JS-off stays the clean reading.
      Clip identity stays (pid, kind, t); the link grammar never carried kind
      and does not change. */
-  function toggleCut(b) {
+  async function toggleCut(b) {
     const kind = b.dataset.czcut;
     let clip = null;
     if (kind === "segment") {
@@ -1588,15 +1600,34 @@
     } else {
       // search hits and issue beads stamp what they know at render; the end
       // starts at the composer's twelve-second window and trims to the
-      // record's own bounds in the tray (§5.6)
+      // record's own bounds in the tray (§5.6). The meeting's own plane —
+      // one cached fetch — supplies the facts the surface did not carry
+      // (the tape, its length, the date), and the end never passes the
+      // tape's end: a clip past it would stall the viewer on the last frame
       const d = b.dataset, t = r1(+d.t);
       if (!isFinite(t) || !d.pid) return;
-      clip = { t, start: t, end: r1(t + 12), kind,
+      // a line already on the tray leaves NOW, before any fetch — so a
+      // second press during the plane's round trip removes rather than
+      // doubles, and the add below re-checks once the plane has answered
+      const have = trayClips();
+      const i0 = have.findIndex(c => cutKey(c) === cutKey({ pid: d.pid, t }));
+      if (i0 >= 0) { have.splice(i0, 1); writeTray(have); toast("removed from the reel"); return; }
+      const m = await getJSON(`${BASE}/meetings/${encodeURIComponent(d.pid)}.json`) || {};
+      const dur = +m.duration || 0;
+      let end = r1(t + 12);
+      if (dur) end = Math.min(end, dur);
+      if (end <= t) end = t + MIN_CLIP;
+      clip = { t, start: t, end: r1(end), kind,
                quote: cut(d.quote || "", 120),
-               pid: d.pid, mtitle: d.mtitle || "" };
+               pid: d.pid, mtitle: m.title || d.mtitle || "",
+               video_id: m.video_id || "", body: m.body || d.body || "",
+               town: m.town || d.town || "", date: m.date || d.date || "",
+               duration: dur };
     }
-    const clips = readReel(REEL_KEY);
-    const i = clips.findIndex(c => clipKey(c) === clipKey(clip));
+    // one line is one cut, whatever surface cut it: a transcript row
+    // already on the tray as a search hit leaves, it does not double
+    const clips = trayClips();
+    const i = clips.findIndex(c => cutKey(c) === cutKey(clip));
     if (i >= 0) clips.splice(i, 1); else clips.push(clip);
     writeTray(clips);
     toast(i >= 0 ? "removed from the reel" : "added to the reel");
@@ -1606,23 +1637,28 @@
   function paintCutTicks() {
     const btns = $$("[data-czcut]");
     if (!btns.length) return;
-    const keys = new Set(readReel(REEL_KEY).map(clipKey));
+    const keys = new Set(trayClips().map(cutKey));
     for (const b of btns) {
       let key;
       if (b.dataset.czcut === "segment") {
         const row = b.closest(".seg"); if (!row || !CREEL) continue;
-        key = clipKey({ pid: CREEL.pid, kind: "segment", t: r1(+row.dataset.t) });
+        key = cutKey({ pid: CREEL.pid, t: r1(+row.dataset.t) });
       } else {
-        key = clipKey({ pid: b.dataset.pid, kind: b.dataset.czcut,
-                        t: r1(+b.dataset.t) });
+        key = cutKey({ pid: b.dataset.pid, t: r1(+b.dataset.t) });
       }
       const inr = keys.has(key);
       b.classList.toggle("on", inr);
       b.setAttribute("aria-pressed", inr ? "true" : "false");
       b.title = inr ? "in the reel — press to remove" : "add to the reel";
-      b.textContent = b.classList.contains("stick")
-        ? (inr ? "✓ in reel" : "＋ reel")
-        : (inr ? "✓" : "＋");
+      // the glyph is painted by the stylesheet from data-g, so a selection
+      // dragged across rows never picks the ticks up into a citation; the
+      // accessible name leads with the visible words (WCAG 2.5.3)
+      const wordy = b.classList.contains("stick");
+      b.dataset.g = wordy ? (inr ? "✓ in reel" : "＋ reel") : (inr ? "✓" : "＋");
+      b.textContent = "";
+      b.setAttribute("aria-label", wordy
+        ? (inr ? "in reel — press to remove this moment" : "reel — add this moment")
+        : (inr ? "in the reel — press to remove this line" : "add this line to the reel"));
     }
   }
   /* the transcript's rows, made cuttable — one small button each, quiet
@@ -1630,15 +1666,29 @@
      the accessibility tree. One fragment pass; a big tape is thousands of
      rows and this must not thrash layout per row. */
   function wireSegTicks() {
+    const tr = $("#transcript");
     const rows = $$("#transcript .seg");
-    if (!rows.length || $(".seg-tick")) return;
+    if (!tr || !rows.length || $(".seg-tick")) return;
     for (const row of rows) {
       const b = document.createElement("button");
       b.type = "button"; b.className = "seg-tick";
       b.dataset.czcut = "segment";
+      // not a tab stop: a two-hour tape is thousands of rows, and the row's
+      // own time link is already one — press c on it to cut the row. The
+      // button stays in the accessibility tree for a screen reader's own
+      // navigation, and a pointer reaches it as ever.
+      b.tabIndex = -1;
       b.setAttribute("aria-label", "add this line to the reel");
       row.appendChild(b);
     }
+    tr.classList.add("cz-cuttable");   // the rows make room for the ticks
+    tr.addEventListener("keydown", e => {
+      if (e.key !== "c" || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const a = e.target.closest && e.target.closest("a.ts");
+      const row = a && a.closest(".seg"); const b = row && row.querySelector(".seg-tick");
+      if (!b) return;
+      e.preventDefault(); toggleCut(b);
+    });
   }
   /* an issue's beads, made cuttable — the bead is an anchor, so its tick is
      a SIBLING (interactive inside interactive is a keyboard trap). */
@@ -1653,6 +1703,10 @@
       b.dataset.czcut = "bead"; b.dataset.pid = m[1]; b.dataset.t = m[2];
       b.dataset.quote = (a.textContent || "").replace(/^\s*[\d:]+\s*/, "").trim().slice(0, 120);
       if (tt) b.dataset.mtitle = tt.textContent.trim();
+      // what the timeline node already says about its meeting rides along
+      const td = node && node.querySelector(".tdate");
+      if (td) b.dataset.date = td.textContent.trim();
+      if (tt) b.dataset.body = tt.textContent.trim();
       b.setAttribute("aria-label", "add this moment to the reel");
       a.after(b);
     });
@@ -1664,9 +1718,18 @@
     if (b) { e.preventDefault(); toggleCut(b); }
   });
 
-  function buildTray() {
+  function buildTray(focus) {
     let tray = $("#reeltray");
-    if (!CREEL.clips.length) { if (tray) tray.remove(); return; }
+    if (!CREEL.clips.length) {
+      if (tray) {
+        // the last clip left under the keyboard: land on the moments panel's
+        // head (or the transcript), never on <body>
+        const had = focus || tray.contains(document.activeElement);
+        tray.remove();
+        if (had) { const to = $(".moments .tag") || $("#transcript"); if (to) { to.tabIndex = -1; to.focus(); } }
+      }
+      return;
+    }
     if (!tray) {
       tray = document.createElement("section");
       tray.className = "card reeltray"; tray.id = "reeltray";
@@ -1717,6 +1780,17 @@
           ? "<b>This reel spans meetings</b> — it plays and cites here; rendering one video across meetings is a desk step still to come."
           : "<b>Rendering the video needs the desk</b> — the reel.json opens in Highlighter."}</p>`;
     wireTray();
+    if (focus) {
+      // the pole rule (the panel's): a move that landed on a pole disabled
+      // the arrow under the keyboard — the opposite arrow takes it; a
+      // removal lands on the next row's first control, never its ✕
+      const row = $(`.rt-clip[data-i="${focus.act === "row" ? focus.i : focus.i}"]`, tray);
+      let t = row && (focus.act === "row" ? $(".rt-b", row) : $(`.rt-b[data-act="${focus.act}"]`, row));
+      if (t && t.disabled) { const other = focus.act === "up" ? "down" : focus.act === "down" ? "up" : "";
+        t = other ? $(`.rt-b[data-act="${other}"]`, row) : $(".rt-b", row); }
+      if (!t) t = $(".rt-clear", tray);
+      if (t && typeof t.focus === "function") t.focus();
+    }
   }
   function wireTray() {
     const tray = $("#reeltray"); if (!tray) return;
@@ -1730,17 +1804,22 @@
   }
   function clipAct(i, act) {
     // the meeting tray and the panel tray are the same tray — one engine
-    // (specs/22 §5.2); the composer's rows just address it by index
-    trayAct(i, act);
+    // (specs/22 §5.2); the composer's rows just address it by index, and
+    // say they did so focus comes back to them
+    trayAct(i, act, "tray");
   }
   /* one honest trim step, shared by both trays: snap to the record's own
      segment bounds when we hold them, else nudge two seconds (specs/22
      §5.6 — sub-segment trims are settled OUT; the units are the record's). */
   function stepEdge(t, dir, segs, dur) {
     if (segs && segs.length) {
-      if (dir === "+") { const nx = segs.find(s => s > t + 0.05);
+      // bounds read off the pressed text are whole seconds while a page's
+      // own are tenths — compare at the bounds' grain, or the first press
+      // from 907.4 "snaps" to 907 (the same line) instead of the line before
+      const q = segs.every(Number.isInteger) ? Math.floor(t) : t;
+      if (dir === "+") { const nx = segs.find(s => s > q + 0.05);
         return nx == null ? Math.min(dur, t + 2) : nx; }
-      const pv = segs.filter(s => s < t - 0.05).pop();
+      const pv = segs.filter(s => s < q - 0.05).pop();
       return pv == null ? Math.max(0, t - 2) : pv;
     }
     return dir === "+" ? Math.min(dur, t + 2) : Math.max(0, t - 2);
@@ -1772,25 +1851,42 @@
     return SEGB_P[pid] ||= fetch(`${BASE}/m/${encodeURIComponent(pid)}/transcript.txt`)
       .then(r => r.ok ? r.text() : "")
       .catch(() => "")
-      .then(tx => (SEGB[pid] = parseSegTimes(tx)));
+      .then(tx => {
+        const segs = parseSegTimes(tx);
+        // a fetch that failed is forgotten, so the next trim asks again —
+        // "no bounds" is a fact about the record, not about this request
+        if (segs.length) SEGB[pid] = segs; else delete SEGB_P[pid];
+        return segs;
+      });
   }
   /* the tray, written once for every writer — the ticks, the meeting tray,
      the panel — and every painted surface reconciled from the one truth
      (other tabs reconcile through the storage event, as before). */
-  function writeTray(clips, focus) {
+  function writeTray(clips, focus, origin) {
     try { localStorage.setItem(REEL_KEY, JSON.stringify(clips)); }
     catch { /* private mode: the tray still works for this visit */ }
-    if (CREEL) { CREEL.clips = clips; buildTray(); paintTicks(); }
+    // focus follows the surface that pressed: the meeting tray's own
+    // control, or the panel's — never the other one's
+    if (CREEL) { CREEL.clips = clips; buildTray(origin === "tray" ? focus : null); paintTicks(); }
     paintCutTicks();
-    refreshReelSummary(focus);
+    refreshReelSummary(origin === "tray" ? undefined : focus);
     refreshPaperSummary();   // the "＋ your reel" count rides the tray
   }
+  /* the tray as this page holds it: the composer's own copy when the page
+     composes (it mirrors every write, and stands even where storage is
+     refused), the stored reel elsewhere. A copy — callers mutate it. */
+  const trayClips = () => CREEL ? CREEL.clips.map(c => ({ ...c })) : readReel(REEL_KEY);
+  /* a cut's identity for the ticks: the line, whatever surface cut it —
+     a search hit and its transcript row are one line (kinds are labels) */
+  const cutKey = c => (c.pid || "") + "@" + r1(c.t);
   /* every tray action, page-agnostic (specs/22 §5.2): index-addressed
-     against the stored reel as it stands. Trims may await a bounds fetch —
-     the reel is RE-READ after the await and the clip re-found by its
-     identity, so a press that landed meanwhile is never overwritten. */
-  async function trayAct(i, act) {
-    let clips = readReel(REEL_KEY);
+     against the reel as it stands. Trims may await a bounds fetch — the
+     reel is RE-READ after the await and the clip re-found by its identity,
+     so a press that landed meanwhile is never overwritten. `origin` names
+     the surface that pressed, so focus returns THERE (the meeting tray's
+     own controls, or the panel's). */
+  async function trayAct(i, act, origin) {
+    let clips = trayClips();
     let c = clips[i]; if (!c) return;
     let focus = { act, i };
     if (act === "rm") {
@@ -1810,7 +1906,7 @@
         toast("that meeting’s transcript didn’t load — nudging by two seconds instead");
       }
       // the fetch awaited — re-read and re-find, another press may have landed
-      clips = readReel(REEL_KEY);
+      clips = trayClips();
       const j = clips.findIndex(x => clipKey(x) === clipKey(c));
       c = clips[j]; if (!c) return;
       focus = { act, i: j };
@@ -1818,7 +1914,7 @@
       if (act[0] === "s") c.start = r1(Math.max(0, Math.min(stepEdge(c.start, act[1], segs, dur), c.end - MIN_CLIP)));
       else c.end = r1(Math.min(dur, Math.max(stepEdge(c.end, act[1], segs, dur), c.start + MIN_CLIP)));
     } else return;
-    writeTray(clips, focus);
+    writeTray(clips, focus, origin);
   }
   /* the meeting a single-meeting reel belongs to: this page's when its clips are
      from here, else reconstructed from what a clip carries (a reel built on
@@ -1876,20 +1972,70 @@
     const mby = {}; for (const [pid, m] of got) if (m) mby[pid] = m;
     const clips = st.clips.map(c => {
       const m = mby[c.pid]; if (!m) return null;   // a clip whose meeting is gone drops out
-      const mo = nearestMoment(m.moments || [], c.start);
-      return { pid: c.pid, start: c.start, end: c.end,
-               t: mo ? r1(mo.t) : c.start, kind: mo ? mo.kind : "moment",
+      // a clip inside a scored moment's window is that moment; any other
+      // cut is its own line — labelled by the tape's words at its start,
+      // never by the nearest moment's (a review catch: anywhere-cuts read
+      // as the wrong words with the wrong deep link)
+      const mo = momentFor(m.moments || [], c.start, c.end);
+      const dur = +m.duration || 0;
+      const end = dur ? Math.min(c.end, dur) : c.end;   // never past the tape
+      if (end <= c.start) return null;
+      return { pid: c.pid, start: c.start, end,
+               t: mo ? r1(mo.t) : c.start, kind: mo ? mo.kind : "cut",
                quote: mo ? mo.quote : "", video_id: m.video_id || "",
                mtitle: m.title || "", body: m.body || "", town: m.town || "",
-               date: m.date || "" };
+               date: m.date || "", duration: dur };
     }).filter(Boolean);
     if (!clips.length) return reelMessage(cites, gone);
+    // the words of every cut that is not a moment, from the tape itself
+    await quoteCuts(clips);
     const nmeet = reelPids(clips).length;
     const first = mby[clips[0].pid];
     document.title = (nmeet > 1 ? `A reel across ${nmeet} meetings`
                                 : `${first.title || "A reel"} — a reel`)
       + ` · publicrecord.studio`;
     buildViewer(stage, cites, clips, mby, nmeet > 1);
+  }
+  /* the moment a clip belongs to, or null: the clip's start must sit
+     inside the moment's own window (its padded start to its end). No
+     "nearest" — a cut from a transcript row two minutes from any moment
+     is not that moment. */
+  function momentFor(moments, start, end) {
+    for (const mo of moments) {
+      const a = r1(mo.start != null ? mo.start : mo.t), b = r1(mo.end || mo.t);
+      if (start >= a - 0.5 && start <= b + 0.5) return mo;
+    }
+    return null;
+  }
+  /* the tape's own words at a cut: the pressed transcript.txt, one fetch
+     per meeting (cached beside the trim bounds), the line at or before
+     the cut's start. A clip that is a moment keeps the moment's quote. */
+  const SEGL = {};
+  function segLines(pid) {
+    if (!pid) return Promise.resolve([]);
+    if (SEGL[pid]) return Promise.resolve(SEGL[pid]);
+    return fetch(`${BASE}/m/${encodeURIComponent(pid)}/transcript.txt`)
+      .then(r => r.ok ? r.text() : "").catch(() => "")
+      .then(tx => { const l = parseSegLines(tx); if (l.length) SEGL[pid] = l; return l; });
+  }
+  function parseSegLines(tx) {
+    const out = [];
+    for (const line of String(tx || "").split("\n")) {
+      const m = /^\[(\d+):(\d\d)(?::(\d\d))?\]\s*(.*)$/.exec(line);
+      if (!m) continue;
+      const t = m[3] == null ? +m[1] * 60 + +m[2] : +m[1] * 3600 + +m[2] * 60 + +m[3];
+      out.push({ t, text: m[4].replace(/^[^:]{1,40}:\s+/, "").trim() });
+    }
+    return out.sort((a, b) => a.t - b.t);
+  }
+  const lineAt = (lines, t) => { let hit = null;
+    for (const l of lines) { if (l.t <= Math.floor(t) + 0.01) hit = l; else break; }
+    return hit ? hit.text : ""; };
+  async function quoteCuts(clips) {
+    const need = [...new Set(clips.filter(c => !c.quote && c.pid).map(c => c.pid))];
+    const got = {};
+    await Promise.all(need.map(async pid => { got[pid] = await segLines(pid); }));
+    for (const c of clips) if (!c.quote && got[c.pid]) c.quote = cut(lineAt(got[c.pid], c.start), 120);
   }
   function nearestMoment(moments, t) {
     // a shared clip's start is the moment's padded window start, so match the
@@ -1960,9 +2106,12 @@
     // the clips a taken reel hands to the tray: ordinary clips — the same
     // identity (pid, kind, t), the same trim rules, the meeting's duration
     // for the trim's ceiling — nothing the record would not say itself
+    // identity = the cut itself (its start), never the moment it sits in:
+    // two cuts inside one moment must stay two clips on the tray, and a
+    // trim must land on the one that was pressed (a review catch)
     const mine = () => clips.map(c => ({
       pid: c.pid, start: r1(c.start), end: r1(c.end),
-      t: c.t != null ? r1(c.t) : r1(c.start), kind: c.kind || "moment",
+      t: r1(c.start), kind: c.kind || "moment",
       quote: c.quote || "", video_id: c.video_id || "", mtitle: c.mtitle || "",
       body: c.body || "", town: c.town || "", date: c.date || "",
       duration: +((mby[c.pid] || {}).duration) || 0 }));
@@ -2000,7 +2149,7 @@
     }
     if (!box) return;
     box.hidden = false;
-    box.innerHTML = `Your tray already holds <b>${have.length}</b> clip${have.length > 1 ? "s" : ""}. `
+    box.innerHTML = `<span class="rv-take-t">Your tray already holds <b>${have.length}</b> clip${have.length > 1 ? "s" : ""}.</span> `
       + `<button type="button" class="btn" data-take="append">append these after them</button> `
       + `<button type="button" class="btn" data-take="replace">replace them with this reel</button> `
       + `<button type="button" class="btn" data-take="keep">keep mine</button>`;
@@ -2027,10 +2176,13 @@
     const confirmed = answer !== "replace"
       || window.confirm(`Replace your ${have.length} clip${have.length > 1 ? "s" : ""} with this reel’s ${clips.length}? Your own cuts would be gone.`);
     const next = takeMerge(answer, have, clips, confirmed);
+    // the button under the keyboard is about to go — the box itself takes
+    // the focus and reads its answer (a review catch: three ways to <body>)
+    const land = () => { if (box) { box.tabIndex = -1; box.focus(); } };
     if (!next) {
       if (box) { box.innerHTML = answer === "keep" ? "kept yours — this reel stays a link you can come back to"
                                                   : "kept yours"; }
-      toast("your tray is unchanged");
+      land(); toast("your tray is unchanged");
       return;
     }
     const added = next.length - (answer === "append" ? have.length : 0);
@@ -2039,6 +2191,7 @@
       ? `${added} clip${added === 1 ? "" : "s"} appended — ${next.length} on your tray now`
       : `your tray is this reel now — ${next.length} clip${next.length > 1 ? "s" : ""}`);
     if (box) box.innerHTML = `on <b>your</b> tray now — ${next.length} clip${next.length > 1 ? "s" : ""}; open the studio to re-cut`;
+    land();
   }
   function startReel(clips) {
     // begin at the first clip that has a tape — a reel that opens on an
@@ -2944,15 +3097,21 @@
     const wantVotes = doc.blocks.some(b => b.kind === "chart" && b.chart === "votes");
     const wantAnalytics = doc.blocks.some(b => b.kind === "chart"
       && (b.chart === "topics" || (b.chart === "framing" && !b.pid)));
-    const [m, it, votesPlane, analytics] = await Promise.all([
+    // a reel's cuts that are not moments quote the tape's own words — one
+    // transcript.txt per reel meeting, fetched beside the planes
+    const reelPidsHere = [...new Set(doc.blocks.filter(b => b.kind === "reel")
+      .flatMap(b => b.clips.map(c => c.pid)))].slice(0, PAPER_MAX_CLIPS);
+    const [m, it, votesPlane, analytics, lineSets] = await Promise.all([
       fetchPlanes(mpids, "meetings", PAPER_MAX_BLOCKS + PAPER_MAX_CLIPS),
       fetchPlanes(islugs, "issues", PAPER_MAX_BLOCKS),
       wantVotes ? getJSON(`${BASE}/votes.json`) : Promise.resolve(null),
       wantAnalytics ? getJSON(`${BASE}/analytics.json`) : Promise.resolve(null),
+      Promise.all(reelPidsHere.map(pid => segLines(pid).then(l => [pid, l]))),
     ]);
     if (gen !== PAPER_GEN) return;     // a newer render superseded this one
     const mby = m.got, iby = it.got, tried = { m: m.tried, i: it.tried };
-    const aux = { votes: votesPlane, analytics };
+    const lines = {}; for (const [pid, l] of lineSets) if (l.length) lines[pid] = l;
+    const aux = { votes: votesPlane, analytics, lines };
     // the on-page editor (specs/23 A3): the DRAFT, in the studio, renders
     // as itself with the arranging chrome on it — a handle, ↑ ↓, ✕ per
     // block, the title in place, an insertion point between blocks. A
@@ -3045,9 +3204,14 @@
     if (b.kind === "reel") {
       const clips = b.clips.map(c => {
         const m = mby[c.pid]; if (!m) return null;
-        const mo = nearestMoment(m.moments || [], c.start);
-        return { ...c, t: mo ? r1(mo.t) : c.start,
-                 kind: mo ? mo.kind : "moment", quote: mo ? mo.quote : "",
+        const mo = momentFor(m.moments || [], c.start, c.end);
+        const dur = +m.duration || 0;
+        const end = dur ? Math.min(c.end, dur) : c.end;
+        if (end <= c.start) return null;
+        const lines = (aux.lines || {})[c.pid];
+        return { ...c, end, t: mo ? r1(mo.t) : c.start,
+                 kind: mo ? mo.kind : "cut",
+                 quote: mo ? mo.quote : (lines ? cut(lineAt(lines, c.start), 120) : ""),
                  mtitle: m.title || "" };
       }).filter(Boolean);
       if (!clips.length)
@@ -3900,7 +4064,7 @@
         // a button inside a link is a keyboard trap (specs/22 §5.1)
         return `<div class="swrap"><a class="sresult" href="${BASE}/m/${encodeURIComponent(h.meeting_id)}#t${Math.floor(h.t || 0)}">
           <span class="ts">${hms(h.t)}</span>${why(h.why)}${mark(h.text || "", terms)}
-          <span class="smeta">${esc(bits.filter(Boolean).join(" · "))}${h.speaker ? " · " + esc(h.speaker) : ""}</span></a>${searchTick(h.meeting_id, h.t, h.text, h.title)}</div>`;
+          <span class="smeta">${esc(bits.filter(Boolean).join(" · "))}${h.speaker ? " · " + esc(h.speaker) : ""}</span></a>${searchTick(h.meeting_id, h.t, h.text, h.title, h.body, h.town, h.date)}</div>`;
       }).join("");
     paintCutTicks();
     return true;
@@ -3908,12 +4072,13 @@
   /* a search hit's tick: everything the tray can label with, stamped at
      render — the end starts at the twelve-second window and trims to the
      record's own bounds in the tray (specs/22 §5.6). */
-  function searchTick(pid, t, text, title) {
+  function searchTick(pid, t, text, title, body, town, date) {
     return `<button class="stick" type="button" data-czcut="hit"
       data-pid="${esc(pid)}" data-t="${r1(+t || 0)}"
       data-quote="${esc(cut(String(text || ""), 120))}"
-      data-mtitle="${esc(title || "")}"
-      aria-label="add this moment to the reel">＋ reel</button>`;
+      data-mtitle="${esc(title || "")}" data-body="${esc(body || "")}"
+      data-town="${esc(town || "")}" data-date="${esc(date || "")}"
+      aria-label="reel — add this moment"></button>`;
   }
 
   /* Why this hit is here. Four words, and the reader is owed the difference:
@@ -3996,7 +4161,7 @@
         const m = meta[mi] || {};
         return `<div class="swrap"><a class="sresult" data-sid="${id}" href="${BASE}/m/${m.pid}#t${Math.floor(t)}">
           <span class="ts">${hms(t)}</span>${mark(text, terms)}
-          <span class="smeta">${esc([m.title, m.body, SCOPE.town ? "" : m.town, m.date].filter(Boolean).join(" · "))}${spk ? " · " + esc(spk) : ""}</span>${peek(segs, id, mi)}</a>${searchTick(m.pid, t, text, m.title)}</div>`;
+          <span class="smeta">${esc([m.title, m.body, SCOPE.town ? "" : m.town, m.date].filter(Boolean).join(" · "))}${spk ? " · " + esc(spk) : ""}</span>${peek(segs, id, mi)}</a>${searchTick(m.pid, t, text, m.title, m.body, m.town, m.date)}</div>`;
       }).join("");
     paintCutTicks();
     selReset();
