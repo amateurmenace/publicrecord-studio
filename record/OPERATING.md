@@ -238,7 +238,10 @@ gcloud run jobs update record-poll --region=us-east1 \
 Restrict the key to the YouTube Data API v3 in the Cloud console. The API
 can only *list* captions for a video the account does not own; the fetch at
 ingest still goes through the caption routes above. A meeting that arrives
-with no words parks in `asr_tasks` for the desk drain, as before.
+with no words parks in `asr_tasks` — and the nightly drain asks again for a
+week (`record/pipeline.py::retry_parked`): a live stream's auto captions
+arrive hours after it ends, so a tape that parked on the night it was
+posted lands a night or two later on its own.
 
 The pipeline job carries the same secret (`gcloud run jobs update
 record-pipeline … --update-secrets=RECORD_YOUTUBE_API_KEY=youtube-data-api-key:latest`):

@@ -157,6 +157,10 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (later still) — **v2.1.19 / r42 is LIVE**: the nightly drain asks
+  again for every meeting that parked without words in the last week — a
+  live stream's auto captions arrive hours after it ends, and Brookline's
+  meetings are live streams. 602 tests.
 - 2026-09-23 (night, last) — **v2.1.18 / r41 is LIVE**: a hosted meeting
   keeps its name and day (the feed's title, YouTube's own details with the
   key), the hosted model lane is bridged (summaries were extractive while

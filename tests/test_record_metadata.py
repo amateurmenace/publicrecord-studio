@@ -149,3 +149,85 @@ class ReceiptsTest(unittest.TestCase):
         self.assertIn("Watch &lt;this&gt;.", html)
         self.assertEqual(html.count("<p>"), 2)
         self.assertEqual(receipt_paras("", "/app/m/x"), "")
+
+
+class RetryParkedTest(unittest.TestCase):
+    """A tape that parked on the night it was posted is not a tape with no
+    words: a live stream's auto captions arrive hours after it ends. The
+    nightly drain asks again for a week, closes the drain ticket when the
+    words land, and never raises past a failure."""
+
+    class Corpus:
+        def __init__(self):
+            self.sql = []
+
+        def _con(self):
+            corpus = self
+
+            class Con:
+                def __enter__(s):
+                    return s
+
+                def __exit__(s, *a):
+                    return False
+
+                def execute(s, q, args=()):
+                    corpus.sql.append((q, args))
+                    return s
+
+                def fetchall(s):
+                    return []
+            return Con()
+
+    def run_retry(self, rows, outcome):
+        from record import pipeline
+        corpus = self.Corpus()
+        seen = {}
+
+        def fake_run(c, plan, job, workdir=None):
+            seen["plan"] = plan
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        with mock.patch.object(pipeline, "parked_meetings", lambda c, days=7: rows), \
+             mock.patch("memory.ingest.run", fake_run), \
+             mock.patch.object(pipeline, "_embed", lambda c, town, meeting_id="", quiet=False: {"embedded": 5}):
+            out = pipeline.retry_parked(corpus, mock.MagicMock(), quiet=True)
+        return out, corpus, seen
+
+    ROW = {"id": "8j49hpWub8M", "url": "https://www.youtube.com/watch?v=8j49hpWub8M",
+           "town": "Brookline", "body": "Select Board", "date": "2026-09-22",
+           "title": "Brookline Select Board Meeting - September 22, 2026", "status": "no_transcript"}
+
+    def test_a_landing_keeps_the_name_and_day_closes_the_ticket_and_embeds(self):
+        out, corpus, seen = self.run_retry([self.ROW], {"meeting_id": "8j49hpWub8M", "status": "live", "segments": 4000})
+        self.assertEqual(out, [{"meeting_id": "8j49hpWub8M", "status": "live", "segments": 4000, "embedded": 5}])
+        self.assertEqual(seen["plan"]["title"], self.ROW["title"])
+        self.assertEqual(seen["plan"]["date"], "2026-09-22")
+        self.assertEqual(seen["plan"]["video_id"], "8j49hpWub8M")
+        self.assertTrue(any("asr_tasks SET status = 'done'" in q and a[1] == "8j49hpWub8M" for q, a in corpus.sql))
+
+    def test_still_no_captions_stays_parked_without_touching_the_ticket(self):
+        out, corpus, _ = self.run_retry([self.ROW], {"meeting_id": "8j49hpWub8M", "status": "no_transcript"})
+        self.assertEqual(out, [{"meeting_id": "8j49hpWub8M", "status": "no_transcript"}])
+        self.assertFalse(any("asr_tasks" in q for q, _ in corpus.sql))
+
+    def test_a_failure_is_reported_not_raised(self):
+        out, corpus, _ = self.run_retry([self.ROW], RuntimeError("the relay didn’t answer"))
+        self.assertEqual(out[0]["status"], "failed")
+        self.assertIn("relay", out[0]["error"])
+        self.assertFalse(any("asr_tasks" in q for q, _ in corpus.sql))
+
+    def test_nothing_parked_is_nothing_asked(self):
+        out, corpus, seen = self.run_retry([], {"status": "live"})
+        self.assertEqual(out, [])
+        self.assertEqual(seen, {})
+
+    def test_the_plan_of_a_parked_meeting_is_its_own_row(self):
+        from record.pipeline import plan_from_meeting
+        plan = plan_from_meeting(self.ROW)
+        self.assertEqual(plan["kind"], "youtube")
+        self.assertEqual(plan["id"], "8j49hpWub8M")
+        self.assertEqual(plan["title"], self.ROW["title"])
+        self.assertEqual((plan["town"], plan["body"], plan["date"]), ("Brookline", "Select Board", "2026-09-22"))

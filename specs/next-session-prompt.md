@@ -10,7 +10,10 @@ state.** Written 2026-09-23, late.
 
 ## Where things stand
 
-- **LIVE: v2.1.18 / r41** — tag `v2.1.18` at the deployed commit. v2.1.18:
+- **LIVE: v2.1.19 / r42** — tag `v2.1.19` at the deployed commit. v2.1.19:
+  the nightly drain asks again for every meeting that parked without words
+  in the last week (`retry_parked`) — Brookline's meetings are live streams
+  and their auto captions arrive hours later. v2.1.18:
   a hosted meeting keeps its title and day (the feed's title from the
   submission's note, YouTube's own `videos.list` when the key is at hand —
   the pipeline job carries `RECORD_YOUTUBE_API_KEY` too); the pipeline

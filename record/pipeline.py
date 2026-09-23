@@ -353,16 +353,93 @@ def ingest_one(corpus, sub: dict, workdir: Path, quiet: bool = False) -> dict:
             "embedded": emb.get("embedded", 0)}
 
 
+# A meeting that arrived with no words is asked again on later nights, for
+# this long. A live stream's auto captions arrive hours after it ends; a tape
+# that parked on the night it was posted is not a tape with no words.
+RETRY_DAYS = 7
+
+
+def parked_meetings(corpus, days: int = RETRY_DAYS) -> List[dict]:
+    """The meetings that arrived with no words in the last `days`, oldest
+    first — the rows a nightly run asks YouTube about again."""
+    since = time.time() - days * 86400
+    with corpus._con() as con:
+        return [dict(r) for r in con.execute(
+            "SELECT * FROM meetings WHERE status = 'no_transcript' AND added_at > %s "
+            "ORDER BY added_at ASC", (since,)).fetchall()]
+
+
+def plan_from_meeting(m: dict) -> dict:
+    """The plan a parked meeting was ingested with, rebuilt from its own row —
+    the shape `ingest.resolve_input` hands out, carrying the name and the day
+    the row already holds so a landing keeps them."""
+    from memory import ingest
+    plan = ingest.resolve_input({
+        "url": m.get("url", ""), "town": m.get("town", ""),
+        "body": m.get("body", ""), "date": m.get("date", "")})
+    if m.get("title") and not plan.get("title"):
+        plan["title"] = m["title"]
+    return plan
+
+
+def retry_parked(corpus, workdir: Path, quiet: bool = False,
+                 days: int = RETRY_DAYS) -> List[dict]:
+    """Ask again for the words of every meeting that parked in the last
+    `days` (a live stream's auto captions arrive hours after it ends). One
+    that lands closes its drain ticket and is embedded like any other; one
+    still without words stays parked, said plainly; a failure is reported,
+    never raised — the queue behind it must not wait on it."""
+    from memory import ingest
+    rows = parked_meetings(corpus, days)
+    if not rows:
+        return []
+    if not quiet:
+        print(f"\n{len(rows)} parked meeting(s) asked again — captions can arrive "
+              "hours after a live stream ends")
+    out: List[dict] = []
+    for m in rows:
+        label = m.get("url") or m["id"]
+        if not quiet:
+            print(f"  {label}")
+        job = JobLog(label=label, quiet=quiet)
+        try:
+            result = ingest.run(corpus, plan_from_meeting(m), job, workdir=workdir)
+        except Exception as exc:
+            if not quiet:
+                print(f"    failed — {exc}")
+            out.append({"meeting_id": m["id"], "status": "failed", "error": str(exc)})
+            continue
+        status = result.get("status", "")
+        if status == "no_transcript":
+            if not quiet:
+                print("    still no captions — parked")
+            out.append({"meeting_id": m["id"], "status": "no_transcript"})
+            continue
+        with corpus._con() as con:
+            con.execute("UPDATE asr_tasks SET status = 'done', updated_at = %s "
+                        "WHERE meeting_id = %s AND status = 'parked'",
+                        (time.time(), m["id"]))
+        emb = _embed(corpus, m.get("town", ""), meeting_id=m["id"], quiet=quiet)
+        out.append({"meeting_id": m["id"], "status": LIVE,
+                    "segments": result.get("segments", 0),
+                    "embedded": emb.get("embedded", 0)})
+    return out
+
+
 def drain(corpus, limit: int = 0, dry_run: bool = False,
-          quiet: bool = False) -> dict:
-    """Work the approved queue. Returns what happened to each row."""
+          quiet: bool = False, retry_days: int = RETRY_DAYS) -> dict:
+    """Work the approved queue, then ask again for the words of what parked
+    lately. Returns what happened to each row."""
     queue = approved_queue(corpus, limit=limit)
+    parked_rows = parked_meetings(corpus, retry_days) if retry_days else []
     if not quiet:
         print(f"{len(queue)} approved submission(s) waiting"
+              + (f" · {len(parked_rows)} parked meeting(s) to ask again" if parked_rows else "")
               + (" — dry run, nothing is written" if dry_run else ""))
-    if dry_run or not queue:
-        return {"queued": len(queue), "results": [],
-                "would": [s["id"] for s in queue]}
+    if dry_run or not (queue or parked_rows):
+        return {"queued": len(queue), "results": [], "retried": [],
+                "would": [s["id"] for s in queue],
+                "would_retry": [m["id"] for m in parked_rows]}
 
     # One scratch root for the whole drain, removed at the end. Sidecars are
     # intermediate artefacts — the meeting is in Postgres and the tape is on
@@ -370,23 +447,28 @@ def drain(corpus, limit: int = 0, dry_run: bool = False,
     # a copy of the thing we already have, in the one place that does not
     # survive the job exiting anyway.
     root = Path(tempfile.mkdtemp(prefix="record-ingest-"))
-    results = []
+    results, retried = [], []
     try:
         for sub in queue:
             results.append(ingest_one(corpus, sub, root, quiet=quiet))
+        if retry_days:
+            retried = retry_parked(corpus, root, quiet=quiet, days=retry_days)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
     landed = [r for r in results if r.get("status") == LIVE]
     parked = [r for r in results if r.get("status") == "no_transcript"]
     failed = [r for r in results if r.get("status") == "failed"]
+    relanded = [r for r in retried if r.get("status") == LIVE]
     if not quiet:
         print(f"\n{len(landed)} landed · {len(parked)} waiting on a transcript "
-              f"· {len(failed)} failed")
+              f"· {len(failed)} failed"
+              + (f" · {len(relanded)} of {len(retried)} parked landed on a second ask" if retried else ""))
         for r in failed:
             print(f"  ✗ {r['submission']}: {r.get('error', '')}")
-    return {"queued": len(queue), "results": results,
-            "landed": len(landed), "parked": len(parked), "failed": len(failed)}
+    return {"queued": len(queue), "results": results, "retried": retried,
+            "landed": len(landed), "parked": len(parked), "failed": len(failed),
+            "relanded": len(relanded)}
 
 
 def main(argv=None) -> int:

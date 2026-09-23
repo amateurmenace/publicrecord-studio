@@ -2,6 +2,16 @@
 
 ## unreleased
 
+### A parked tape is asked again — 2026-09-23 (v2.1.19)
+
+Brookline's meetings are live streams, and a live stream's auto captions
+arrive hours after it ends: the first Brookline meeting the standing
+pipeline reached parked honestly with no words, and nothing would ever
+have asked again. The nightly drain now asks again for every meeting that
+parked in the last week — the same three caption routes, the meeting's own
+name and day kept — closes its drain ticket when the words land, embeds it
+like any other, and says plainly what is still waiting. 602 tests.
+
 ### A hosted meeting keeps its name, and the reading is drafted — 2026-09-23 (v2.1.18)
 
 The first meetings ingested through the standing pipeline landed as their
