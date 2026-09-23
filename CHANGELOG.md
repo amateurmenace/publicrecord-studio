@@ -2,6 +2,46 @@
 
 ## unreleased
 
+### specs/23 C + B2, the folds folded — live print twins, true pairs, the reader's last press — 2026-09-23 (v2.1.15)
+
+A focused re-review of v2.1.14's two folds (three lenses; fourteen
+findings, twelve distinct) found where the fixes still fought each other
+or said less than the truth. Eight of the fourteen reached their skeptics
+— fifteen votes, every one standing; the other six were read against the
+code by hand and pinned by tests, their skeptics having run into the
+account's spend limit (the re-run was stopped at the day's hand-off).
+Every finding is folded.
+
+The printed paper prints what the editor shows: the note's and the
+title's print twins follow each keystroke and re-read the live fields on
+beforeprint, so words typed since the last render print, and a long title
+prints whole instead of one clipped line. The editor paints a block at
+half width only where the reader's page pairs it — two consecutive
+halves, taken two at a time — and only where the reader's page sets
+halves side by side; a lone half, and every half on a phone, paints full
+width, as the reader sees it and as it prints. The tape's lines land in
+the add-search in place, so a hit the reader has tabbed onto, or a
+document chooser in flight, survives them, and the status line gives no
+verdict while the lines are still being read. A digest whose appearances
+are all undated shows them as undated instead of calling them curated
+away; a quote on a tape with no lines says the line isn't in this
+pressing, not that it was left unfetched; a document chooser whose
+meeting didn't load offers a real "try again" that fetches again.
+
+On the reel page, a second cite of the meeting a stashed switch will
+load moves that switch — the reader's last press is the one that loads,
+or, held, the one that is cued — and a ▶ on the page frame resumes a
+paused reel from where the frame stands against its clip: inside it,
+from its start, or on to the next clip when the pause landed at its end.
+The stage cues a stopped clip at its exact start, so the frame's own ▶
+there resumes the clip within its bounds, and a trim reaches the clip a
+stop left behind.
+
+The tests now run the real stops. One twin drives the real pagePause and
+pvPause through both load gaps with only the frames stubbed; another runs
+the quote, head and layout renderers; and a mutation pass reverted each
+of this fold's seventeen fixes in turn — every revert fails the suite.
+
 ### specs/23 B2, refolded — one engine, held — 2026-09-23 (v2.1.14)
 
 The preview stage's own re-review (three lenses, eighteen findings, eight
