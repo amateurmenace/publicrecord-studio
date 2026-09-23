@@ -41,7 +41,8 @@ def _file():
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 OPENAI_BASE = "https://api.openai.com"
 
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"     # fast + cheap, 1M window
+DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"     # fast + cheap, 1M window — the API retired
+                                              # gemini-2.0-flash and named this one (2026-09-23)
 GEMINI_BASE = "https://generativelanguage.googleapis.com"
 
 
@@ -151,6 +152,7 @@ CONTEXT_WINDOWS = {
     "claude-opus-4-8": 1_000_000,
     "gemini-1.5-flash": 1_000_000, "gemini-1.5-pro": 2_000_000,
     "gemini-2.0-flash": 1_000_000, "gemini-2.5-flash": 1_000_000,
+    "gemini-3.6-flash": 1_000_000,
     "gemini-2.5-pro": 1_000_000,
 }
 _WINDOW_DEFAULT = 128_000

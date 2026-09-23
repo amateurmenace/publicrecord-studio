@@ -30,7 +30,10 @@ They press into the meeting plane only when a model wrote them; the meeting
 page, the front page's latest story and a paper's reading block show them
 under their own label with every receipt a link into the tape; the
 constitution gains their row in the same commit. The live meetings are
-backfilled once, under the spend cap. 597 tests.
+backfilled once, under the spend cap. The seam's default Gemini model had
+been retired by the API (`gemini-2.0-flash`); the default is the one the API
+names now, and the pipeline job can name another in `CONTROL_Z_LLM_MODEL`.
+597 tests.
 
 ### The toggle and the scope, composed — 2026-09-23 (v2.1.17)
 
