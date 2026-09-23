@@ -2,6 +2,29 @@
 
 ## unreleased
 
+### specs/22 P2 — the preview stage: hearing a clip before keeping it — 2026-09-23 (v2.1.13)
+
+The one dangerous item in the cutting room, built as its own bounded
+machine with its laws written before its code (specs/23 B2). The stage
+hears only messages from its own frame and the page player only from its
+own — `onYT` gates on `YT.win` now, a strictly narrower singleton; one
+engine seeks — starting the stage pauses the page player and any reel it
+was playing, and every door into the page player (`loadTape`, `ytSeek`,
+`startReel`) pauses the stage; the stage has its own armed gate and settle
+window, reproduced for one clip, and plays exactly that clip, then stops;
+a stage nobody can see is silent — leaving the studio or collapsing the
+rail pauses it. It lives in the studio markup outside every node the panel
+repaints, built on the first ▶ (that press is the click-to-load). The
+panel tray's ▶ previews here; ↗ still opens the tape in a new tab. A
+paper's reel rows inherit it: a ▶ beside each cite, a sibling never a
+nested control, painted only in the studio and in the paper's own deep
+green. `pvStep` is twin-tested; every law is pinned by token. Five review lenses raised 33 findings against the stage as first
+committed; every one is folded, and the deploy carries the fold. The
+skeptic pass ran into the account's session limit after 18 of its votes —
+each of those stood, or found the fold already in place — and the fold's
+own adversarial re-review follows; anything it finds ships with the next
+version.
+
 ### specs/22 — the cutting room: reels, cut from anywhere — 2026-09-23 (v2.1.12)
 
 The record was readable everywhere and cuttable in exactly one place: the

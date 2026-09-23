@@ -157,6 +157,12 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (later still) — **specs/22 is DONE: the preview stage is LIVE
+  (v2.1.13 / r35).** One small player in the studio drawer on its own engine
+  (source-gated dispatch; one engine seeks; its own armed gate; one clip;
+  hidden is silent); a paper's reel rows preview through it in the studio.
+  D1 rode along: the source points at this repo, releases are tagged, CI
+  runs the suite, and the nightly edition workflow waits on three secrets.
 - 2026-09-23 (later) — **specs/23 B is LIVE (v2.1.12 / r34): the cutting
   room.** Transcript rows, search hits and issue beads are cuttable; the
   studio panel is the tray on every page (trims snapped to `transcript.txt`
