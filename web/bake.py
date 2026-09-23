@@ -703,6 +703,18 @@ class Bake:
             self.note(f"issues/{islug(issue['id'])}.json", _gz_of(doc))
             full.append(doc)
         full.sort(key=lambda d: (-d["n_meetings"], -d["n_segments"], d["name"]))
+        # the issues' own index (specs/23 A3): one small plane naming every
+        # issue this pressing holds, so the paper editor's add-search can
+        # find an issue by name from the static edition alone — the same
+        # way search/meta.json already names every meeting. Written inside
+        # this stage (no new stage) so the hosted press mirrors it free.
+        index = [{"slug": d["slug"], "name": d["name"],
+                  "aliases": d["aliases"][:4],
+                  "n_meetings": d["n_meetings"],
+                  "first_seen": d["first_seen"], "last_seen": d["last_seen"]}
+                 for d in full]
+        _json(self.out / "issues" / "index.json", index)
+        self.note("issues/index.json", _gz_of(index))
         return full
 
     # -- tombstones (a forgotten issue's grave) --------------------------

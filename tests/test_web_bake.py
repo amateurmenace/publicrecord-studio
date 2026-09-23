@@ -353,12 +353,67 @@ class TestBakeEdition(unittest.TestCase):
         # & rides HTML-escaped in an attribute)
         self.assertIn("/app/p?v=2&amp;t=the%20roll%20calls%2C%20watched", stub)
         self.assertIn("b=c.votes,c.framing", stub)
+        # on the front page they are CARDS now, inside the front door
+        # (specs/23 A1 grew the one quiet line into the section)
         home = (self.out / "index.html").read_text()
-        self.assertIn('class="featline"', home)
-        self.assertIn("or edit your own", home)
-        self.assertIn("/app/p?v=2", home)
+        self.assertNotIn('class="featline"', home)
+        door = home[home.index('class="yp-door"'):home.index("</section>", home.index('class="yp-door"'))]
+        self.assertIn('class="pf-card"', door)
+        self.assertIn("/app/p?v=2&amp;t=the%20roll%20calls%2C%20watched", door)
+        self.assertIn("the press built from the record", door)
         # the latest-meeting paper names the latest meeting (vid2, June)
         self.assertIn("b=m.vid2,c.framing.vid2,c.topics", stub)
+
+    def test_the_front_door_is_baked_content_in_the_paper_palette(self):
+        """specs/23 A1: the front page carries a REAL section for the making
+        half — benefit copy, a Start button to the editor, template starts
+        the editor reads from the hash, the featured papers as cards. It is
+        the record's own prose: real links (JS-off follows them and lands
+        on the stub's honest hint), no studio class, no studio hue — the
+        byte-clean guard below sweeps the same page for cz- markers."""
+        home = (self.out / "index.html").read_text()
+        self.assertIn('class="yp-door"', home)
+        door = home[home.index('class="yp-door"'):home.index("</section>", home.index('class="yp-door"'))]
+        self.assertIn("your paper — be the editor", door)
+        self.assertIn("Make your own front page of the record.", door)
+        self.assertIn("No account. Nothing uploaded.", door)
+        self.assertIn('href="/app/p#edit"', door)
+        self.assertIn("Start your paper", door)
+        # the three template starts — the same shapes the featured papers
+        # press, offered as drafts; the refs are the record's own
+        self.assertIn('href="/app/p#edit&amp;tpl=rolls"', door)
+        self.assertIn('href="/app/p#edit&amp;tpl=meeting&amp;ref=vid2"', door)
+        self.assertIn('href="/app/p#edit&amp;tpl=issue&amp;ref=issue_testville_budget-override"', door)
+        self.assertIn("budget override, watched", door)
+        # the section sits between the lead row and by-the-numbers: the
+        # record's lead stays the lead (home stays the record's front page)
+        self.assertLess(home.index('class="leadrow"'), home.index('class="yp-door"'))
+        self.assertLess(home.index('class="yp-door"'), home.index('class="numbers"'))
+        # content, not chrome: nothing studio-namespaced, nothing scripted
+        for bad in ("cz-", "<button", "onclick"):
+            self.assertNotIn(bad, door, f"{bad!r} in the baked front door")
+        # the stylesheet carries the namespace, in the paper palette only
+        css = (self.out / "app.css").read_text()
+        self.assertIn(".yp-door{", css)
+        block = css[css.index(".yp-door{"):css.index(".yp-pressed .kicker")]
+        for pop in ("#a855f7", "#7c3aed", "studio"):
+            self.assertNotIn(pop, block, f"{pop!r} reached the front door")
+
+    def test_issues_index_plane_names_every_issue(self):
+        """specs/23 A3: the editor's add-search reads the record's own
+        static index — every meeting is already in search/meta.json; every
+        issue now sits in issues/index.json, written inside bake_issues so
+        the hosted press mirrors it without a new stage."""
+        idx = self._read("issues/index.json")
+        self.assertEqual([i["slug"] for i in idx], ["issue_testville_budget-override"])
+        self.assertEqual(idx[0]["name"], "budget override")
+        self.assertEqual(idx[0]["n_meetings"], 2)
+        for k in ("aliases", "first_seen", "last_seen"):
+            self.assertIn(k, idx[0])
+        # and the SW shell precaches both, so a paper assembles offline
+        sw = (self.out / "sw.js").read_text()
+        self.assertIn('"/app/search/meta.json"', sw)
+        self.assertIn('"/app/issues/index.json"', sw)
 
     def test_meeting_json_and_stub(self):
         mj = self._read("meetings/vid1.json")
@@ -592,7 +647,10 @@ class TestBakeEdition(unittest.TestCase):
         louder' and 'JS-off degrades to paper' require. The studio lives only in
         the shipped script and stylesheet."""
         MARKERS = ("cz-studio", "cz-m-", "cz-mode", "cz-panel", "cz-tab",
-                   "cz-pill", "cz-enter")
+                   "cz-pill", "cz-enter",
+                   # specs/23 A2/A3: the card affordances and the on-page
+                   # editor are script-added in preview/studio only
+                   "cz-mk", "cz-ed", "cz-drop")
         for stub in self.out.rglob("index.html"):
             html = stub.read_text()
             for m in MARKERS:
@@ -2408,9 +2466,11 @@ class TestPaper(unittest.TestCase):
         rule is load-bearing — a draft that grew between paint and press
         (another tab) is replaced only past a confirm. Executed with the
         panel stubbed; the planes dark, so the refs must stand on their own."""
-        tpl = self.lift(r"  async function applyPaperTemplate\(t\) \{.+?\n  \}")
+        tpl = self.lift(r"  async function applyPaperTemplate\(t, ref, where\) \{.+?\n  \}")
         body = "\n".join([
             self.PRELUDE, self.helpers(),
+            self.lift(r"  function afterAdd\(i, at, focus\) \{.+?\n  \}"),
+            "let PAGE_FOCUS = null; const renderPaperNow = () => {};",
             "let saved = null, confirms = 0, confirmAnswer = false;",
             "const window = { confirm: () => { confirms++; return confirmAnswer; } };",
             "const getJSON = async () => null;",
@@ -2438,7 +2498,15 @@ class TestPaper(unittest.TestCase):
             "  if (saved.title !== 'budget-override, watched') fail('issue title '+saved.title);",
             "  if (saved.blocks[0].slug !== 'budget-override'",
             "      || saved.blocks[1].chart !== 'reach') fail('issue shape '+JSON.stringify(saved.blocks));",
+            # a title-only draft (named first, shaped second — the on-page
+            # editor's order): the name stays, the shape arrives, no question
             "  cur = { title: 'mine', blocks: [] }; saved = null; confirmAnswer = false;",
+            "  await applyPaperTemplate('rolls');",
+            "  if (confirms) fail('asked before shaping a draft that is only a title');",
+            "  if (!saved || saved.title !== 'mine') fail('a title-only draft lost its name: ' + JSON.stringify(saved));",
+            "  if (saved.blocks.length !== 3) fail('the shape did not arrive');",
+            # blocks are work: asked about, and refused means untouched
+            "  cur = { title: 'mine', blocks: [{kind:'note',text:'kept'}] }; saved = null; confirmAnswer = false;",
             "  await applyPaperTemplate('rolls');",
             "  if (!confirms) fail('never asked before replacing a live draft');",
             "  if (saved) fail('replaced a draft the editor refused to lose');",
@@ -2451,6 +2519,113 @@ class TestPaper(unittest.TestCase):
         r = self.node(body)
         self.assertEqual(r.returncode, 0,
                          f"the template misbehaved:\n{r.stdout}{r.stderr}")
+
+    def test_the_on_page_editor_touches_no_server(self):
+        """The covenant, extended to specs/23 A3 (a review catch: the make-
+        path scan ended at PART 2, and the whole editor sat past it). The
+        on-page editor — its add-search included — reads localStorage,
+        strings and the record's own static planes; every plane it asks for
+        is a same-origin edition path, and no server is reached."""
+        block = self.JS[self.JS.index("PART 3: the on-page editor"):
+                        self.JS.index("================= SEARCH =================")]
+        for forbidden in ("fetch(", "XMLHttpRequest", "sendBeacon", "/api/",
+                          "askStudio", "API_TIMEOUT", "document.cookie",
+                          "new Image(", "run.app"):
+            self.assertNotIn(forbidden, block,
+                             f"the on-page editor reached for {forbidden!r} — "
+                             f"composing must not touch a server (specs/23 §3)")
+        planes = re.findall(r"getJSON\(`([^`]+)`", block)
+        self.assertTrue(planes, "the add-search reads no static plane at all?")
+        for plane in planes:
+            self.assertTrue(plane.startswith("${BASE}/"),
+                            f"{plane} is not an edition path")
+        # the two index planes it reads are the pressed ones — no new door
+        self.assertIn("${BASE}/search/meta.json", block)
+        self.assertIn("${BASE}/issues/index.json", block)
+
+    def test_the_editor_door_and_its_focus_rules_are_pinned(self):
+        """The review's folds, pinned by token so a revert shows: the hash
+        door is consumed once and dropped from the address (a reload keeps
+        the mode the reader chose); a same-document #edit click is heard;
+        on a phone the door opens the studio collapsed to its rail; the
+        teaching surface and the block editor both put the caret back after
+        a repaint; a block dropped on the title is a cancelled move, never a
+        payload typed into the field; the reader's own drags outside the
+        editor rows are left alone; the visible words lead every
+        accessible name (WCAG 2.5.3)."""
+        for token in ('history.replaceState(null, "", location.pathname + location.search); }',
+                      'window.addEventListener("hashchange"',
+                      'window.matchMedia("(max-width: 720px)").matches',
+                      "writeRail(narrow); setMode(\"studio\");",
+                      "clearTimeout(PAPER_RERENDER);\n          }",
+                      "restoreEdFocus(el, PAGE_FOCUS || keep2)",
+                      "const keep2 = captureEdFocus(el) || keep;",
+                      "function edForget(dark)",
+                      "captureEdFocus(el) || captureEdPanel(el)",
+                      "if (!row && !slot) { e.preventDefault(); ED_DRAG = -1; edClearDrop(el); return; }",
+                      "if (!row) return;\n      if (!row.draggable) { e.preventDefault(); return; }",
+                      "`in your paper — remove “${name}”`",
+                      "`your paper — add “${name}”`",
+                      'aria-label="add here${at',
+                      'if (m === "studio") schedulePaperRender(); else renderPaperNow();'):
+            self.assertIn(token, self.JS, f"{token!r} drifted — a review fold was reverted")
+        # the hit list is not a live region; one short status line is
+        self.assertNotIn('class="cz-edhits" aria-live', self.JS)
+        self.assertIn('class="cz-edcount" role="status"', self.JS)
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        for rule in (".pf-lede a{color:var(--text-primary);text-decoration:underline",
+                     "html:not(.cz-m-paper) .cz-mkwrap-lead>.lead>.kicker{padding-right:112px}",
+                     "html.cz-m-studio .cz-edq::placeholder{color:var(--text-secondary)}",
+                     ".tnode .thead .cz-mk{display:inline-block",
+                     "html.cz-m-studio.cz-rail body{padding-left:44px}"):
+            self.assertIn(rule, css, f"{rule!r} missing from the sheet")
+
+    def test_the_editor_helpers_are_pure_and_total(self):
+        """specs/23 A3: the on-page editor's three pure helpers, in node —
+        insertBlock lands at the index it is given (or the end) and refuses
+        a full paper; moveBlock moves a block to a drop slot counted before
+        the move and no-ops out of range; lexRank requires every term, ranks
+        word-start hits over inside-word hits, then the item's own order,
+        and answers everything for no terms (the browse start)."""
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            self.lift(r"  function insertBlock\(p, nb, at\) \{.+?\n  \}"),
+            self.lift(r"  function moveBlock\(blocks, from, to\) \{.+?\n  \}"),
+            self.lift(r"  const lexTerms = .+?;"),
+            self.lift(r"  function lexRank\(terms, items\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const p = { title: '', blocks: [{kind:'note',text:'a'},{kind:'note',text:'b'}] };",
+            "if (insertBlock(p, {kind:'note',text:'x'}, 1) !== 1 || p.blocks[1].text !== 'x') fail('insert at 1');",
+            "if (insertBlock(p, {kind:'note',text:'y'}) !== 3 || p.blocks[3].text !== 'y') fail('insert at end');",
+            "if (insertBlock(p, {kind:'note',text:'z'}, 99) !== 4) fail('past the end clamps to the end');",
+            "if (insertBlock(p, {kind:'note',text:'w'}, -3) !== 5) fail('a negative index means the end');",
+            "const full = { title: '', blocks: Array.from({length: PAPER_MAX_BLOCKS}, () => ({kind:'note',text:''})) };",
+            "if (insertBlock(full, {kind:'note',text:''}, 0) !== -1 || full.blocks.length !== PAPER_MAX_BLOCKS) fail('the cap');",
+            "const L = () => ['a','b','c','d'];",
+            "let b = L(); if (!moveBlock(b, 0, 4) || b.join('') !== 'bcda') fail('0→end ' + b.join(''));",
+            "b = L(); if (!moveBlock(b, 3, 0) || b.join('') !== 'dabc') fail('end→0 ' + b.join(''));",
+            "b = L(); if (!moveBlock(b, 0, 2) || b.join('') !== 'bacd') fail('0→slot2 ' + b.join(''));",
+            "b = L(); if (!moveBlock(b, 2, 1) || b.join('') !== 'acbd') fail('2→slot1 ' + b.join(''));",
+            "b = L(); if (moveBlock(b, 1, 1) || moveBlock(b, 1, 2) || b.join('') !== 'abcd') fail('a no-op move must say so');",
+            "b = L(); if (moveBlock(b, 4, 0) || moveBlock(b, -1, 0) || moveBlock(b, 0, 5) || b.join('') !== 'abcd') fail('out of range');",
+            "const items = [",
+            "  { ref: 'm1', text: 'Select Board Meeting - March 10, 2026 Select Board Brookline 2026-03-10', sort: '2026-03-10' },",
+            "  { ref: 'm2', text: 'School Committee Meeting - June 18, 2026 School Committee Brookline 2026-06-18', sort: '2026-06-18' },",
+            "  { ref: 'm3', text: 'Reselection hearing 2025-12-09', sort: '2025-12-09' },",
+            "];",
+            "const ids = (t) => lexRank(lexTerms(t), items).map(i => i.ref).join(',');",
+            "if (ids('') !== 'm2,m1,m3') fail('no terms = everything, newest first: ' + ids(''));",
+            "if (ids('select') !== 'm1,m3') fail('word-start (Select) outranks inside-word (Reselection): ' + ids('select'));",
+            "if (ids('board march') !== 'm1') fail('every term must match: ' + ids('board march'));",
+            "if (ids('brookline') !== 'm2,m1') fail('ties fall to the item order: ' + ids('brookline'));",
+            "if (ids('nothing-here') !== '') fail('a miss is empty, not a throw');",
+            "if (lexTerms('a b c d e f g h i j').length !== 8) fail('terms are capped');",
+            "if (lexTerms('Über—Straße!').join(',') !== 'ber,stra,e') fail('terms are ascii word runs: ' + lexTerms('Über—Straße!'));",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"an editor helper misbehaved:\n{r.stdout}{r.stderr}")
 
     def test_the_paper_make_path_touches_no_api(self):
         """The covenant, extended to P1 (specs/21 §5): composing, arranging,
@@ -2477,7 +2652,15 @@ class TestPaper(unittest.TestCase):
                       'test(path)) paper()',
                       # P3: the templates and the featured papers' hide hook
                       "function applyPaperTemplate(", 'data-cz="ptpl"',
-                      '$("#pfeat")'):
+                      '$("#pfeat")',
+                      # specs/23 A2/A3: adds by ref, the card affordances,
+                      # the on-page editor and its hash door
+                      "function addStoryRef(", "function removeStoryRef(",
+                      "function paintMakeAffordances(", "function wireEditor(",
+                      "function lexRank(", "function moveBlock(",
+                      "function insertBlock(", "function paperTeach(",
+                      'hp.has("edit")', 'hp.get("tpl")', "cz-edrow",
+                      "restoreEdFocus(el, PAGE_FOCUS || keep)"):
             self.assertIn(token, self.JS, f"{token!r} drifted in app.js")
 
 
@@ -2580,6 +2763,29 @@ class TestStudioFootprint(unittest.TestCase):
         self.assertNotIn('.cz-mode[aria-pressed', css,
                          "a checked-state rule still keys on aria-pressed — "
                          "it can never match the radio the JS paints")
+
+    def test_the_pill_says_the_thing_itself_and_the_cards_never_paint_in_paper_mode(self):
+        """specs/23 A2/A4: the preview pill names the product's second half
+        ("✎ Your paper — edit", not a room to enter), and the card
+        affordances are gated on the PAINTED mode — removed from the page
+        in paper mode by the JS, and hidden by the stylesheet as a belt, so
+        the resident who hid the studio sees exactly the specs/20 paper."""
+        self.assertIn("✎ Your paper — edit", self.JS)
+        self.assertNotIn("Enter the studio", self.JS)
+        block = self.JS[self.JS.index("function paintMakeAffordances("):
+                        self.JS.index("function pageStoryRef(")]
+        self.assertIn('const hide = shownMode() === "paper";', block)
+        self.assertIn("b.hidden = hide;", block)
+        # a card is wrapped, never nested: no button inside the <a>
+        self.assertIn("card.replaceWith(wrap); wrap.appendChild(card);", block)
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        self.assertIn("html.cz-m-paper .cz-mk{display:none}", css)
+        # the affordance wears the paper palette (deep green), not the studio's
+        mk = css[css.index(".cz-mk{"):css.index(".tnode .thead .cz-mk")]
+        self.assertNotIn("studio", mk)
+        self.assertIn("var(--accent)", mk)
+        # the scope filter hides the row WITH the card it wraps
+        self.assertIn('if (w && w.classList.contains("cz-mkwrap")) w.hidden = !ok;', self.JS)
 
     def test_the_control_speaks_about_the_painted_mode_not_the_stored_one(self):
         """The fold's fix: in a storage-blocked browser readMode() answers

@@ -362,6 +362,59 @@ def _brief_card(m):
               f'{int(round((m.get("duration") or 0)/60))} min</span></div></a>')
 
 
+def _your_paper_door(ms, stats, featured):
+    """The front door to the making half (specs/23 A1): a baked section of
+    the record's own prose — the paper palette, benefit-forward, the register
+    a skeptical reader trusts — that says plainly what the second half of
+    this product is and opens it in one press. Everything here is CONTENT:
+    real links a reader with JavaScript off can follow (the editor they land
+    on says honestly what it needs), no studio class, no studio hue. The
+    template starts are links the editor reads from the hash
+    (`/app/p#edit&tpl=…`) — the same three shapes the featured papers
+    press, offered as drafts to make yours rather than pages to read. The
+    featured papers themselves ride along as cards (the `pf-` press-time
+    machinery), grown from the one quiet line P3 allowed them."""
+    lead = ms[0] if ms else None
+    loud = (stats or {}).get("loud") or []
+    tpls = ['<a class="btn yp-tpl" href="/app/p#edit&amp;tpl=rolls">'
+            'the roll calls, watched</a>']
+    if lead:
+        tpls.append(f'<a class="btn yp-tpl" href="/app/p#edit&amp;tpl=meeting'
+                    f'&amp;ref={_js_euc(lead["pid"])}">the latest meeting, '
+                    'covered</a>')
+    if loud:
+        tpls.append(f'<a class="btn yp-tpl" href="/app/p#edit&amp;tpl=issue'
+                    f'&amp;ref={_js_euc(loud[0]["slug"])}">'
+                    f'{esc(loud[0]["name"][:60])}, watched</a>')
+    cards = "".join(
+        f'<a class="pf-card" href="/app/p?{esc(f["qs"])}">'
+        f'<b>{esc(f["title"])}</b>'
+        f'<span class="pf-sub">{esc(f["sub"])}</span></a>'
+        for f in (featured or []))
+    pressed = (f'''
+    <div class="yp-pressed">
+      <span class="kicker">or read {n_of(len(featured), "paper")} the press built from the record</span>
+      <div class="pf-cards">{cards}</div>
+    </div>''' if cards else "")
+    return f'''  <section class="yp-door" id="yourpaper" aria-labelledby="yp-hl">
+    <span class="kicker yp-kick">your paper — be the editor</span>
+    <h2 class="yp-hl" id="yp-hl">Make your own front page of the record.</h2>
+    <p class="yp-copy">The record is raw material. Pick the meetings and
+      issues that matter to you, add a reel of the moments that decided
+      something, chart the votes, write a note in your own words — and
+      share the result as your own edition.</p>
+    <p class="yp-copy">No account. Nothing uploaded. Your paper lives in
+      your browser and in the link you send; every story in it points
+      back into the record.</p>
+    <div class="yp-acts">
+      <a class="btn primary yp-start" href="/app/p#edit">Start your paper →</a>
+      <span class="yp-or">or start from a shape</span>
+      {"".join(tpls)}
+    </div>{pressed}
+  </section>
+'''
+
+
 def page_home(meetings, issues, stats, manifest, base, featured=None):
     c = stats["counts"]
     ms = sorted(meetings, key=lambda m: (m.get("date") or ""), reverse=True)
@@ -471,16 +524,8 @@ def page_home(meetings, issues, stats, manifest, base, featured=None):
         for v in allvotes[:4]) \
         or '<p class="hint">no roll calls read yet</p>'
 
-    # -- one quiet line for the papers the press built (specs/21 P3) --
-    # the front page's whole nod to the studio: three links and an invitation,
-    # in the folio's register, after everything the record itself has to say
-    featline = ""
-    if featured:
-        links = " · ".join(
-            f'<a href="/app/p?{esc(f["qs"])}">{esc(f["title"])}</a>'
-            for f in featured)
-        featline = ('  <p class="featline">papers, pressed from the record: '
-                    f'{links} — <a href="/app/p">or edit your own</a></p>\n')
+    # -- the front door to the making half (specs/23 A1) --
+    door = _your_paper_door(ms, stats, featured)
 
     # -- coverage strip --
     mx = max([m["total"] for m in stats["coverage"]] or [1])
@@ -508,7 +553,7 @@ def page_home(meetings, issues, stats, manifest, base, featured=None):
       <div class="mcards briefs">{briefs}</div>
     </div>
   </div>
-  <section class="numbers">
+{door}  <section class="numbers">
     <div class="sectionhead"><span class="kicker">by the numbers</span></div>
     <div class="statband">{band}</div>
     <div class="covwrap"><span class="kicker">meetings by month</span>
@@ -527,7 +572,7 @@ def page_home(meetings, issues, stats, manifest, base, featured=None):
       <a class="seeall" href="/app/officials">the votes →</a></div>
       <div class="vteasers">{votes_teaser}</div></section>
   </div>
-{featline}"""
+"""
     return shell("The record — publicrecord.studio",
                  f"{c['meetings']} meetings, {c['hours']} hours, {c['issues']} issues "
                  "tracked across the record — open in any browser.",
@@ -1036,8 +1081,8 @@ def page_paper(manifest, base, featured=None):
     <div class="pfeat" id="pfeat">
       <div class="sectionhead"><span class="kicker">no paper in hand? three the press built</span></div>
       <p class="pf-lede">Examples pressed from the record itself — each an
-        ordinary paper link, built the way any editor's is. Open one, then
-        enter the studio and make it yours.</p>
+        ordinary paper link, built the way any editor's is. Open one to read
+        it; <a href="/app/p#edit">edit your own</a> to make one.</p>
       <div class="pf-cards">{feats}</div>
     </div>""" if feats else ""
     body = f"""
@@ -1052,9 +1097,10 @@ def page_paper(manifest, base, featured=None):
       own planes); a note is the editor's own words, and it is labeled as
       exactly that.</p>
     <div class="paperbody" id="paperbody">
-      <p class="hint">Reading a paper needs JavaScript — the paper lives in
-        the link that brought you here (or in your own browser), not on any
-        page a server could print. With JavaScript off, open <a
+      <p class="hint">Reading a paper, or editing your own, needs JavaScript:
+        a paper lives in the link that brought you here, or in your own
+        browser, not on any page a server could print, and the editor runs
+        there too. With JavaScript off, open <a
         href="/app/">the record</a> or <a href="/app/s">search it</a> — every
         story a paper could cite reads there in full.</p>
     </div>{feat_html}
@@ -2055,7 +2101,10 @@ def _write_pwa(out: Path, manifest):
         "/app/", f"/app/app.css?v={manifest.get('version','0')}",
         f"/app/app.js?v={manifest.get('version','0')}", "/app/favicon.svg",
         "/app/manifest.json", "/app/stats.json", "/app/s/", "/app/watching/",
-        "/app/officials/", "/app/p/", "/app/r/", "/app/ai/"],
+        "/app/officials/", "/app/p/", "/app/r/", "/app/ai/",
+        # the editor's add-search reads these two (specs/23 A3) — small, and
+        # with them in the shell a paper can be assembled with the host gone
+        "/app/search/meta.json", "/app/issues/index.json"],
         separators=(",", ":"))
     sw = f"""'use strict';
 // the record's service worker — precache the shell, keep last-read meetings,

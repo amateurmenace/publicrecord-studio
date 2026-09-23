@@ -2,6 +2,79 @@
 
 ## unreleased
 
+### specs/23 A — the open newsroom: the front door + the real editor — 2026-09-23 (v2.1.11)
+
+The diagnosis, verified live on v2.1.10: nothing was broken — the making
+half was invisible. One corner pill and one quiet sentence carried the
+product's entire second half, and the owner could not find the way to
+edit a front page. Phase A makes the making half a place a stranger can
+find and use, without touching a byte of paper mode.
+
+**The front door** — a real front-page section, baked as the record's
+own prose in the paper palette (`yp-`, a new namespace): a kicker in the
+"your paper — be the editor" register, two sentences of benefit copy, a
+primary **Start your paper** that opens the editor at `/app/p#edit`,
+three template starts the editor reads from the hash (`#edit&tpl=rolls`,
+`tpl=meeting&ref=<pid>`, `tpl=issue&ref=<slug>` — the same shapes the
+featured papers press, offered as DRAFTS), and the featured papers grown
+from one `.featline` into cards. It sits after the lead row, so home
+stays the record's front page. Real links throughout: with JavaScript
+off they land on the stub's honest hint.
+
+**"＋ your paper" on the record's cards** — every meeting and issue card
+the front page presses (the lead, the briefs, the long view, the
+updates) and every meeting on an issue's timeline grows a small
+affordance in preview and studio modes: press it and the story joins
+your paper without leaving the page; press again and it leaves. The
+label is the painted truth ("✓ in your paper"). A card is a whole-card
+link, so the button is a SIBLING in a wrapper row (never a control
+inside a control) — the scope filter hides the row with the card.
+Script-added, never baked (the byte-clean guard now sweeps `cz-mk`,
+`cz-ed` and `cz-drop`), and never painted in paper mode (the JS removes
+it; the sheet hides it as a belt). `addPageToPaper` generalised to
+`addStoryRef(ref, at)`.
+
+**The on-page editor** — `/app/p` in the studio renders YOUR DRAFT as an
+editor on the paper itself, not only in the sidebar: a drag handle per
+block (HTML5 drag-and-drop, armed only while the handle is held so a
+note's text still selects), ↑ ↓ ✕ per block (the panel's own controls,
+mirrored, so no arrangement is pointer-only; the handle also takes ↑ ↓),
+the title typed in place, notes typed in place, and an insertion point
+between any two blocks that opens an inline add: a lexical search over
+the record's own static index — `search/meta.json` names every meeting
+and a new `issues/index.json` (written inside `bake_issues`, so the
+hosted press mirrors it free) names every issue — plus a note, the reel
+and the record-wide charts. Adds land at the chosen index
+(`insertBlock`); a drop lands at its slot (`moveBlock`, twin-tested);
+focus survives every repaint and never falls to a ✕. A shared or stored
+paper never grows any of this — read-only until specs/22's
+make-this-yours. On a phone the collapsed studio rail now shifts the
+page by its own 44px instead of covering every line's left edge.
+
+**First run** — the empty draft in the studio teaches: the title, three
+big starts (the templates, with refs from `stats.json`; browse the
+record) and the first insertion point. The pill says the thing itself:
+**✎ Your paper — edit**.
+
+The covenant held throughout: composing is still client-only, the
+add-search reads static planes, the door count is unchanged, free text
+stored is still title + notes. A five-lens adversarial pass confirmed
+23 findings (the first landing on `/app/p#edit` double-rendered and
+dropped focus; on a phone the door opened the drawer over the editor it
+promised; the hash door re-opened the studio on every reload; a same-
+document `#edit` click was inert; a block dropped on the title typed its
+index into the field; the editor's `dragstart` guard cancelled the
+reader's own drags in the read-only render; an open add-search died on
+any repaint; the hit list was a live region; a dark index read as an
+empty record; label-in-name on the toggles; the lede link with no
+underline; the placeholder at the browser default; the covenant scan
+stopping short of the editor) — every one folded. The fold's own re-
+review (by hand, the workflow's finders having hit a session limit)
+caught three more: a repaint could paint a stale title over a caret, a
+dark index could never actually retry (`getJSON` keeps a failed fetch),
+and the lead kicker's clearance leaked into paper mode on a 320px phone.
+542 tests.
+
 ### specs/21 P3 — templates, the featured papers, and the radiogroup — 2026-07-22 (v2.1.10) · the spec is DONE
 
 The studio's last owed phase, and the smallest: three ways in, no new
