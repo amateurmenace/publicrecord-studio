@@ -157,6 +157,18 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (night) — **v2.1.15 / r37 is LIVE.** The v2.1.14 folds, folded
+  (specs/23 C + B2: live print twins, true pairs, the reader's last press,
+  tests that run the real stops), and a second review of that fold folded
+  in turn — three lenses, two skeptics on every finding, thirteen findings,
+  none refuted, all folded, seven executed twins added, then a re-review of
+  the fixes (no regression; three more twins). 569 tests. **Every Cloud Run
+  job moved to r37** — the poll and the pipeline had sat on r18 since July
+  (OPERATING §5 now says: one line per job, every deploy). Next, on
+  branches `nightly-intake` and `story-paths` (584 tests, pane-checked):
+  v2.1.16 — a standing rule that approves what YouTube's own caption list
+  names a track for, the probe via the Data API, and the front page as the
+  story (specs/24).
 - 2026-09-23 (evening) — **specs/23 C is LIVE (v2.1.14 / r36): the rich tier.**
   A shelf of papers (`cz-papers`, the P1 draft migrated once), layouts as
   enums (lead / head / half) through doc, link (`l=`), export and store,

@@ -1,7 +1,7 @@
 # 23 — The open newsroom: the making half, visible and powerful
 
-**Status:** v0.2 · **Stage:** **Phases A–C SHIPPED + LIVE (v2.1.11 → v2.1.14,
-2026-09-23)** — the front door and the on-page editor (A, v2.1.11), the
+**Status:** v0.3 · **Stage:** **Phases A–C SHIPPED + LIVE (v2.1.11 → v2.1.15,
+2026-09-23; v2.1.15 folds the two review passes on C's folds)** — the front door and the on-page editor (A, v2.1.11), the
 cutting room and its preview stage (B, v2.1.12; B2, v2.1.13), the rich tier
 (C, v2.1.14); D1 shipped with them; D2 diagnosed (§4 D); SETTLED (Stephen,
 2026-09-23 — all four scope answers on the record below); **what remains is
