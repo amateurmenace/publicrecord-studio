@@ -266,9 +266,18 @@ class TestCanonicalForm(unittest.TestCase):
              "issue slug"),
             ({"kind": "chart", "chart": "framing", "pid": "has space"},
              "meeting id"),
-            ({"kind": "chart", "chart": "votes", "pid": "abc"}, "exactly"),
+            # specs/24: votes may name ONE meeting (a pid); a slug is a mangle
+            ({"kind": "chart", "chart": "votes", "slug": "abc"}, "exactly"),
             ({"kind": "chart", "chart": "topics", "slug": "abc"}, "exactly"),
             ({"kind": "chart", "chart": "votes", "data": [1, 2]}, "exactly"),
+            ({"kind": "chart", "chart": "numbers"}, "exactly one"),
+            ({"kind": "chart", "chart": "numbers", "pid": "a", "slug": "b"}, "exactly one"),
+            ({"kind": "chart", "chart": "shape", "slug": "abc"}, "exactly"),
+            ({"kind": "chart", "chart": "ledger", "pid": "abc"}, "exactly"),
+            ({"kind": "chart", "chart": "shape", "pid": "has space"}, "meeting id"),
+            ({"kind": "reading"}, "exactly one"),
+            ({"kind": "reading", "pid": "a", "slug": "b"}, "exactly one"),
+            ({"kind": "reading", "pid": "a", "text": "words"}, "exactly"),
         ]
         for block, fragment in cases:
             with self.assertRaises(PaperError, msg=repr(block)) as cm:
@@ -408,3 +417,25 @@ class TestPaperEndpoints(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTwoPathsKinds(unittest.TestCase):
+    """specs/24: the two paths' kinds are refs and enums like every kind
+    before them — a numbers chart names a meeting or an issue (one), a
+    shape a meeting, a ledger an issue, votes may name one meeting, and the
+    record's reading names a meeting or an issue. No new free text."""
+
+    def test_the_new_kinds_store_as_refs(self):
+        from record.papers import canonical
+        blocks = [{"kind": "chart", "chart": "numbers", "pid": "2YhgO14jXys"},
+                  {"kind": "chart", "chart": "numbers", "slug": "issue_x"},
+                  {"kind": "chart", "chart": "shape", "pid": "2YhgO14jXys"},
+                  {"kind": "chart", "chart": "ledger", "slug": "issue_x"},
+                  {"kind": "chart", "chart": "votes", "pid": "2YhgO14jXys"},
+                  {"kind": "chart", "chart": "votes"},
+                  {"kind": "reading", "pid": "2YhgO14jXys"},
+                  {"kind": "reading", "slug": "issue_x"}]
+        c = canonical(portable(blocks=blocks))
+        doc = json.loads(c)
+        self.assertEqual(doc["blocks"], blocks)
+        self.assertEqual(canonical(json.loads(c)), c)

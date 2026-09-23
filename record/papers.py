@@ -54,7 +54,12 @@ NOTE_MAX = 2000
 # an enum, never data or free text — the reader computes the picture from the
 # record's own pressed planes, so a stored paper cannot assert a number the
 # record would not draw.
-CHARTS = ("votes", "reach", "framing", "topics")
+CHARTS = ("votes", "reach", "framing", "topics",
+          # specs/24 — the two paths' pictures, refs and enums like the rest:
+          # the numbers (a meeting's or an issue's), the shape of a meeting
+          # (its moments on its own time axis), an issue's ledger (every roll
+          # call along its way)
+          "numbers", "shape", "ledger")
 # The layouts a block may ask for (specs/23 C1): an enum, never data. A
 # block with no layout reads as it always did; any other value is refused —
 # the store holds no layout the reader would have to guess at.
@@ -113,6 +118,34 @@ def _layout(b, what):
             f"{what}: unknown layout {lay!r} — a block may be "
             f"{', '.join(LAYOUTS)}, or carry no layout at all")
     return lay
+
+
+def _pid(b, what):
+    pid = b.get("pid")
+    if not isinstance(pid, str) or not _REF.fullmatch(pid):
+        raise PaperError(f"{what}: not a meeting id")
+    return pid
+
+
+def _slug(b, what):
+    slug = b.get("slug")
+    if not isinstance(slug, str) or not _REF.fullmatch(slug):
+        raise PaperError(f"{what}: not an issue slug")
+    return slug
+
+
+def _one_ref(b, what, fixed):
+    """Exactly one of `pid` / `slug`, beside the fixed keys — a block that
+    names both, or neither, is refused rather than guessed at."""
+    has_pid, has_slug = "pid" in b, "slug" in b
+    if has_pid == has_slug:
+        raise PaperError(f"{what}: name a meeting (pid) or an issue (slug), "
+                         "exactly one")
+    if has_pid:
+        _exact_keys(b, fixed | {"pid"}, what)
+        return {"pid": _pid(b, what)}
+    _exact_keys(b, fixed | {"slug"}, what)
+    return {"slug": _slug(b, what)}
 
 
 def _block(b, i):
@@ -205,8 +238,27 @@ def _block_kind(b, i):
             if not isinstance(pid, str) or not _REF.fullmatch(pid):
                 raise PaperError(f"{what}: not a meeting id")
             return {"kind": "chart", "chart": "framing", "pid": pid}
+        # specs/24: a meeting's own roll calls (votes with a pid), the shape
+        # of a meeting (pid only), an issue's ledger (slug only), and the
+        # numbers of exactly one of the two
+        if chart == "votes" and "pid" in b:
+            _exact_keys(b, {"kind", "chart", "pid"}, what)
+            return {"kind": "chart", "chart": "votes", "pid": _pid(b, what)}
+        if chart == "shape":
+            _exact_keys(b, {"kind", "chart", "pid"}, what)
+            return {"kind": "chart", "chart": "shape", "pid": _pid(b, what)}
+        if chart == "ledger":
+            _exact_keys(b, {"kind", "chart", "slug"}, what)
+            return {"kind": "chart", "chart": "ledger", "slug": _slug(b, what)}
+        if chart == "numbers":
+            return {"kind": "chart", "chart": "numbers", **_one_ref(b, what, {"kind", "chart"})}
         _exact_keys(b, {"kind", "chart"}, what)
         return {"kind": "chart", "chart": chart}
+    if kind == "reading":
+        # specs/24: the record's reading of a meeting or an issue — decisions,
+        # questions, names, milestones — computed at render from the pressed
+        # plane; a ref and nothing else
+        return {"kind": "reading", **_one_ref(b, what, {"kind"})}
     if kind == "quote":
         _exact_keys(b, {"kind", "pid", "t"}, what)
         pid = b.get("pid")

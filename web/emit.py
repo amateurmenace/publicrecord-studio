@@ -365,137 +365,101 @@ def _brief_card(m):
               f'{int(round((m.get("duration") or 0)/60))} min</span></div></a>')
 
 
-def _your_paper_door(ms, stats, featured):
-    """The front door to the making half (specs/23 A1): a baked section of
-    the record's own prose — the paper palette, benefit-forward, the register
-    a skeptical reader trusts — that says plainly what the second half of
-    this product is and opens it in one press. Everything here is CONTENT:
-    real links a reader with JavaScript off can follow (the editor they land
-    on says honestly what it needs), no studio class, no studio hue. The
-    template starts are links the editor reads from the hash
-    (`/app/p#edit&tpl=…`) — the same three shapes the featured papers
-    press, offered as drafts to make yours rather than pages to read. The
-    featured papers themselves ride along as cards (the `pf-` press-time
-    machinery), grown from the one quiet line P3 allowed them."""
-    lead = ms[0] if ms else None
+def _start_label(m):
+    """A start's label: the body and the day, never the whole title (a
+    Brookline title runs to fifty characters and a button is not a headline)."""
+    who = " ".join(x for x in (m.get("town", ""), m.get("body", "")) if x) or "meeting"
+    return f'{who} · {m.get("date") or "undated"}'
+
+
+def _story_paths(ms, stats, featured):
+    """The front door to the making half (specs/24, after specs/23 A1): the
+    two paths into a data story, side by side, as baked CONTENT in the paper
+    palette — the record inviting, like the covenant line. Every start is an
+    ordinary `/app/p#edit&tpl=…&ref=…` link the editor reads from the hash
+    (JS-off follows it to the stub's honest hint); no button, no script, no
+    studio class or hue (the byte-clean guard sweeps this page). Path one —
+    one meeting, what happened — starts from the latest four meetings; path
+    two — over time, how it moved — from the four issues with the longest
+    reach. The roll-calls start and the papers the press built keep their
+    place beneath."""
     loud = (stats or {}).get("loud") or []
-    tpls = ['<a class="btn yp-tpl" href="/app/p#edit&amp;tpl=rolls">'
-            'the roll calls, watched</a>']
-    if lead:
-        tpls.append(f'<a class="btn yp-tpl" href="/app/p#edit&amp;tpl=meeting'
-                    f'&amp;ref={_js_euc(lead["pid"])}">the latest meeting, '
-                    'covered</a>')
-    if loud:
-        tpls.append(f'<a class="btn yp-tpl" href="/app/p#edit&amp;tpl=issue'
-                    f'&amp;ref={_js_euc(loud[0]["slug"])}">'
-                    f'{esc(loud[0]["name"][:60])}, watched</a>')
+    m_starts = "".join(
+        f'<a class="btn sp-start" href="/app/p#edit&amp;tpl=meeting&amp;ref={_js_euc(m["pid"])}">'
+        f'{esc(_start_label(m))}</a>' for m in ms[:4])
+    i_starts = "".join(
+        f'<a class="btn sp-start" href="/app/p#edit&amp;tpl=issue&amp;ref={_js_euc(i["slug"])}">'
+        f'{esc(i["name"][:48])} · {n_of(i["n_meetings"], "meeting")}</a>' for i in loud[:4])
     cards = "".join(
         f'<a class="pf-card" href="/app/p?{esc(f["qs"])}">'
         f'<b>{esc(f["title"])}</b>'
         f'<span class="pf-sub">{esc(f["sub"])}</span></a>'
         for f in (featured or []))
     pressed = (f'''
-    <div class="yp-pressed">
-      <span class="kicker">or read {n_of(len(featured), "paper")} the press built from the record</span>
+    <div class="sp-pressed">
+      <span class="kicker">or read {n_of(len(featured), "paper")} the press built from the record, each the shape of a path</span>
       <div class="pf-cards">{cards}</div>
     </div>''' if cards else "")
-    return f'''  <section class="yp-door" id="yourpaper" aria-labelledby="yp-hl">
-    <span class="kicker yp-kick">your paper — be the editor</span>
-    <h2 class="yp-hl" id="yp-hl">Make your own front page of the record.</h2>
-    <p class="yp-copy">The record is raw material. Pick the meetings and
-      issues that matter to you, add a reel of the moments that decided
-      something, chart the votes, write a note in your own words — and
-      share the result as your own edition.</p>
-    <p class="yp-copy">No account. Nothing uploaded. Your paper lives in
-      your browser and in the link you send; every story in it points
-      back into the record.</p>
-    <div class="yp-acts">
-      <a class="btn primary yp-start" href="/app/p#edit">Start your paper →</a>
-      <span class="yp-or">or start from a shape</span>
-      {"".join(tpls)}
+    return f'''  <section class="sp-paths" id="yourpaper" aria-labelledby="sp-hl">
+    <span class="kicker sp-kick">your paper — be the editor</span>
+    <h2 class="sp-hl" id="sp-hl">Now tell yours. Two ways in.</h2>
+    <p class="sp-copy">The two stories above are the two ways into the record:
+      one meeting, or one thread over time. Start from either, or from any
+      meeting or issue, and the record drafts the story — the numbers, the
+      moments, the votes, the pictures — with a receipt on every line. You
+      write the note that says what it means. No account. Nothing uploaded.
+      Your paper lives in your browser and in the link you send.</p>
+    <div class="sp-two">
+      <article class="sp-path">
+        <span class="sp-num">path one — one meeting</span>
+        <h3>What happened</h3>
+        <p>One night, told whole: the lede, the meeting in numbers, the shape
+          of the tape with its moments marked, the three moments that decided
+          it, the roll calls, how it was framed, the filings — and your note.</p>
+        <div class="sp-starts"><span class="sp-or">start from</span>{m_starts or '<span class="hint">no meeting pressed yet</span>'}</div>
+      </article>
+      <article class="sp-path">
+        <span class="sp-num">path two — over time</span>
+        <h3>How it moved</h3>
+        <p>One issue, followed across every meeting it touched: its reach,
+          what changed each time it came back, every roll call along the way,
+          its first word and its latest — and your note.</p>
+        <div class="sp-starts"><span class="sp-or">start from</span>{i_starts or '<span class="hint">the long view needs two read meetings</span>'}</div>
+      </article>
+    </div>
+    <div class="sp-more">
+      <a class="btn primary sp-blank" href="/app/p#edit">or start a blank paper →</a>
+      <a class="btn" href="/app/p#edit&amp;tpl=rolls">the roll calls, watched</a>
     </div>{pressed}
   </section>
 '''
 
 
-def page_home(meetings, issues, stats, manifest, base, featured=None):
-    c = stats["counts"]
+def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None):
+    """The front page — two stories, one toggle (specs/24 §2.4).
+
+    The record's front page is a story, told by the press: the record over
+    time (votes, threads, framing, topics, the record in words — with a
+    counted commentary), and the latest meeting, what happened (its numbers,
+    its shape, the moments that decided it, its roll calls, framing,
+    questions, words, names, filings). Both are pressed as real HTML; the
+    reader's script shows one at a time and remembers the choice in this
+    browser; with JavaScript off both stand in order. Each ends where the
+    making half begins — "make this story yours" opens the same story as a
+    draft in the studio — and the two paths section beneath says the rest.
+    The briefs and the access ledger close the page."""
+    from . import story
     ms = sorted(meetings, key=lambda m: (m.get("date") or ""), reverse=True)
     lead = ms[0] if ms else None
-
-    # -- the lead story: the latest meeting, given the front page --
-    if lead:
-        # the two strongest moments, but never two from the same second — a vote
-        # and the question beside it share a timestamp, and the paper wants two
-        # different beats
-        top, secs = [], set()
-        for mo in sorted(lead.get("moments") or [], key=lambda mo: -mo["score"]):
-            if int(mo["t"]) in secs:
-                continue
-            secs.add(int(mo["t"]))
-            top.append(mo)
-            if len(top) == 2:
-                break
-        pulls = "".join(
-            f'<a class="pull" href="/app/m/{lead["pid"]}#t{int(mo["t"])}">'
-            f'<span class="ts">{hms(mo["t"])}</span>'
-            f'<span class="mk">{esc(mo["kind"])}</span> '
-            f'{esc(mo["quote"][:130])}</a>' for mo in top)
-        lthumb = lead.get("thumb") or ""
-        deck = (f'<p class="deck">{esc(lead["summary"][:260])}</p>'
-                if lead.get("summary") else "")
-        lead_html = (
-            f'<article class="lead" data-town="{esc(lead["town"])}" '
-            f'data-body="{esc(lead["body"])}">'
-            f'<span class="kicker">the latest meeting on the record</span>'
-            + (f'<a class="lead-media" href="/app/m/{lead["pid"]}">'
-               f'<img src="{esc(lthumb)}" alt="" width="960" height="540"></a>'
-               if lthumb else "")
-            + f'<a class="lead-hl" href="/app/m/{lead["pid"]}"><h2>{esc(lead["title"])}</h2></a>'
-              f'<p class="lead-meta"><span class="chip">{esc(lead["body"] or "meeting")}</span> '
-              f'{esc(lead["town"] or "")} · {esc(lead["date"] or "undated")} · '
-              f'{int(round((lead["duration"] or 0)/60))} min</p>'
-            + deck
-            + (f'<div class="pulls"><span class="kicker">from the tape</span>{pulls}</div>'
-               if pulls else "")
-            + '</article>')
-    else:
-        lead_html = '<p class="hint">The record is empty — no meetings pressed yet.</p>'
+    over = story.over_time(meetings, issues, stats, analytics, base="/app")
+    latest = (story.latest(lead, base="/app") if lead else
+              '  <article class="fp-story fp-latest" id="latest"><span class="kicker">the latest meeting on the record</span>'
+              '<p class="hint">The record is empty — no meetings pressed yet.</p></article>\n')
+    tabs = story.tabs(lead["title"] if lead else "")
 
     # -- briefs: the next few meetings --
     briefs = "".join(_brief_card(m) for m in ms[1:6]) or \
         '<p class="hint">just the one meeting, so far</p>'
-
-    # -- by the numbers: every figure a link --
-    def stat(n, label, href):
-        return (f'<a class="statcell" href="{href}"><b>{n}</b>'
-                f'<span>{esc(label)}</span></a>')
-    band = "".join([
-        stat(c["meetings"], "meetings", "/app/s"),
-        stat(c["hours"], "hours", "/app/analytics"),
-        stat(c["bodies"], "bodies", "/app/analytics"),
-        stat(c["issues"], "issues", "/app/graph"),
-        stat(c["votes"], "roll calls", "/app/officials"),
-        stat(f'{c["segments"]:,}', "segments", "/app/s"),
-        stat(c["languages"], "languages", "/app/press#interpreter"),
-        stat(c["described"], "described", "/app/press#narrator"),
-    ])
-
-    # -- standing stories: the long view --
-    loud = "".join(
-        f'<a class="lrow" href="/app/i/{i["slug"]}">'
-        f'<b>{esc(i["name"])}</b>'
-        f'<span class="lmeta">{n_of(i["n_meetings"], "meeting")} · {n_of(i["n_segments"], "moment")} · '
-        f'{esc((i["first_seen"] or "")[:4])}–{esc((i["last_seen"] or "")[:4])}</span></a>'
-        for i in stats["loud"])
-
-    # -- updates: what resurfaced, quoting its bead --
-    resurf = "".join(
-        f'<a class="rsrow" href="/app/i/{r["slug"]}"><b>{esc(r["name"])}</b>'
-        f'<span class="rsdelta">{esc(r["delta"][:220])}</span></a>'
-        for r in stats["resurfacings"]) \
-        or ('<p class="hint">No threads have resurfaced yet — follow an issue '
-            'and the record will keep watch.</p>')
 
     # -- the access ledger: captioned / translated / described, honest zeros --
     langs = stats["languages"]
@@ -512,35 +476,10 @@ def page_home(meetings, issues, stats, manifest, base, featured=None):
         f'<b class="acc-n">{stats["access"]["described_pct"]}%</b>'
         f'<span class="acc-w">audio description arrives with the drain</span></div>')
 
-    # -- the votes teaser: latest roll calls --
-    allvotes = []
-    for m in meetings:
-        for v in (m.get("votes") or []):
-            allvotes.append({"pid": m["pid"], "date": m.get("date", ""),
-                             "title": m.get("title", ""), **v})
-    allvotes.sort(key=lambda v: (v.get("date", ""), v.get("t", 0)), reverse=True)
-    votes_teaser = "".join(
-        f'<a class="vteaser" href="/app/m/{v["pid"]}#t{int(v.get("t") or 0)}">'
-        f'<span class="vt-motion">{esc((v.get("motion") or "")[:90])}</span>'
-        f'<span class="vt-meta"><span class="outcome">{esc(v.get("outcome",""))}</span> '
-        f'<span class="tally">{esc(v.get("tally",""))}</span> · {esc(v.get("date",""))}</span></a>'
-        for v in allvotes[:4]) \
-        or '<p class="hint">no roll calls read yet</p>'
+    # -- the two paths into a story of your own (specs/24; the front door of specs/23 A1) --
+    door = _story_paths(ms, stats, featured)
 
-    # -- the front door to the making half (specs/23 A1) --
-    door = _your_paper_door(ms, stats, featured)
-
-    # -- coverage strip --
-    mx = max([m["total"] for m in stats["coverage"]] or [1])
-    bars = "".join(
-        f'<div class="covbar" data-month="{esc(m["month"])}" '
-        f'title="{esc(m["month"])}: {m["total"]} meeting(s)">'
-        f'<span style="height:{max(6, round(56*m["total"]/mx))}px"></span>'
-        # an undated meeting's month is the literal "undated" — slicing [5:] off
-        # that spells "ed"; show a dash for the no-date bucket instead
-        f'<label>{esc("—" if m["month"] == "undated" else (m["month"] or "?")[5:] or "?")}</label></div>'
-        for m in stats["coverage"])
-
+    c = stats["counts"]
     body = f"""
   <form class="askform frontsearch" action="/app/s" method="get">
     <input name="q" placeholder="ask the record — a phrase, a topic, a street name…" aria-label="Search the record">
@@ -549,31 +488,11 @@ def page_home(meetings, issues, stats, manifest, base, featured=None):
   </form>
   <p class="scopeline" id="scopeline" hidden></p>
   {body_strip()}
-  <div class="leadrow">
-    <div class="leadcol">{lead_html}</div>
-    <div class="briefscol">
-      <div class="sectionhead"><span class="kicker">also on the record</span></div>
-      <div class="mcards briefs">{briefs}</div>
-    </div>
-  </div>
-{door}  <section class="numbers">
-    <div class="sectionhead"><span class="kicker">by the numbers</span></div>
-    <div class="statband">{band}</div>
-    <div class="covwrap"><span class="kicker">meetings by month</span>
-      <div class="covstrip">{bars}</div></div>
-  </section>
-  <div class="storyrow">
-    <section class="story"><div class="sectionhead"><span class="kicker">the long view — issues by reach</span></div>
-      <div class="lrows">{loud or '<p class="hint">the long view needs two read meetings</p>'}</div></section>
-    <section class="story"><div class="sectionhead"><span class="kicker">what changed, last time</span></div>
-      <div class="rsrows">{resurf}</div></section>
-  </div>
-  <div class="storyrow">
+{tabs}{over}{latest}{door}  <div class="storyrow">
+    <section class="story"><div class="sectionhead"><span class="kicker">also on the record</span></div>
+      <div class="mcards briefs">{briefs}</div></section>
     <section class="story"><div class="sectionhead"><span class="kicker">the access ledger</span></div>
       <div class="accled">{access}</div></section>
-    <section class="story"><div class="sectionhead"><span class="kicker">the latest roll calls</span>
-      <a class="seeall" href="/app/officials">the votes →</a></div>
-      <div class="vteasers">{votes_teaser}</div></section>
   </div>
 """
     return shell("The record — publicrecord.studio",
@@ -986,10 +905,21 @@ def _paper_qs(title, blocks) -> str:
             parts.append("m." + _js_euc(b["pid"]))
         elif b["kind"] == "story" and b["story"] == "issue":
             parts.append("i." + _js_euc(b["slug"]))
+        elif b["kind"] == "chart" and b["chart"] == "numbers":
+            # a numbers chart names a meeting OR an issue — the ref says which
+            parts.append("c.numbers." + _js_euc(
+                ("m:" + b["pid"]) if b.get("pid") else ("i:" + b["slug"])))
         elif b["kind"] == "chart":
             ref = b.get("slug") or b.get("pid") or ""
             parts.append("c." + b["chart"] + (("." + _js_euc(ref)) if ref else ""))
-    v = "2" if any(b["kind"] in ("chart", "note") for b in blocks) else "1"
+        elif b["kind"] == "reading":
+            parts.append("a." + _js_euc(
+                ("m:" + b["pid"]) if b.get("pid") else ("i:" + b["slug"])))
+    v4 = any(b["kind"] == "reading"
+             or (b["kind"] == "chart" and (b["chart"] in ("numbers", "shape", "ledger")
+                                           or (b["chart"] == "votes" and b.get("pid"))))
+             for b in blocks)
+    v = "4" if v4 else "2" if any(b["kind"] in ("chart", "note") for b in blocks) else "1"
     qs = "v=" + v
     if title:
         qs += "&t=" + _js_euc(title)
@@ -1027,25 +957,33 @@ def featured_papers(meetings, issues, stats):
         # a young record's loudest issue may hold one meeting — "longest
         # thread across 1 meetings" would be both broken English and a boast
         sub = (f"the record's longest thread — one issue across {n} "
-               "meetings, and its reach over time") if n > 1 else \
-              "one issue, tracked from its first appearance — and its reach over time"
+               "meetings: its numbers, its reach, every roll call along the "
+               "way, and the record's reading") if n > 1 else \
+              "one issue, tracked from its first appearance — its reach, its ledger, its reading"
         out.append({
             "title": title,
             "sub": sub,
             "qs": _paper_qs(title,
                             [{"kind": "story", "story": "issue", "slug": i["slug"]},
-                             {"kind": "chart", "chart": "reach", "slug": i["slug"]}]),
+                             {"kind": "chart", "chart": "numbers", "slug": i["slug"]},
+                             {"kind": "chart", "chart": "reach", "slug": i["slug"]},
+                             {"kind": "chart", "chart": "ledger", "slug": i["slug"]},
+                             {"kind": "reading", "slug": i["slug"]}]),
         })
     ms = sorted(meetings, key=lambda m: (m.get("date") or ""), reverse=True)
     if ms:
         m = ms[0]
         out.append({
             "title": "the latest meeting, covered",
-            "sub": f'{m.get("title") or m["pid"]} — as a story, with its '
-                   "framing and what keeps coming back record-wide",
+            "sub": f'{m.get("title") or m["pid"]} — as a story: its numbers, '
+                   "its shape, its framing, the record's reading, and what "
+                   "keeps coming back record-wide",
             "qs": _paper_qs("the latest meeting, covered",
                             [{"kind": "story", "story": "meeting", "pid": m["pid"]},
+                             {"kind": "chart", "chart": "numbers", "pid": m["pid"]},
+                             {"kind": "chart", "chart": "shape", "pid": m["pid"]},
                              {"kind": "chart", "chart": "framing", "pid": m["pid"]},
+                             {"kind": "reading", "pid": m["pid"]},
                              {"kind": "chart", "chart": "topics"}]),
         })
     return out
@@ -2166,7 +2104,8 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     # already pass identically — so the two pressings cannot drift apart
     featured = featured_papers(meetings, issues, stats)
     (out / "index.html").write_text(
-        page_home(meetings, issues, stats, manifest, base, featured=featured),
+        page_home(meetings, issues, stats, manifest, base, featured=featured,
+                  analytics=analytics),
         encoding="utf-8")
     (out / "s" / "index.html").parent.mkdir(parents=True, exist_ok=True)
     (out / "s" / "index.html").write_text(page_search(manifest, base), encoding="utf-8")

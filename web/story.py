@@ -1,0 +1,451 @@
+"""The front page's two stories, written by the press (specs/24 §2.4).
+
+The record's front page is a story, not a dashboard and not a door: the
+record over time, and the latest meeting — each told whole, with its pictures
+(web/charts.py) and a commentary that is COUNTED, never modeled. Every
+sentence here is a rule over the pressed planes, and every number in it is a
+receipt into the page that holds it. The one paragraph a model may have
+drafted — a meeting's summary — arrives labeled, as it does everywhere else
+on the record (`summary_origin`), and stands beside the counted commentary,
+never instead of it.
+
+Two stories, one toggle: the page presses both; the reader's script shows one
+at a time (the choice is remembered in this browser and nowhere else); with
+JavaScript off both stand, in order, under their own headings. Each story
+ends where the making half begins — "make this story yours" opens the same
+story as a draft in the studio, block for block.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+from typing import Dict, List, Optional, Sequence
+
+from . import charts
+from .charts import esc, hms, n_of, ARTIFACTS, cut_words
+
+
+# --------------------------------------------------------------------------
+# small helpers
+# --------------------------------------------------------------------------
+
+def month_name(d: str) -> str:
+    """'2026-06-18' → 'June 2026'; anything else → '' (never a guess)."""
+    try:
+        return _dt.datetime.strptime(str(d)[:7], "%Y-%m").strftime("%B %Y")
+    except ValueError:
+        return ""
+
+
+def day_name(d: str) -> str:
+    """'2026-06-18' → 'June 18, 2026'."""
+    try:
+        t = _dt.datetime.strptime(str(d)[:10], "%Y-%m-%d")
+        return f'{t.strftime("%B")} {t.day}, {t.year}'
+    except ValueError:
+        return str(d or "undated")
+
+
+def the_list(items: Sequence[str]) -> str:
+    """'a', 'a and b', 'a, b and c' — prose, not a dump."""
+    xs = [x for x in items if x]
+    if not xs:
+        return ""
+    if len(xs) == 1:
+        return xs[0]
+    return ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def hours_words(seconds: float) -> str:
+    s = int(seconds or 0)
+    h, m = s // 3600, (s % 3600) // 60
+    if h and m:
+        return f"{h} h {m} min"
+    if h:
+        return f"{h} h"
+    return f"{m} min"
+
+
+def _name(e) -> str:
+    """A named thing, without the punctuation the analyzer's cut left on it."""
+    v = str(e.get("name") or e.get("text") or "") if isinstance(e, dict) else str(e or "")
+    return v.strip().rstrip(".,;:")
+
+
+def _topic_name(t) -> str:
+    if isinstance(t, dict):
+        return str(t.get("topic") or t.get("name") or t.get("word") or "").strip()
+    return str(t or "").strip()
+
+
+def _real_topics(topics) -> List[dict]:
+    out = []
+    for t in topics or []:
+        name = _topic_name(t)
+        if name and name.lower() not in ARTIFACTS:
+            out.append({"name": name, "count": int((t.get("count") if isinstance(t, dict) else 0) or 0),
+                        "meetings": (t.get("meetings") if isinstance(t, dict) else None) or [],
+                        "t": (t.get("t") if isinstance(t, dict) else None)})
+    return out
+
+
+def kicker(text: str, right: str = "") -> str:
+    return (f'<div class="sectionhead"><span class="kicker">{text}</span>'
+            + (f'<span class="fp-right">{right}</span>' if right else "") + "</div>")
+
+
+def say(html_: str) -> str:
+    """A commentary line under a picture — what the picture says, counted."""
+    return f'<p class="fp-say">{html_}</p>'
+
+
+# --------------------------------------------------------------------------
+# the toggle
+# --------------------------------------------------------------------------
+
+def tabs(latest_title: str = "") -> str:
+    """Two tabs, as links: with JavaScript off they are in-page anchors and
+    both stories stand; the reader's script turns them into a toggle that
+    shows one story at a time and says which is showing."""
+    return f'''  <nav class="stab" aria-label="the front page’s two stories">
+    <a class="stab-a" href="#over-time" data-story="over-time" aria-current="true"><b>Over time</b><span>how the record moved</span></a>
+    <a class="stab-a" href="#latest" data-story="latest"><b>The latest meeting</b><span>{esc(latest_title or "what happened")}</span></a>
+  </nav>
+'''
+
+
+# --------------------------------------------------------------------------
+# story one — the record, over time
+# --------------------------------------------------------------------------
+
+def over_time(meetings: Sequence[dict], issues: Sequence[dict], stats: dict,
+              analytics: Optional[dict], base: str = "/app") -> str:
+    c = stats.get("counts") or {}
+    ms = sorted(meetings, key=lambda m: (str(m.get("date") or "")))
+    dated = [m for m in ms if m.get("date")]
+    first, last = (dated[0], dated[-1]) if dated else (None, None)
+    bodies = sorted({str(m.get("body") or "") for m in ms if m.get("body")})
+    towns = sorted({str(m.get("town") or "") for m in ms if m.get("town")})
+    votes = [{**v, "pid": m["pid"], "date": m.get("date", ""), "body": m.get("body", ""),
+              "town": m.get("town", ""), "title": m.get("title", "")}
+             for m in ms for v in (m.get("votes") or [])]
+    passed = sum(1 for v in votes if v.get("outcome") == "passes")
+    failed = sum(1 for v in votes if v.get("outcome") == "fails")
+    other = len(votes) - passed - failed
+    hours = c.get("hours") or round(sum(float(m.get("duration") or 0) for m in ms) / 3600, 1)
+    an = analytics or {}
+    loud = [i for i in (stats.get("loud") or []) if i.get("slug")]
+    n_meet = len(ms)
+
+    # -- the headline and the lede: counted, every number a receipt --------
+    since = month_name(first["date"]) if first else ""
+    headline = (f'{n_of(n_meet, "meeting")}, {hours} hours, {n_of(len(votes), "roll call")} — '
+                + (f'the record since {esc(since)}' if since else "the record so far"))
+    lede = []
+    if n_meet:
+        who = the_list([f"the {b}" for b in bodies]) or "its public bodies"
+        where = the_list(towns)
+        lede.append(
+            f'Since {esc(day_name(first["date"])) if first else "its first pressing"}, the record holds '
+            f'<a href="{base}/s">{n_of(n_meet, "meeting")}</a> of {esc(who)}'
+            + (f' in {esc(where)}' if where else "")
+            + f' — <a href="{base}/analytics">{hours} hours</a> of tape, '
+            f'<a href="{base}/s">{int(c.get("segments") or 0):,} lines</a> of it, every line searchable.')
+    if loud:
+        top = loud[0]
+        tail = the_list([f'<a href="{base}/i/{esc(i["slug"])}">{esc(i["name"])}</a>' for i in loud[1:3]])
+        lede.append(
+            f'The longest thread is <a href="{base}/i/{esc(top["slug"])}">{esc(top["name"])}</a>, on the table in '
+            f'{n_of(int(top.get("n_meetings") or 0), "meeting")} ({n_of(int(top.get("n_segments") or 0), "moment")})'
+            + (f'; {tail} follow.' if tail else "."))
+    if votes:
+        latest_v = max(votes, key=lambda v: (str(v.get("date") or ""), float(v.get("t") or 0)))
+        lede.append(
+            f'<a href="{base}/officials">{n_of(len(votes), "roll call")}</a> were read from the tapes: '
+            f'{passed} passed, {failed} failed' + (f', {other} landed otherwise' if other else "")
+            + f'. The latest was <a href="{base}/m/{esc(latest_v["pid"])}#t{int(float(latest_v.get("t") or 0))}">'
+            f'“{esc(cut_words(latest_v.get("motion"), 90))}”</a> — {esc(latest_v.get("outcome") or "")}'
+            + (f' {esc(latest_v["tally"])}' if latest_v.get("tally") else "")
+            + f', {esc(day_name(latest_v.get("date") or ""))}.')
+    else:
+        lede.append("No roll call has been read from a tape yet — the bodies' votes so far were by voice, or unrecorded.")
+    cov = [x for x in (stats.get("coverage") or []) if x.get("month") and x["month"] != "undated"]
+    if cov:
+        busiest = max(cov, key=lambda x: (int(x.get("total") or 0), x["month"]))
+        lede.append(f'The busiest month was {esc(month_name(busiest["month"]))} ({n_of(int(busiest["total"]), "meeting")}).')
+    frows = [r for r in (an.get("framing") or []) if isinstance(r, dict)]
+    lens_tot: Dict[str, float] = {}
+    for r in frows:
+        for l, n in (r.get("lenses") or {}).items():
+            lens_tot[l] = lens_tot.get(l, 0.0) + float(n or 0)
+    tot = sum(lens_tot.values())
+    top_lenses = sorted(lens_tot.items(), key=lambda kv: -kv[1])[:2]
+    if tot and top_lenses:
+        lede.append(
+            f'Across the record the talk leaned <a href="{base}/analytics">{esc(top_lenses[0][0])}</a> '
+            f'({round(100 * top_lenses[0][1] / tot)}% of framed lines)'
+            + (f' and {esc(top_lenses[1][0])} ({round(100 * top_lenses[1][1] / tot)}%)' if len(top_lenses) > 1 else "")
+            + ' — counted by open word lists, not modeled.')
+    topics = _real_topics(an.get("topics"))
+    if topics:
+        t0 = topics[0]
+        lede.append(
+            f'“{esc(t0["name"])}” came up {n_of(t0["count"], "time")} across {n_of(len(t0["meetings"]), "meeting")}'
+            + (f'; “{esc(topics[1]["name"])}” and “{esc(topics[2]["name"])}” keep coming back too' if len(topics) > 2 else "")
+            + '.')
+
+    # -- the pictures, each with what it says ------------------------------
+    parts: List[str] = []
+    # by the numbers + meetings by month
+    cells = [(c.get("meetings", n_meet), "meetings", f"{base}/s"),
+             (hours, "hours", f"{base}/analytics"),
+             (c.get("bodies", len(bodies)), "bodies", f"{base}/analytics"),
+             (c.get("issues", len(issues)), "issues", f"{base}/graph"),
+             (c.get("votes", len(votes)), "roll calls", f"{base}/officials"),
+             (f'{int(c.get("segments") or 0):,}', "lines", f"{base}/s")]
+    mx = max([int(x.get("total") or 0) for x in cov] or [1])
+    bars = "".join(
+        f'<div class="covbar" data-month="{esc(x["month"])}" title="{esc(x["month"])}: {x["total"]} meeting(s)">'
+        f'<span style="height:{max(6, round(56 * int(x["total"]) / mx))}px"></span>'
+        f'<label>{esc(x["month"][5:] or "?")}</label></div>' for x in cov)
+    parts.append(f'<section class="fp-part">{kicker("the record, by the numbers")}'
+                 + charts.numbers_strip(cells)
+                 + (f'<div class="covwrap"><span class="kicker">meetings by month</span><div class="covstrip">{bars}</div></div>' if cov else "")
+                 + "</section>")
+    # votes over time
+    vsay = ""
+    if votes:
+        by_body: Dict[str, int] = {}
+        for v in votes:
+            by_body[v.get("body") or "—"] = by_body.get(v.get("body") or "—", 0) + 1
+        bb = max(by_body.items(), key=lambda kv: (kv[1], kv[0]))
+        vsay = say(f'{n_of(len(votes), "roll call")} across {n_of(len({v["pid"] for v in votes}), "meeting")}: '
+                   f'{passed} passed, {failed} failed' + (f', {other} otherwise' if other else "")
+                   + f'. The {esc(bb[0])} took the most ({bb[1]}). A filled dot passes, a hollow one fails; '
+                   f'every dot opens the tape where the vote was taken — '
+                   f'<a href="{base}/officials">who voted how</a> reads in place.')
+    teaser = "".join(
+        f'<a class="vteaser" href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}">'
+        f'<span class="vt-motion">{esc(str(v.get("motion") or "")[:90])}</span>'
+        f'<span class="vt-meta"><span class="outcome">{esc(v.get("outcome") or "")}</span> '
+        f'<span class="tally">{esc(v.get("tally") or "")}</span> · {esc(v.get("date") or "")}</span></a>'
+        for v in sorted(votes, key=lambda v: (str(v.get("date") or ""), float(v.get("t") or 0)), reverse=True)[:4])
+    see_all = f'<a class="seeall" href="{base}/officials">the votes →</a>'
+    teaser_block = (f'<div class="fp-sub">{kicker("the latest roll calls", see_all)}'
+                    f'<div class="vteasers">{teaser}</div></div>' if teaser else "")
+    parts.append(f'<section class="fp-part">{kicker("votes over time — every roll call, meeting by meeting")}'
+                 + charts.votes_over_time(votes, base) + vsay + teaser_block + "</section>")
+    # the long view
+    months = [x["month"] for x in cov]
+    isay = ""
+    if loud:
+        top = loud[0]
+        isay = say(f'<a href="{base}/i/{esc(top["slug"])}">{esc(top["name"])}</a> surfaced in '
+                   f'{n_of(int(top.get("n_meetings") or 0), "meeting")}'
+                   + (f', from {esc(month_name(top.get("first_seen") or ""))} to {esc(month_name(top.get("last_seen") or ""))}'
+                      if top.get("first_seen") and top.get("last_seen") else "")
+                   + '. A taller bar is a month it came up more; every bar opens the meeting it came up in. '
+                   f'The whole long view — {n_of(len(issues), "issue")} — reads on <a href="{base}/graph">the issue graph</a>.')
+    parts.append(f'<section class="fp-part">{kicker("the long view — issues by reach, month by month")}'
+                 + charts.issues_over_time(issues, months, base=base) + isay + "</section>")
+    # how the talk was framed
+    fsay = ""
+    if frows and last:
+        lastrow = next((r for r in frows if r.get("pid") == last.get("pid")), None)
+        if lastrow and lastrow.get("total"):
+            ll = max((lastrow.get("lenses") or {}).items(), key=lambda kv: kv[1], default=None)
+            if ll:
+                fsay = say(f'Deeper is more of the meeting’s talk through that lens. In the latest meeting, '
+                           f'<a href="{base}/m/{esc(last["pid"])}">{esc(last.get("title") or last["pid"])}</a>, '
+                           f'the talk leaned {esc(ll[0])} ({round(100 * float(ll[1]) / float(lastrow["total"]))}%). '
+                           'Eight civic lenses, counted from the words themselves — a lens is a word list, readable in the source.')
+    parts.append(f'<section class="fp-part">{kicker("how the talk was framed — eight civic lenses, meeting by meeting")}'
+                 + charts.framing_strip(frows, an.get("lens_order") or [], base=base) + fsay + "</section>")
+    # what keeps coming back
+    tsay = ""
+    if topics:
+        t0 = topics[0]
+        tsay = say(f'“{esc(t0["name"])}” led with {n_of(t0["count"], "mention")} across {n_of(len(t0["meetings"]), "meeting")}. '
+                   'Each name is the record’s own search for it — the same search that found these.')
+    parts.append(f'<section class="fp-part">{kicker("what keeps coming back — recurring topics, record-wide")}'
+                 + charts.topic_bars(an.get("topics") or [], base=base) + tsay + "</section>")
+    # the record in words
+    words = record_words(ms)
+    wsay = ""
+    if words:
+        w0 = words[0]
+        wsay = say(f'“{esc(w0["word"])}” came up most — {n_of(int(w0["count"]), "mention")} across the record'
+                   + (f'; “{esc(words[1]["word"])}” and “{esc(words[2]["word"])}” next' if len(words) > 2 else "")
+                   + '. Sized by how often, placed by rank; every word opens the search for it.')
+    parts.append(f'<section class="fp-part">{kicker("the record in words — what was said most")}'
+                 + charts.word_cloud(words, base=base) + wsay + "</section>")
+    # what changed
+    resurf = stats.get("resurfacings") or []
+    rrows = "".join(
+        f'<a class="rsrow" href="{base}/i/{esc(r["slug"])}"><b>{esc(r["name"])}</b>'
+        f'<span class="rsdelta">{esc(str(r.get("delta") or "")[:220])}</span></a>' for r in resurf[:6]) \
+        or '<p class="hint">No thread has resurfaced yet — follow an issue and the record will keep watch.</p>'
+    parts.append(f'<section class="fp-part">{kicker("what changed, last time — threads that resurfaced")}'
+                 f'<div class="rsrows">{rrows}</div></section>')
+    # the close: make this story yours
+    starts = "".join(
+        f'<a class="btn" href="{base}/p#edit&amp;tpl=issue&amp;ref={esc(i["slug"])}">{esc(i["name"][:44])}</a>'
+        for i in loud[:4])
+    close = (f'<div class="fp-close"><a class="btn primary" href="{base}/p#edit&amp;tpl=rolls">make this story yours →</a>'
+             f'<span class="fp-or">or follow one thread over time:</span>{starts}</div>')
+    return f'''  <article class="fp-story fp-over" id="over-time" aria-labelledby="fp-over-hl">
+    <span class="kicker">the record, over time — how it moved</span>
+    <h2 class="fp-hl" id="fp-over-hl">{headline}</h2>
+    <p class="fp-lede">{" ".join(lede)}</p>
+    <p class="decksrc">counted from the record’s own planes when this edition was pressed — no model wrote a line of it; every number opens the page that holds it</p>
+    {"".join(parts)}
+    {close}
+  </article>
+'''
+
+
+def record_words(meetings: Sequence[dict], top: int = 60) -> List[dict]:
+    """Word frequencies across every meeting's transcript — the record-wide
+    cloud. The analyzer's own counter (civic stopwords out), summed."""
+    from highlighter import insight
+    counts: Dict[str, int] = {}
+    for m in meetings:
+        for w in insight.word_freq(m.get("segments") or [], top=200):
+            counts[w["word"]] = counts.get(w["word"], 0) + int(w["count"])
+    return [{"word": w, "count": n} for w, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:top]]
+
+
+# --------------------------------------------------------------------------
+# story two — the latest meeting, what happened
+# --------------------------------------------------------------------------
+
+def latest(m: dict, base: str = "/app") -> str:
+    from highlighter import insight
+    pid = m["pid"]
+    an = m.get("analysis") or {}
+    mos = sorted((mo for mo in (m.get("moments") or []) if mo.get("t") is not None), key=lambda mo: -float(mo.get("score") or 0))
+    dec, qs, ten = an.get("decisions") or [], an.get("questions") or [], an.get("tension") or []
+    votes = m.get("votes") or []
+    docs = m.get("documents") or []
+    segs = m.get("segments") or []
+    dur = float(m.get("duration") or 0)
+    href = f"{base}/m/{esc(pid)}"
+    at = lambda t: f"{href}#t{int(float(t or 0))}"
+
+    # -- the lede: the labeled summary, then the counted commentary ---------
+    origin = ("an AI summary, labeled" if str(m.get("summary_origin") or "").startswith("ai:")
+              else "a summary drawn from the tape")
+    summary = (f'<p class="fp-lede">{esc(str(m.get("summary") or "")[:600])}</p>'
+               f'<p class="decksrc">{origin} — supplements the official record</p>' if m.get("summary") else "")
+    told = []
+    told.append(f'The night ran <a href="{href}">{hours_words(dur)}</a>. The analyzer found '
+                f'<a href="{href}">{n_of(len(dec), "decision")}</a>, {n_of(len(qs), "question")} and '
+                f'{n_of(len(ten), "moment")} of pushback' + (f', and read {n_of(len(votes), "roll call")}' if votes else ", and read no roll call") + '.')
+    top, secs = [], set()
+    for mo in mos:
+        if int(float(mo["t"])) in secs:
+            continue
+        secs.add(int(float(mo["t"]))); top.append(mo)
+        if len(top) == 3:
+            break
+    if top:
+        mo = top[0]
+        told.append(f'Its loudest moment came at <a href="{at(mo["t"])}">{hms(mo["t"])}</a>, '
+                    f'a {esc(charts.SHAPE_KINDS.get(mo.get("kind"), mo.get("kind") or "moment"))}: '
+                    f'“{esc(cut_words(mo.get("quote"), 160))}”.')
+    lenses = [l for l in ((an.get("framing") or {}).get("lenses") or []) if int(l.get("count") or 0) > 0]
+    ftot = float((an.get("framing") or {}).get("total") or 0)
+    if lenses and ftot:
+        l0 = max(lenses, key=lambda l: int(l["count"]))
+        drift = {"rising": "rising as the night went on", "fading": "fading as the night went on"}.get(l0.get("drift"), "steady through the night")
+        told.append(f'The talk leaned <a href="{href}">{esc(l0["lens"])}</a> ({round(100 * int(l0["count"]) / ftot)}% of framed lines), {drift}.')
+    ents = an.get("entities") or {}
+    money = [_name(e) for e in (ents.get("money") or [])][:5]
+    people = [_name(e) for e in (ents.get("people") or [])][:5]
+    if money:
+        told.append(f'Money on the table: {esc(the_list(money))}.')
+    if people:
+        told.append(f'Named, more than once: {esc(the_list(people))}.')
+    if docs:
+        told.append(f'The town filed {n_of(len(docs), "paper")} for it — {esc(the_list([str(d.get("kind") or "document") for d in docs[:3]]))}.')
+
+    # -- the pictures ---------------------------------------------------------
+    parts: List[str] = []
+    cells = [(int(round(dur / 60)), "minutes", href), (len(votes), "roll calls", href),
+             (len(dec), "decisions", href), (len(qs), "questions asked", href),
+             (len(ten), "moments of pushback", href), (len(docs), "filings", href)]
+    parts.append(f'<section class="fp-part">{kicker("the meeting in numbers")}{charts.numbers_strip(cells)}</section>')
+    shape_say = say('Where the night’s moments fell on the tape, scored by the analyzer — not chosen for you. '
+                    'Every mark opens the tape where it fell; the table under it reads them in order.') if mos else ""
+    parts.append(f'<section class="fp-part">{kicker("the shape of the meeting")}'
+                 + charts.meeting_shape(m.get("moments") or [], dur, pid, base=base) + shape_say + "</section>")
+    if top:
+        pulls = "".join(
+            f'<a class="pull" href="{at(mo["t"])}"><span class="ts">{hms(mo["t"])}</span>'
+            f'<span class="mk">{esc(mo.get("kind") or "")}</span> {esc(cut_words(mo.get("quote"), 160))}</a>' for mo in top)
+        parts.append(f'<section class="fp-part"><div class="pulls">{kicker("the moments that decided it — from the tape")}{pulls}</div></section>')
+    if votes:
+        vrows = "".join(
+            f'<a class="vteaser" href="{at(v.get("t"))}"><span class="vt-motion">{esc(str(v.get("motion") or "")[:110])}</span>'
+            f'<span class="vt-meta"><span class="outcome">{esc(v.get("outcome") or "")}</span> '
+            f'<span class="tally">{esc(v.get("tally") or "")}</span> · {hms(v.get("t"))}</span></a>' for v in votes[:8])
+        parts.append(f'<section class="fp-part">{kicker("the roll calls — read from this tape")}<div class="vteasers">{vrows}</div>'
+                     + say('Read from the transcript; a name may be misheard — verify against the official minutes.') + "</section>")
+    else:
+        parts.append(f'<section class="fp-part">{kicker("the roll calls")}<p class="hint">No roll call was read from this tape — the body may have voted by voice, or not at all.</p></section>')
+    if lenses:
+        parts.append(f'<section class="fp-part">{kicker("how the meeting framed it — eight civic lenses, counted from its own words")}'
+                     + charts.lens_bars(lenses)
+                     + say('Counted, not modeled — each lens is a word list; drift compares the first half of the night to the second.') + "</section>")
+    if qs:
+        parts.append(f'<section class="fp-part">{kicker("the questions asked — by what they ask about")}'
+                     + charts.question_bars(qs, pid, base=base)
+                     + say(f'{n_of(len(qs), "question")} the analyzer typed by what they ask about; each type opens the tape at the first one.') + "</section>")
+    words = [w for w in insight.word_freq(segs, top=80)] if segs else []
+    if words:
+        w0 = words[0]
+        parts.append(f'<section class="fp-part">{kicker("the meeting in words — what was said most")}'
+                     + charts.word_cloud(words, base=base, href=lambda w: at(w.get("t") or 0))
+                     + say(f'“{esc(w0["word"])}” came up {n_of(int(w0["count"]), "time")}. Every word opens the tape at its first mention.') + "</section>")
+    topics = _real_topics(an.get("topics"))
+    sparks = charts.sparklines(segs, [t["name"] for t in topics[:6]], dur, pid, base=base) if segs and topics else ""
+    if sparks:
+        parts.append(f'<section class="fp-part">{kicker("where the words fell — the night’s topics, slice by slice")}'
+                     + sparks + say('The highlighter’s sparkline search, pressed: a taller bar is a slice of the tape where the topic came up more; each bar opens the tape there.') + "</section>")
+    named = []
+    for k, label in (("people", "people"), ("organizations", "organizations"), ("places", "places"), ("money", "money")):
+        vals = [_name(e) for e in (ents.get(k) or [])][:8]
+        vals = [v for v in vals if v]
+        if vals:
+            named.append(f'<p class="fp-named"><span class="pb-rdtag">{esc(label)}</span> {esc(" · ".join(vals))}</p>')
+    if named:
+        parts.append(f'<section class="fp-part">{kicker("who and what was named")}{"".join(named)}'
+                     + say('Names the analyzer lifted from the transcript — a name may be misheard.') + "</section>")
+    if docs:
+        drows = "".join(
+            (f'<a class="docrow" href="{esc(d["url"])}" target="_blank" rel="noopener">' if d.get("url") else '<div class="docrow">')
+            + f'📄 <b>{esc(d.get("kind") or "document")}</b> {esc(str(d.get("title") or "")[:70])}'
+            + (f' <span class="lmeta">{d.get("pages", 0)} pp</span>' if d.get("pages") else "")
+            + ("</a>" if d.get("url") else "</div>") for d in docs[:6])
+        parts.append(f'<section class="fp-part">{kicker("the town’s paper — filings for this meeting")}<div class="docrows">{drows}</div></section>')
+
+    thumb = m.get("thumb") or ""
+    still = (f'<a class="lead-still" href="{href}"><img src="{esc(thumb)}" alt="" width="320" height="180" loading="lazy">'
+             f'<span class="lead-tape">▶ the tape · {hms(dur)} · loads only when you press it</span></a>' if thumb else "")
+    meta = " · ".join(x for x in (m.get("town") or "", m.get("date") or "undated",
+                                  f'{int(round(dur / 60))} min') if x)
+    close = (f'<div class="fp-close"><a class="btn primary" href="{base}/p#edit&amp;tpl=meeting&amp;ref={esc(pid)}">make this story yours →</a>'
+             f'<a class="btn" href="{href}">read the meeting →</a></div>')
+    return f'''  <article class="lead fp-story fp-latest" id="latest" data-town="{esc(m.get("town") or "")}" data-body="{esc(m.get("body") or "")}" aria-labelledby="fp-latest-hl">
+    <span class="kicker">the latest meeting on the record — what happened</span>
+    <div class="lead-grid"><div class="lead-words">
+    <a class="lead-hl" href="{href}"><h2 id="fp-latest-hl">{esc(m.get("title") or pid)}</h2></a>
+    <p class="lead-meta"><span class="chip">{esc(m.get("body") or "meeting")}</span> {esc(meta)}</p>
+    {summary}
+    <p class="fp-told">{" ".join(told)}</p>
+    <p class="decksrc">counted from the meeting’s own pressed plane — no model wrote a line of it; every number opens the tape</p>
+    </div>{still}</div>
+    {"".join(parts)}
+    {close}
+  </article>
+'''

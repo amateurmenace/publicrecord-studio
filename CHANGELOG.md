@@ -2,6 +2,49 @@
 
 ## unreleased
 
+### The front page is the story — the record over time, the latest meeting, the two paths, the mode bar — 2026-09-23 (v2.1.16)
+
+The record's front page led with a picture and a door. It now leads with
+two stories the press writes at press time, one showing at a time behind
+a two-tab toggle (both stand with the script off). **The record, over
+time**: a counted headline and lede — the bodies and towns, the longest
+thread, the roll calls passed and failed with the latest quoted, the
+busiest month, the lean of the talk, what keeps coming back — then the
+record by the numbers, votes over time as dots stacked by meeting, the
+six widest issues month by month as small multiples, the eight lenses as
+a heat strip meeting by meeting, the recurring topics as bars, the record
+in words as a cloud, and what changed. **The latest meeting, what
+happened**: the labeled summary as the lede, a counted commentary (how
+long the night ran, what the analyzer found, the loudest moment quoted
+with its time and kind, the lean of the talk and its drift, the money on
+the table, who was named), the meeting in numbers, the shape of the tape
+with its moments marked, the moments that decided it, the roll calls,
+the framing, the questions by type, the meeting in words, where the
+night's topics fell slice by slice, who and what was named, the filings,
+the still at card size. Every picture is pressed SVG or HTML in the
+paper palette, byte-identical press to press, with a receipt under every
+mark and a table twin; every sentence of commentary is a rule over the
+planes — no model wrote a line of it, and each story says so beneath its
+lede. Each ends where the making half begins: *make this story yours*
+opens the same story as a draft, block for block.
+
+The studio learned the two paths as templates — one meeting, what
+happened; over time, how it moved — on five new kinds the paper carries
+as refs and enums like every kind before them: a numbers chart (a
+meeting's or an issue's), the shape of a meeting, an issue's ledger, one
+meeting's roll calls, and the record's reading (decisions, questions,
+names and pushback for a meeting; the milestones in order for an issue —
+extractive, receipts throughout). They travel the link at v=4, the
+store, the export and the renderers; the panel's chart menu and the
+add-search's hit buttons offer them. A writing desk sits beside every
+note: three rotating prompts and a drawer of facts at hand from the
+paper's own planes, each cited at the caret as a receipt. And a mode bar
+under the section line says plainly whether you are reading or editing —
+Read / Edit, a radiogroup like the footprint control, in the studio's own
+accents when the studio is open. The two paths section beneath the
+stories names the ways in and offers real starts. specs/24 is the paper
+trail. 584 tests.
+
 ### Nightly intake — the standing rule, and YouTube's own caption list — 2026-09-23 (v2.1.16)
 
 The poll found meetings every night and the pipeline ingested none of them:
