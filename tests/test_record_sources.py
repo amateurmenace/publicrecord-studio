@@ -421,3 +421,229 @@ class PollObeysTheRulesTest(unittest.TestCase):
                                    "UCx", check_captions=False)
         self.assertEqual(out["filed"], 2)
         self.assertEqual({f["body"] for f in filed}, {"Select Board"})
+
+
+class StandingRuleTest(unittest.TestCase):
+    """A steward's standing rule approves what it files — and nothing else.
+
+    The nightly poll found meetings every night and the pipeline ingested
+    none of them: `approved` was only ever written by a click, and the queue
+    was unattended (specs/23 D2). A source may now carry `auto_approve`; the
+    poll files a rule-matched candidate at `approved` — but ONLY one YouTube's
+    own caption list names a track for. A candidate the probe could not
+    answer for, or answered "no tracks yet", files for a person exactly as
+    before, and is asked about again on later polls for a week. The audit log
+    names the rule the way it names a steward.
+    """
+
+    def feed(self, titles):
+        return [{"title": t, "url": f"https://www.youtube.com/watch?v=vid{i:08d}",
+                 "video_id": f"vid{i:08d}", "published": "2026-09-22"}
+                for i, t in enumerate(titles)]
+
+    def discover(self, titles, rules, probe, known=None, **kw):
+        from unittest import mock
+
+        from record.connectors import youtube
+
+        class Corpus:
+            def __init__(self):
+                self.filed, self.approved, self.audits = [], [], []
+
+            def find_by_url_canon(self, key):
+                return None
+
+        corpus = Corpus()
+        items = self.feed(titles)
+        known = known or {}
+
+        def file_(c, sub):
+            corpus.filed.append({**sub, "status": sub.get("status") or "submitted"}); return True
+
+        with mock.patch.object(youtube, "poll", lambda *a, **k: items), \
+             mock.patch.object(youtube, "_submission_for",
+                               lambda c, k: known.get(k)), \
+             mock.patch.object(youtube, "captions_probe", probe), \
+             mock.patch.object(youtube, "_file_submission", file_), \
+             mock.patch.object(youtube, "_approve_by_rule",
+                               lambda c, sid, note: corpus.approved.append((sid, note)) or True), \
+             mock.patch.object(youtube, "_audit_rule",
+                               lambda c, label, sid, town, **p: corpus.audits.append((label, sid, town, p))):
+            out = youtube.discover(corpus, "Boston", "", "UCx", rules=rules, **kw)
+        return out, corpus
+
+    def rules(self, auto=True):
+        return {**src("Boston", 0), "auto_approve": auto, "label": "Boston City TV"}
+
+    def test_a_rule_approves_only_what_youtube_lists_captions_for(self):
+        answers = {"vid00000000": True, "vid00000001": False, "vid00000002": None}
+        probe = lambda v, **k: {"video_id": v, "captions": answers[v], "tracks": [],
+                                "note": {True: "captions published (YouTube's own list): en/auto",
+                                         False: "no caption tracks yet",
+                                         None: "captions were not checked"}[answers[v]]}
+        out, c = self.discover([
+            "Boston Licensing Board Voting Hearing 9/22/2026",
+            "BPDA Board of Directors Meeting 9/22/26",
+            "Boston School Committee Meeting 9/22/2026"], self.rules(), probe)
+        self.assertEqual(out["filed"], 3)
+        self.assertEqual(out["approved"], 1)
+        self.assertEqual([f["status"] for f in c.filed],
+                         ["approved", "submitted", "submitted"])
+        self.assertIn("approved by the standing rule for Boston City TV", c.filed[0]["note"])
+        self.assertNotIn("standing rule", c.filed[1]["note"])
+        # the audit names the rule, the submission and the town
+        self.assertEqual(len(c.audits), 1)
+        label, sid, town, payload = c.audits[0]
+        self.assertEqual((label, town), ("Boston City TV", "Boston"))
+        self.assertEqual(sid, c.filed[0]["id"])
+        self.assertEqual(payload["body"], "Licensing Board")
+
+    def test_without_the_flag_nothing_is_approved(self):
+        probe = lambda v, **k: {"video_id": v, "captions": True, "tracks": [], "note": "ok"}
+        out, c = self.discover(["Boston Licensing Board Voting Hearing 9/22/2026"],
+                               self.rules(auto=False), probe)
+        self.assertEqual((out["filed"], out["approved"]), (1, 0))
+        self.assertEqual(c.filed[0]["status"], "submitted")
+        self.assertEqual(c.audits, [])
+
+    def test_a_rule_without_a_caption_probe_approves_nothing(self):
+        """`--no-captions` skips the probe; a rule must not treat "not asked"
+        as "yes"."""
+        probe = lambda v, **k: {"video_id": v, "captions": True, "tracks": [], "note": "ok"}
+        out, c = self.discover(["Boston Licensing Board Voting Hearing 9/22/2026"],
+                               self.rules(), probe, check_captions=False)
+        self.assertEqual((out["filed"], out["approved"]), (1, 0))
+        self.assertEqual(c.filed[0]["status"], "submitted")
+
+    def test_a_rule_asks_again_about_what_it_filed_last_week(self):
+        """A live stream's auto track arrives hours after it ends. The row the
+        poll filed at `submitted` on night one is re-probed on night two and
+        approved once YouTube lists a track — only that kind of row: not a
+        person's submission, not a steward's reject, not a stale one."""
+        import time as _t
+        recent = _t.time() - 86400
+        known = {
+            "youtube:vid00000000": {"id": "sub:a", "status": "submitted",
+                                    "note": "found by the nightly poll of UCx", "added_at": recent},
+            "youtube:vid00000001": {"id": "sub:b", "status": "submitted",
+                                    "note": "a neighbour sent this in", "added_at": recent},
+            "youtube:vid00000002": {"id": "sub:c", "status": "rejected",
+                                    "note": "found by the nightly poll of UCx", "added_at": recent},
+            "youtube:vid00000003": {"id": "sub:d", "status": "submitted",
+                                    "note": "found by the nightly poll of UCx",
+                                    "added_at": _t.time() - 30 * 86400},
+        }
+        asked = []
+        probe = lambda v, **k: asked.append(v) or {"video_id": v, "captions": True,
+                                                   "tracks": [], "note": "listed"}
+        out, c = self.discover([
+            "Boston Licensing Board Voting Hearing 9/20/2026",
+            "Boston Licensing Board Voting Hearing 9/19/2026",
+            "Boston Licensing Board Voting Hearing 9/18/2026",
+            "Boston Licensing Board Voting Hearing 8/18/2026"], self.rules(), probe, known=known)
+        self.assertEqual((out["known"], out["filed"], out["approved"]), (4, 0, 1))
+        self.assertEqual(asked, ["vid00000000"])       # one re-probe, the right one
+        self.assertEqual([sid for sid, _ in c.approved], ["sub:a"])
+        self.assertEqual([a[1] for a in c.audits], ["sub:a"])
+
+    def test_a_known_row_is_left_alone_without_the_flag(self):
+        known = {"youtube:vid00000000": {"id": "sub:a", "status": "submitted",
+                                         "note": "found by the nightly poll of UCx",
+                                         "added_at": __import__("time").time()}}
+        asked = []
+        probe = lambda v, **k: asked.append(v) or {"captions": True, "note": "", "tracks": [], "video_id": v}
+        out, c = self.discover(["Boston Licensing Board Voting Hearing 9/20/2026"],
+                               self.rules(auto=False), probe, known=known)
+        self.assertEqual((out["known"], out["approved"]), (1, 0))
+        self.assertEqual(asked, [])
+        self.assertEqual(c.approved, [])
+
+
+class DataApiProbeTest(unittest.TestCase):
+    """YouTube's own caption list, when the poll carries a key.
+
+    From a datacenter address the watch page arrives without its caption list
+    (the bot wall), so every hosted probe answered "not checked" — the honest
+    answer, and a useless one. `captions.list` answers with an API key alone,
+    and names the auto-generated track that `videos.list`'s `caption` flag
+    hides (verified live 2026-09-23 on a Brookline tape). A refusal — quota, a
+    restricted key, a throttle — is never reported as an absence.
+    """
+
+    def probe(self, body=None, error=None, key="k"):
+        from unittest import mock
+
+        from record.connectors import youtube
+
+        def fetch(url, **kw):
+            self.assertIn("googleapis.com/youtube/v3/captions", url)
+            self.assertIn("key=k", url)
+            if error:
+                raise error
+            return body
+
+        with mock.patch.object(youtube, "_fetch", fetch):
+            return youtube.captions_list("vid00000000", key)
+
+    def test_an_auto_track_counts_as_captions(self):
+        out = self.probe('{"items":[{"snippet":{"language":"en","trackKind":"asr","name":""}}]}')
+        self.assertIs(out["captions"], True)
+        self.assertEqual(out["tracks"], [{"lang": "en", "kind": "asr", "name": ""}])
+        self.assertIn("en/auto", out["note"])
+        self.assertIn("YouTube's own list", out["note"])
+
+    def test_an_empty_list_is_a_real_no_for_now(self):
+        out = self.probe('{"items":[]}')
+        self.assertIs(out["captions"], False)
+        self.assertIn("no caption tracks yet", out["note"])
+
+    def test_a_refusal_is_not_an_absence(self):
+        from record.connectors import youtube
+        for err, word in ((RuntimeError("YouTube's caption list answered HTTP 403 (Forbidden)"), "quota"),
+                          (RuntimeError("YouTube's caption list answered HTTP 404 (Not Found)"), "404"),
+                          (youtube.Throttled("https://x/?key=SECRET", 429, None, 4), "throttling")):
+            out = self.probe(error=err)
+            self.assertIsNone(out["captions"], word)
+            self.assertIn("captions were not checked", out["note"])
+            self.assertIn(word, out["note"])
+            self.assertNotIn("SECRET", out["note"])     # a key never reaches a note
+
+    def test_nonsense_is_not_an_absence(self):
+        for body in ("not json", '{"kind":"youtube#captionListResponse"}', "[]"):
+            out = self.probe(body)
+            self.assertIsNone(out["captions"], body)
+
+    def test_the_probe_prefers_youtubes_list_and_falls_back_to_the_page(self):
+        from unittest import mock
+
+        from record.connectors import youtube
+        page = {"video_id": "v", "captions": None, "tracks": [],
+                "note": "captions were not checked — the watch page named neither captions nor video details"}
+        listed = {"video_id": "v", "captions": True, "tracks": [{"lang": "en", "kind": "asr", "name": ""}],
+                  "note": "captions published (YouTube's own list): en/auto"}
+        unsure = {"video_id": "v", "captions": None, "tracks": [], "note": "captions were not checked — HTTP 403"}
+        with mock.patch.object(youtube, "data_api_key", lambda: ""), \
+             mock.patch.object(youtube, "_captions_probe_page", lambda v, **k: page), \
+             mock.patch.object(youtube, "captions_list",
+                               lambda v, key, **k: self.fail("no key, no API call")):
+            self.assertEqual(youtube.captions_probe("v"), page)
+        with mock.patch.object(youtube, "data_api_key", lambda: "k"), \
+             mock.patch.object(youtube, "_captions_probe_page",
+                               lambda v, **k: self.fail("the list answered; the page is not asked")), \
+             mock.patch.object(youtube, "captions_list", lambda v, key, **k: listed):
+            self.assertEqual(youtube.captions_probe("v"), listed)
+        with mock.patch.object(youtube, "data_api_key", lambda: "k"), \
+             mock.patch.object(youtube, "_captions_probe_page", lambda v, **k: dict(page)), \
+             mock.patch.object(youtube, "captions_list", lambda v, key, **k: unsure):
+            out = youtube.captions_probe("v")
+            self.assertIsNone(out["captions"])
+            self.assertIn("HTTP 403; then the watch page:", out["note"])
+
+    def test_the_key_comes_from_the_environment_and_only_there(self):
+        from unittest import mock
+
+        from record.connectors import youtube
+        with mock.patch.dict("os.environ", {"RECORD_YOUTUBE_API_KEY": " abc "}):
+            self.assertEqual(youtube.data_api_key(), "abc")
+        with mock.patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(youtube.data_api_key(), "")

@@ -377,6 +377,17 @@ function drawSource(town, src, si) {
         onchange: function () { src.since = this.value.trim(); touch(town); },
       }))));
 
+  // -- the standing rule: approve what the body rules match, unattended -----
+  // Only a candidate YouTube's own caption list names a track for is approved
+  // (the poll's Data API probe); the rest file for a person as before. The
+  // audit log names the rule the way it names a steward.
+  wrap.appendChild(h('div', { class: 'field' },
+    h('label', { class: 'inline' },
+      h('input', {
+        type: 'checkbox', checked: src.auto_approve === true,
+        onchange: function () { src.auto_approve = this.checked; touch(town); },
+      }), ' approve matches automatically — a standing rule (only when YouTube lists a caption track)')));
+
   // -- body rules: ordered, first match wins --------------------------------
   wrap.appendChild(h('h4', { text: 'body rules — ordered, first match wins' }));
   if (!(src.bodies || []).length) {

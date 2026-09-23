@@ -1759,11 +1759,16 @@ def page_ai(manifest, base):
           Content-Security-Policy on every page — no third-party script or
           beacon can load, and the search call carries no identity.</p></details></li>
       <li><b>People gate the record.</b> Nothing enters on a model's say-so: a
-        steward approves every submitted meeting; corrections annotate, never
+        steward approves every submitted meeting — in person, or by a standing
+        rule the steward wrote for a channel they trust, which approves only a
+        meeting YouTube's own list carries captions for; the record's audit
+        names the rule the way it names a person. Corrections annotate, never
         rewrite. AI drafts; people decide.
         <details><summary>check it yourself</summary><p>Submit a meeting from
           <a href="/app/add">the add page</a> — the reply says a steward
-          reviews it before the record updates.</p></details></li>
+          reviews it before the record updates. A standing rule reaches only
+          the nightly poll of a channel a steward configured; it never touches
+          what a person submits.</p></details></li>
       <li><b>Local first where it counts.</b> The desk tools run their models
         on your machine — noise reduction, voice isolation, rotoscoping — and
         nothing leaves the room. The hosted record uses a cloud model only

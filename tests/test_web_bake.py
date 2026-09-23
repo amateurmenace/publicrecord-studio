@@ -329,6 +329,17 @@ class TestBakeEdition(unittest.TestCase):
     def _read(self, rel):
         return json.loads((self.out / rel).read_text())
 
+    def test_the_constitution_names_the_standing_rule(self):
+        """When the use of the gate changes, /app/ai changes in the same
+        commit (CLAUDE.md): a standing rule may now approve a channel's
+        rule-matched meetings, only where YouTube lists captions, and the
+        page says so beside the promise it qualifies."""
+        ai = (self.out / "ai" / "index.html").read_text()
+        self.assertIn("People gate the record.", ai)
+        self.assertIn("standing", ai)
+        self.assertIn("approves only a", ai)
+        self.assertIn("never touches", ai)
+
     def test_manifest_and_counts(self):
         m = self._read("manifest.json")
         self.assertEqual(m["schema"], 1)

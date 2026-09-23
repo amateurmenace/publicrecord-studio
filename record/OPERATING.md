@@ -147,6 +147,19 @@ gcloud run deploy record-api \
 it you build an arm64 image, Cloud Run refuses it, and the error names the
 architecture rather than the flag.
 
+**The jobs run the same image, and every deploy moves all of them.** The
+service and the press were moved on each deploy; the poll, the pipeline and
+the embed job were found still on `r18`/`r20` on 2026-09-23 — two months of
+connector fixes never reached the night. One line per job, every time:
+
+```bash
+for j in record-press record-pipeline record-poll record-embed; do
+  gcloud run jobs update $j --region=us-east1 \
+    --image=us-east1-docker.pkg.dev/publicrecord-studio/record/api:NEXT
+done
+# record-press also needs its --args bumped to the new --version (below)
+```
+
 **Rolling back** is instant and does not require a build:
 
 ```bash
@@ -184,6 +197,48 @@ update-traffic`, above) and the source it ran can be matched without a
 search. CI (`.github/workflows/ci.yml`) runs the no-Postgres suite on every
 push and pull request; the PG-backed half is proven at the desk before a
 deploy, not in Actions (no database there, on purpose).
+
+### Nightly intake — the poll, the standing rule, and the caption key
+
+Three things happen at night, and each stands on the one before:
+
+| when (ET) | job | what it does |
+|---|---|---|
+| 03:00 | `record-poll` | polls every live town's channels; files rule-matched candidates as submissions |
+| 03:30 | `record-pipeline` | ingests every `approved` submission — captions via the watch page, then `yt-dlp`, then the community caption service (the highlighter's public transcript engine, which fetches through a residential proxy: from Cloud Run the watch page is walled and only the relay answers — verified 2026-09-23, 7,842 cues in 5.7 s) |
+| 04:30 | the nightly-edition workflow | presses from the cloud and carries the edition to the Pages repo — once its three secrets exist (below) |
+
+Until 2026-09-23 the middle step never ran: `approved` was only ever written
+by a click in the console, and the queue was unattended. Two things change
+that, and both are a steward's to switch on:
+
+1. **A standing rule.** In the console's intake screen each source has
+   *approve matches automatically — a standing rule*. With it on, the poll
+   files a rule-matched candidate at `approved` — **only when YouTube's own
+   caption list names a track for it** (auto-generated counts). A candidate
+   YouTube lists no track for yet files at `submitted` for a person, and the
+   poll asks YouTube again about it on later nights for a week (a live
+   stream's auto track arrives hours after it ends). The audit log records
+   the approval as `rule:<the source's label>`, and `/app/ai` says a rule may
+   gate the record beside the promise it qualifies. A rule never touches what
+   a person submits from `/app/add`.
+2. **The caption key.** The "YouTube's own list" question is Data API v3
+   `captions.list` (50 quota units; 10,000 per day per project), which an
+   API key answers — a datacenter address cannot read the watch page's list.
+   Without a key a standing rule approves nothing from Cloud Run, and every
+   probe note says so. The key is a secret, never an argument:
+
+```bash
+printf '%s' 'THE-KEY' | gcloud secrets create youtube-data-api-key \
+  --data-file=- --project=publicrecord-studio
+gcloud run jobs update record-poll --region=us-east1 \
+  --update-secrets=RECORD_YOUTUBE_API_KEY=youtube-data-api-key:latest
+```
+
+Restrict the key to the YouTube Data API v3 in the Cloud console. The API
+can only *list* captions for a video the account does not own; the fetch at
+ingest still goes through the caption routes above. A meeting that arrives
+with no words parks in `asr_tasks` for the desk drain, as before.
 
 ### The nightly edition — automated, once two credentials exist
 

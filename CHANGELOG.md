@@ -2,6 +2,37 @@
 
 ## unreleased
 
+### Nightly intake — the standing rule, and YouTube's own caption list — 2026-09-23 (v2.1.16)
+
+The poll found meetings every night and the pipeline ingested none of them:
+`approved` was only ever written by a click, the queue was unattended, and
+the poll's caption probe — the watch page, read from a datacenter address —
+was served YouTube's bot wall and filed every candidate as "not checked".
+The ingest's third caption route, the community caption service (the
+highlighter's public transcript engine, fetching through a residential
+proxy), was proven from inside Cloud Run today: the whole June 18 tape,
+7,842 cues, in under six seconds. The pipeline could always ingest; nothing
+ever told it to.
+
+Two things now can, and both are a steward's to switch on. A source may
+carry a **standing rule** (`auto_approve`, a checkbox in the console's
+intake screen): the poll files a rule-matched candidate at `approved`, but
+only when YouTube's own caption list names a track for it; a candidate with
+no track yet files for a person and is asked about again on later nights
+for a week; the audit log names the rule the way it names a steward; a rule
+never touches what a person submits. And the probe asks **YouTube's own
+list** when the poll carries a Data API key (`RECORD_YOUTUBE_API_KEY`, a
+secret): `captions.list` answers with a key alone and names the
+auto-generated track that `videos.list`'s `caption` flag hides — a refusal
+(quota, a restricted key, a throttle) is never reported as an absence, and
+the key never reaches a note or a log. Without a key the probe reads the
+watch page as before and a rule approves nothing from the cloud.
+
+`/app/ai` says, in the same commit, that a standing rule may gate the
+record beside the promise it qualifies. `record/OPERATING.md` gains the
+nightly-intake section and the one-line-per-job rule: the poll and the
+pipeline were found on an image two months old. 573 tests.
+
 ### specs/23 C + B2, the folds folded — live print twins, true pairs, the reader's last press — 2026-09-23 (v2.1.15)
 
 A focused re-review of v2.1.14's two folds (three lenses; fourteen

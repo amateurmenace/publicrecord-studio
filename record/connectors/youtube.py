@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import re
 import sys
@@ -77,6 +78,15 @@ UA = ("CommunityAIStudio/0.1 (+https://communityai.studio; civic record; "
 
 FEED_BASE = "https://www.youtube.com/feeds/videos.xml"
 WATCH_BASE = "https://www.youtube.com/watch?v="
+# YouTube's Data API — the one caption question a datacenter address may
+# ask and get answered (see `captions_list`). Optional; a key arrives in
+# RECORD_YOUTUBE_API_KEY and is never written to a log or a note.
+DATA_API_BASE = "https://www.googleapis.com/youtube/v3"
+# A candidate a standing rule could not approve on the night it was filed
+# (YouTube listed no caption track yet) is asked about again on later
+# polls, for this long. An auto track for a live stream can arrive hours
+# after the stream ends; a week covers every case seen so far.
+REPROBE_DAYS = 7
 
 # Politeness, spelled out. Four tries covers a routine 503; past that the
 # source is saying no, and the honest move is to report it and come back
@@ -339,8 +349,107 @@ def poll(source: str, limit: int = 25, timeout: float = 20.0) -> List[dict]:
 # captions — asked about, never assumed
 # --------------------------------------------------------------------------
 
+def data_api_key() -> str:
+    """The YouTube Data API key the poll may carry — RECORD_YOUTUBE_API_KEY.
+
+    Optional. Without it the probe reads the watch page, which a datacenter
+    address is served *without* its caption list (YouTube's bot wall), so a
+    hosted poll files every candidate as "not checked". With it the probe asks
+    YouTube's own list. The key is read here and passed as an argument, so a
+    test can hand a fake one in without touching the environment."""
+    return os.environ.get("RECORD_YOUTUBE_API_KEY", "").strip()
+
+
+def captions_list(video_id: str, key: str, timeout: float = 20.0) -> dict:
+    """YouTube's own list of a video's caption tracks — Data API v3
+    `captions.list`, 50 quota units, an API key suffices (no OAuth).
+
+    Verified 2026-09-23 against a Brookline tape whose only track is
+    auto-generated: `captions.list` names it (`en`, `asr`) while
+    `videos.list`'s `caption` flag reports `false` — the flag speaks of
+    owner-published captions only, which is why the flag is not used here.
+    The API cannot *download* a track the account does not own; the fetch
+    still goes through the routes `memory.ingest` already has.
+
+    Returns the probe shape. `captions` is True when the list names a track,
+    False when YouTube's own list is empty, and None when the API could not
+    answer — quota, a restricted key, an unknown video, a throttle. A refusal
+    is never reported as an absence, for the same reason the watch-page probe
+    refuses to."""
+    out: dict = {"video_id": video_id, "captions": None, "tracks": [],
+                 "note": ""}
+    url = (f"{DATA_API_BASE}/captions?part=snippet"
+           f"&videoId={urllib.parse.quote(video_id)}&key={urllib.parse.quote(key)}")
+    try:
+        body = _fetch(url, timeout=timeout, cap=MAX_FEED_BYTES,
+                      what="YouTube's caption list")
+    except Throttled as e:
+        # never echo `e` here — its text carries the URL, and the URL carries
+        # the key
+        out["note"] = ("captions were not checked — YouTube's Data API is "
+                       f"throttling (HTTP {e.status} after {e.attempts} tries)")
+        return out
+    except RuntimeError as e:
+        why = str(e)
+        if "HTTP 403" in why:
+            why += " — the daily quota is spent, or the key is restricted"
+        elif "HTTP 400" in why:
+            why += " — the key is not accepted"
+        out["note"] = f"captions were not checked — {why}"
+        return out
+    try:
+        data = json.loads(body)
+    except ValueError:
+        out["note"] = ("captions were not checked — YouTube's Data API "
+                       "answered something that is not JSON")
+        return out
+    items = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        out["note"] = ("captions were not checked — YouTube's Data API "
+                       "answered without a track list")
+        return out
+    for it in items:
+        sn = (it.get("snippet") or {}) if isinstance(it, dict) else {}
+        out["tracks"].append({
+            "lang": str(sn.get("language") or ""),
+            "kind": "asr" if str(sn.get("trackKind") or "") == "asr" else "manual",
+            "name": str(sn.get("name") or "")})
+    if out["tracks"]:
+        out["captions"] = True
+        out["note"] = "captions published (YouTube's own list): " + ", ".join(
+            f"{t['lang'] or '?'}{'/auto' if t['kind'] == 'asr' else ''}"
+            for t in out["tracks"])
+        return out
+    out["captions"] = False
+    out["note"] = ("no caption tracks yet — YouTube's own list is empty. An "
+                   "auto track can arrive hours after a live stream ends; a "
+                   "standing rule asks again on later polls, a steward may "
+                   "re-check before deciding")
+    return out
+
+
 def captions_probe(video_id: str, timeout: float = 20.0) -> dict:
-    """Does this video carry published captions?
+    """Does this video carry published captions? True, False, or None for
+    "could not tell" — the third value is the point (see the page probe).
+
+    YouTube's own list first, when the poll carries a Data API key; the
+    watch page otherwise, or when the API could not answer — and then the
+    note says both, because "not checked" with two reasons is what a steward
+    needs to decide whether to store a key or wait."""
+    key = data_api_key()
+    if not key:
+        return _captions_probe_page(video_id, timeout=timeout)
+    api = captions_list(video_id, key, timeout=timeout)
+    if api["captions"] is not None:
+        return api
+    page = _captions_probe_page(video_id, timeout=timeout)
+    if page["captions"] is None and api["note"]:
+        page["note"] = f"{api['note']}; then the watch page: {page['note']}"
+    return page
+
+
+def _captions_probe_page(video_id: str, timeout: float = 20.0) -> dict:
+    """Does this video carry published captions? — asked of the watch page.
 
     Returns `{"video_id", "captions", "tracks", "note"}` where `captions` is
     True, False, or **None for "could not tell"** — the third value is the
@@ -429,27 +538,62 @@ def _submission_for(corpus, url_canon: str) -> Optional[dict]:
         return None
     with corpus._con() as con:
         r = con.execute(
-            "SELECT id, status FROM submissions WHERE url_canon=%s "
-            "ORDER BY added_at LIMIT 1", (url_canon,)).fetchone()
+            "SELECT id, status, note, added_at FROM submissions "
+            "WHERE url_canon=%s ORDER BY added_at LIMIT 1", (url_canon,)).fetchone()
     return dict(r) if r else None
 
 
 def _file_submission(corpus, sub: dict) -> bool:
-    """File one candidate at `submitted`. Returns whether a row was written.
+    """File one candidate — at `submitted`, or at the `status` the row itself
+    carries (`approved`, when a standing rule the steward wrote says so; see
+    `discover`). Returns whether a row was written.
 
     The id is derived from the canonical URL, so a feed that shows the same
     video for fifteen nights files it once, and a steward who has already
     rejected it is never overruled by the poller that found it again."""
     now = time.time()
+    status = str(sub.get("status") or "submitted")
     with corpus._con() as con:
         cur = con.execute(
             "INSERT INTO submissions (id, url, url_canon, town, body, date, "
             "note, status, added_at, updated_at) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,'submitted',%s,%s) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
             "ON CONFLICT (id) DO NOTHING",
             (sub["id"], sub["url"], sub["url_canon"], sub["town"],
-             sub["body"], sub["date"], sub["note"], now, now))
+             sub["body"], sub["date"], sub["note"], status, now, now))
         return bool(cur.rowcount)
+
+
+def _approve_by_rule(corpus, sub_id: str, note: str) -> bool:
+    """A standing rule approves a submission this poll filed on an earlier
+    night without a caption answer, now that YouTube lists a track. Only a
+    `submitted` row moves — a steward's reject is never overruled, and an
+    `approved` row is not approved twice."""
+    with corpus._con() as con:
+        cur = con.execute(
+            "UPDATE submissions SET status='approved', "
+            "note = note || ' · ' || %s, updated_at=%s "
+            "WHERE id=%s AND status='submitted'",
+            (note, time.time(), sub_id))
+        return bool(cur.rowcount)
+
+
+def _audit_rule(corpus, label: str, sub_id: str, town: str, **payload) -> None:
+    """The audit log names the rule the way it names a steward — `rule:<the
+    source's label>` — so an approval nobody clicked is still an approval
+    somebody can find. Never raises: the audit refusing is not a reason to
+    unfile a meeting."""
+    try:
+        from .. import auth
+        auth.audit(corpus, f"rule:{label}", "approve", sub_id, town,
+                   {"by": "standing rule", **payload})
+    except Exception as exc:                    # pragma: no cover
+        print(f"  ! the audit log refused the rule's approval of {sub_id}: {exc}")
+
+
+def _rule_note(label: str) -> str:
+    return (f"approved by the standing rule for {label} — a steward wrote the "
+            "rule, and YouTube's own list names a caption track")
 
 
 def discover(corpus, town: str, body: str, source: str, limit: int = 25,
@@ -480,7 +624,17 @@ def discover(corpus, town: str, body: str, source: str, limit: int = 25,
     scheduler is an honorary user (specs/17 §4) and an honorary user reads
     machine-readable failure."""
     out: dict = {"source": source, "town": town, "body": body,
-                 "polled": 0, "known": 0, "filed": 0, "errors": []}
+                 "polled": 0, "known": 0, "filed": 0, "approved": 0,
+                 "errors": []}
+    # A standing rule (`auto_approve` on the source, written by a steward in
+    # the console) approves what it files — but only a candidate YouTube's
+    # own list names a caption track for. Nothing enters on a guess: a
+    # candidate the probe could not answer for, or answered "no tracks yet",
+    # files at `submitted` for a person, and is asked about again on later
+    # polls for REPROBE_DAYS. A rule without a Data API key approves nothing
+    # from a datacenter address, and the notes say why.
+    auto = bool(rules and rules.get("auto_approve"))
+    label = str((rules or {}).get("label") or source)
     try:
         items = poll(source, limit=limit)
     except Throttled as e:
@@ -517,8 +671,17 @@ def discover(corpus, town: str, body: str, source: str, limit: int = 25,
             out["errors"].append({"kind": "uncanonical", "url": it["url"],
                                   "detail": "no canonical key for this entry"})
             continue
-        if corpus.find_by_url_canon(key) or _submission_for(corpus, key):
+        known = _submission_for(corpus, key)
+        if corpus.find_by_url_canon(key) or known:
             out["known"] += 1
+            if auto and known and _asks_again(known):
+                probe = captions_probe(it["video_id"])
+                if probe["captions"] is True and _approve_by_rule(
+                        corpus, known["id"], _rule_note(label)):
+                    out["approved"] += 1
+                    _audit_rule(corpus, label, known["id"], town,
+                                url=it["url"], body=it.get("body") or body,
+                                captions=probe["note"])
             continue
 
         notes = [it["title"] or "(untitled)"]
@@ -543,6 +706,10 @@ def discover(corpus, town: str, body: str, source: str, limit: int = 25,
                     "url": it["url"], "title": it["title"],
                     "detail": probe["note"]})
         notes.append(f"found by the nightly poll of {source}")
+        status = "submitted"
+        if auto and check_captions and probe["captions"] is True:
+            status = "approved"
+            notes.append(_rule_note(label))
 
         try:
             filed = _file_submission(corpus, {
@@ -555,16 +722,37 @@ def discover(corpus, town: str, body: str, source: str, limit: int = 25,
                 # The rule that matched names the body; the caller's `body` is
                 # the fallback for the manual path, where a human named it.
                 "town": town, "body": it.get("body") or body, "date": "",
-                "note": " · ".join(n for n in notes if n)})
+                "note": " · ".join(n for n in notes if n), "status": status})
         except Exception as e:
             out["errors"].append({"kind": "not_filed", "url": it["url"],
                                   "detail": str(e)})
             continue
         if filed:
             out["filed"] += 1
+            if status == "approved":
+                out["approved"] += 1
+                _audit_rule(corpus, label, submission_id(key), town,
+                            url=it["url"], body=it.get("body") or body,
+                            captions=probe["note"])
         else:
             out["known"] += 1     # someone filed it between the check and now
     return out
+
+
+def _asks_again(known: dict) -> bool:
+    """Is this a candidate the poll itself filed recently and nobody has
+    decided on — the one kind of known row a standing rule re-asks YouTube
+    about? A person's submission, a steward's reject, and anything older than
+    REPROBE_DAYS are left exactly as they are."""
+    if str(known.get("status") or "") != "submitted":
+        return False
+    if "found by the nightly poll" not in str(known.get("note") or ""):
+        return False
+    try:
+        added = float(known.get("added_at") or 0)
+    except (TypeError, ValueError):
+        return False
+    return added > time.time() - REPROBE_DAYS * 86400
 
 
 def poll_town(corpus, town_row: dict, limit: int = 25) -> dict:
@@ -587,7 +775,7 @@ def poll_town(corpus, town_row: dict, limit: int = 25) -> dict:
 
     out: dict = {"town": town, "slug": str(town_row.get("slug") or ""),
                  "sources": 0, "polled": 0, "known": 0, "filed": 0,
-                 "excluded": 0, "unmatched": 0, "capped": 0,
+                 "approved": 0, "excluded": 0, "unmatched": 0, "capped": 0,
                  "errors": [], "results": []}
     first = True
     for src in sources:
@@ -612,7 +800,8 @@ def poll_town(corpus, town_row: dict, limit: int = 25) -> dict:
         r = discover(corpus, town, str(src.get("body", "") or ""), url,
                      limit=limit, rules=src)
         out["sources"] += 1
-        for k in ("polled", "known", "filed", "excluded", "unmatched", "capped"):
+        for k in ("polled", "known", "filed", "approved", "excluded",
+                  "unmatched", "capped"):
             out[k] += r.get(k, 0)
         out["errors"].extend(r["errors"])
         out["results"].append(r)
@@ -625,6 +814,8 @@ def poll_town(corpus, town_row: dict, limit: int = 25) -> dict:
 
 def _print_run(r: dict) -> None:
     line = (f"  polled {r['polled']} · known {r['known']} · filed {r['filed']}")
+    if r.get("approved"):
+        line += f" · {r['approved']} approved by a standing rule"
     # What default-deny turned away is the number that proves it ran. A poll
     # that reports only what it filed cannot be told apart from one with no
     # rules at all — which is exactly how the first nightly run looked right
@@ -679,8 +870,10 @@ def _poll_all_towns(args) -> int:
         print(json.dumps({"towns": runs}, indent=2))
     else:
         filed = sum(r["filed"] for r in runs)
-        print(f"\n{len(runs)} town(s) polled · {filed} submission(s) filed "
-              f"· awaiting a steward")
+        approved = sum(r.get("approved", 0) for r in runs)
+        print(f"\n{len(runs)} town(s) polled · {filed} submission(s) filed"
+              + (f" · {approved} approved by standing rules" if approved else "")
+              + f" · {max(0, filed - approved)} awaiting a steward")
     # Non-zero when a feed was unreachable, so a scheduler notices. A nightly
     # job that always exits 0 is a nightly job nobody ever reads.
     return 1 if failed else 0

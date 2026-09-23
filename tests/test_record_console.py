@@ -208,6 +208,12 @@ class ConsoleCoversTheSpecTest(unittest.TestCase):
         for key in ("would_cost", "unmatched", "excluded", "suggestions"):
             self.assertIn(key, self.js, key)
 
+    def test_the_standing_rule_has_its_checkbox(self):
+        """A source's `auto_approve` is a steward's decision made in the
+        console, not an environment variable somebody sets at 3am."""
+        self.assertIn("auto_approve", self.js)
+        self.assertIn("standing rule", self.js)
+
     def test_the_ledgers_are_read(self):
         self.assertIn("/api/steward/spend", self.js)
         self.assertIn("/api/steward/audit", self.js)
