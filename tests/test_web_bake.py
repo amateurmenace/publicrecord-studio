@@ -3021,6 +3021,106 @@ class TestPaper(unittest.TestCase):
         self.assertEqual(r.returncode, 0,
                          f"layouts misbehaved:\n{r.stdout}{r.stderr}")
 
+    def test_the_rich_tier_fold_is_pinned(self):
+        """The C review fold (specs/23 C1+C2): a tape that did not load is
+        DARK, not empty, and a quote says so; the lines AT a second are the
+        quote (two short lines can share one whole-second stamp); the digest
+        ranks dated appearances newest first and counts the undated; a
+        section head paints for the three ref kinds and is additive for a
+        block with a body; deletePaper re-reads the shelf after its blocking
+        confirm; the add-search paints the index at once and the lines under
+        a generation stamp; printed citations spell the site; the note
+        prints whole from the editor."""
+        for token in ("const linesAt = (lines, t) => {",
+                      "for (const l of (lines || [])) {",
+                      '.then(r => r.ok ? r.text() : null).catch(() => null)',
+                      "if (tx == null) return null;",
+                      "if (l === null || l.length) lines[pid] = l;",
+                      "if (lines === null) return paperDark(",
+                      "const paperDark = (what, where) =>",
+                      '<figure class="pb-quote"><blockquote>',
+                      "<figcaption>",
+                      'data-cite="${esc(location.origin)}${cite}"',
+                      "const nodes = tl.filter(n => n.date).sort(",
+                      "undated appearance${undated === 1 ? \"\" : \"s\"} not ranked here",
+                      'else if (b.kind === "quote") {\n      const m = mby[b.pid]; if (!m) return null;',
+                      '} else if (b.kind === "doc") {\n      const m = mby[b.pid]; if (!m) return null;',
+                      '} else if (b.kind === "digest") {\n      const it = iby[b.slug]; if (!it) return null;',
+                      'return head ? (b.kind === "story" ? head : head + html) : html;',
+                      "const id = cur.id;",
+                      'if (!sh.papers.some(p => p.id === id)) { toast("that paper was already deleted in another tab");',
+                      "const gen = slot._edgen = (slot._edgen || 0) + 1;",
+                      "if (slot._edgen !== gen || !box2) return;",
+                      'el.style.setProperty("--site", JSON.stringify(location.origin));',
+                      '<div class="cz-ednote-print" aria-hidden="true">',
+                      'data-layout="${esc(b.layout || "")}"',
+                      "const first = $(\"button, [tabindex]\", span); if (first) first.focus();",
+                      "this meeting’s plane didn’t load — try again",
+                      'aria-label="quote — the line at ${hms(l.t)} of ${esc(l.title)}, in your paper"',
+                      "(opens in a new tab)"):
+            self.assertTrue(token in self.JS, f"{token!r} drifted — the C fold was reverted")
+        self.assertTrue("docChooserHTML" not in self.JS)   # the dead second chooser is gone
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        prn = css[css.index("@media print{"):]
+        for rule in ('content:" " var(--site,"") attr(href)',
+                     ".pb-dg::after{grid-column:1/-1}",
+                     ".cz-editing .cz-ednote{display:none}",
+                     ".cz-editing .cz-ednote-print{display:block}",
+                     '.cz-editing .cz-edrow[data-layout="half"]{display:inline-block;width:48%'):
+            self.assertIn(rule, prn, f"the print sheet lost {rule!r}")
+        self.assertIn(".cz-ednote-print{display:none}", css)
+        self.assertIn('html.cz-m-studio .cz-edrow[data-layout="half"] .cz-edbody{width:50%', css)
+        self.assertIn(".pb-quote figcaption{", css)
+        self.assertNotIn(".pb-quote cite", css)
+        # the lines at a second — the twin
+        r = self.node("\n".join([
+            self.PRELUDE,
+            self.lift(r"  const lineAt = \(lines, t\) => \{.+?return hit; \};"),
+            self.lift(r"  const linesAt = \(lines, t\) => \{.+?\n  \};"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const L = [{t:5,spk:'A',text:'one'},{t:9,spk:'B',text:'two'},{t:9,spk:'C',text:'three'},{t:30,spk:'',text:''}];",
+            "if (linesAt(L, 9.4).map(l => l.text).join('|') !== 'two|three') fail('both lines at the second: ' + JSON.stringify(linesAt(L, 9.4)));",
+            "if (linesAt(L, 12).map(l => l.text).join('|') !== 'three') fail('the line running through 12 is the last one that started at 9');",
+            "if (linesAt(L, 6.9).map(l => l.text).join('|') !== 'one') fail('one line running through 6.9');",
+            "if (linesAt(L, 31).length !== 0) fail('an empty line at 30 is no quote');",
+            "if (linesAt(L, 2).length !== 0) fail('before the first line: nothing');",
+            "if (linesAt(null, 9).length !== 0 || linesAt([], 9).length !== 0) fail('total over null and []');",
+            "if (lineAt(null, 9) !== null) fail('lineAt is total over null');",
+            "console.log('ok');"]))
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+        # deletePaper re-reads the shelf after the confirm: another tab's
+        # paper, written while the dialog stood, survives the delete
+        r = self.node("\n".join([
+            self.PRELUDE, self.helpers(),
+            "const STORE = {}; const localStorage = { getItem: k => (k in STORE ? STORE[k] : null),",
+            "  setItem: (k, v) => { STORE[k] = String(v); }, removeItem: k => { delete STORE[k]; } };",
+            "let PAPER_SHORT = ''; const toasts = []; const toast = m => toasts.push(m); const retireShortOut = () => {};",
+            "const refreshPaperSummary = () => {}; const renderPaperNow = () => {}; const schedulePaperRender = () => {};",
+            self.lift(r"  const PAPER_KEY = .+?;"),
+            self.lift(r"  const PAPERS_KEY = .+?;"),
+            self.lift(r"  const PAPERS_MAX = .+?;"),
+            self.lift(r"  const PAPER_ID = .+?;"),
+            self.lift(r"  const paperId = .+?;"),
+            self.lift(r"  function readPapers\(\) \{.+?\n  \}"),
+            self.lift(r"  function writePapers\(sh\) \{.+?\n  \}"),
+            self.lift(r"  function readPaper\(\) \{.+?\n  \}"),
+            self.lift(r"  function deletePaper\(\) \{.+?\n  \}"),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "STORE['cz-papers'] = JSON.stringify({ active: 'aaaa11', papers: [{id:'aaaa11', title:'mine', blocks:[]}, {id:'bbbb22', title:'other', blocks:[]}] });",
+            "// while the dialog stands, another tab adds a paper and opens it",
+            "const window = { confirm: () => { STORE['cz-papers'] = JSON.stringify({ active: 'cccc33', papers: [{id:'aaaa11', title:'mine', blocks:[]}, {id:'bbbb22', title:'other', blocks:[]}, {id:'cccc33', title:'new in tab two', blocks:[{kind:'note',text:'x'}]}] }); return true; } };",
+            "deletePaper();",
+            "const sh = JSON.parse(STORE['cz-papers']);",
+            "if (sh.papers.map(p => p.id).join(',') !== 'bbbb22,cccc33') fail('the other tab\\'s paper must survive: ' + STORE['cz-papers']);",
+            "if (sh.active !== 'cccc33') fail('the other tab\\'s open paper stays open: ' + sh.active);",
+            "// the paper was already deleted elsewhere: nothing is written, the reader is told",
+            "window.confirm = () => { STORE['cz-papers'] = JSON.stringify({ active: 'cccc33', papers: [{id:'cccc33', title:'new in tab two', blocks:[]}] }); return true; };",
+            "STORE['cz-papers'] = JSON.stringify({ active: 'bbbb22', papers: [{id:'bbbb22', title:'other', blocks:[]}, {id:'cccc33', title:'t', blocks:[]}] });",
+            "deletePaper();",
+            "if (JSON.parse(STORE['cz-papers']).papers.length !== 1 || !toasts.some(t => /already deleted/.test(t))) fail('a vanished paper is reported, not re-deleted: ' + STORE['cz-papers'] + ' ' + toasts);",
+            "console.log('ok');"]))
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+
     def test_the_c2_kinds_are_refs_that_travel_and_never_carry_words(self):
         """specs/23 C2: a pull-quote is (pid, t) — its words ride the DRAFT
         for the panel's label and no traveling form; a document is (pid,

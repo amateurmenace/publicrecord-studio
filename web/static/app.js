@@ -2543,6 +2543,9 @@
      v=2 marks a paper carrying kinds a v1 reader cannot represent (notes,
      charts) — the shipped reader then shows its honest "shared from a newer
      version" message instead of silently rendering a mutilated paper. */
+  // v=3 is the rich tier whole — layouts (C1) and the three ref kinds (C2)
+  // shipped in ONE edition (v2.1.14), so no reader ever holds a decoder that
+  // knows one grammar and not the other; a fourth grammar mints v=4
   const paperV = p => p.blocks.some(b => b.layout || C2_KINDS.includes(b.kind)) ? "3"
     : p.blocks.some(b => b.kind === "note" || b.kind === "chart") ? "2" : "1";
   /* does anything actually TRAVEL — a title, or a block that survives
@@ -2672,13 +2675,18 @@
     retireShortOut(); refreshPaperSummary({ act: "pshelf" }); renderPaperNow();
   }
   function deletePaper() {
-    const sh = readPapers();
-    const cur = sh.papers.find(p => p.id === sh.active); if (!cur) return;
+    const seen = readPapers();
+    const cur = seen.papers.find(p => p.id === seen.active); if (!cur) return;
+    const id = cur.id;
     if ((cur.title || cur.blocks.length)
-        && !window.confirm(`Delete “${cur.title || "this untitled paper"}”? It lives only in this browser; a link or a paper.json you shared keeps reading.`)) return;
-    sh.papers = sh.papers.filter(p => p.id !== sh.active);
+        && !window.confirm(`Delete ${cur.title ? `“${cur.title}”` : "this untitled paper"}? It lives only in this browser; a link or a paper.json you shared keeps reading.`)) return;
+    // the confirm blocked; another tab may have written meanwhile — delete
+    // the paper the reader named from the shelf as it stands NOW
+    const sh = readPapers();
+    if (!sh.papers.some(p => p.id === id)) { toast("that paper was already deleted in another tab"); refreshPaperSummary({ act: "pshelf" }); renderPaperNow(); return; }
+    sh.papers = sh.papers.filter(p => p.id !== id);
     if (!sh.papers.length) sh.papers.push({ id: paperId(), title: "", blocks: [] });
-    sh.active = sh.papers[0].id;
+    if (!sh.papers.some(p => p.id === sh.active)) sh.active = sh.papers[0].id;
     if (!writePapers(sh)) { toast("this browser blocks storage — the delete didn’t hold"); return; }
     retireShortOut(); refreshPaperSummary({ act: "pshelf" }); renderPaperNow();
     toast("paper deleted — the record is untouched");
@@ -3577,7 +3585,7 @@
     ]);
     if (gen !== PAPER_GEN) return;     // a newer render superseded this one
     const mby = m.got, iby = it.got, tried = { m: m.tried, i: it.tried };
-    const lines = {}; for (const [pid, l] of lineSets) if (l.length) lines[pid] = l;
+    const lines = {}; for (const [pid, l] of lineSets) if (l === null || l.length) lines[pid] = l;
     const aux = { votes: votesPlane, analytics, lines };
     // the on-page editor (specs/23 A3): the DRAFT, in the studio, renders
     // as itself with the arranging chrome on it — a handle, ↑ ↓, ✕ per
@@ -3585,6 +3593,9 @@
     // shared or stored paper never does: it stays exactly the reader.
     const editing = from === "draft" && shownMode() === "studio";
     el.classList.toggle("cz-editing", editing);
+    // the print sheet spells every relative citation out whole (origin +
+    // path) — the origin rides a custom property, not the markup
+    el.style.setProperty("--site", JSON.stringify(location.origin));
     if (editing) {
       setTimeout(pvShow, 0);   // the stage's mark on a reel row survives the repaint
       // the draft may have moved under the awaits (a keystroke on this
@@ -3645,6 +3656,17 @@
       if (!text) return null;
     } else if (b.kind === "chart") text = chartRowLabel(b).replace(/^▤ /, "");
     else if (b.kind === "reel") text = `a reel — ${b.clips.length} moment${b.clips.length > 1 ? "s" : ""}`;
+    else if (b.kind === "quote") {
+      const m = mby[b.pid]; if (!m) return null;
+      text = `${m.title || b.pid} · ${hms(b.t)}`; href = `${BASE}/m/${b.pid}#t${Math.floor(b.t)}`;
+    } else if (b.kind === "doc") {
+      const m = mby[b.pid]; if (!m) return null;
+      const d = (m.documents || []).find(x => x && x.doc_id === b.doc);
+      text = d ? (d.title || b.doc) : ""; href = d && d.url ? d.url : `${BASE}/m/${b.pid}`;
+    } else if (b.kind === "digest") {
+      const it = iby[b.slug]; if (!it) return null;
+      text = `what changed — ${it.name || b.slug}`; href = `${BASE}/i/${b.slug}`;
+    }
     if (!text) return null;
     const inner = href ? `<a href="${esc(href)}">${esc(text)}</a>` : esc(text);
     return `<h3 class="pb-head">${inner}</h3>`;
@@ -3653,7 +3675,13 @@
      half is marked for pairing */
   function withLayoutHTML(html, b, mby, iby) {
     if (b.layout === "lead") return `<div class="pb-lead">${html}</div>`;
-    if (b.layout === "head") return renderHead(b, mby, iby) || html;
+    if (b.layout === "head") {
+      const head = renderHead(b, mby, iby);
+      // a story's head IS the story (a name that links to it); anything
+      // with a body of its own — a note, a chart, a reel — keeps its body
+      // under the head, so a layout never discards the editor's words
+      return head ? (b.kind === "story" ? head : head + html) : html;
+    }
     if (b.layout === "half") return `<div class="pb-half">${html}</div>`;
     return html;
   }
@@ -3678,9 +3706,11 @@
   function segLines(pid) {
     if (!pid) return Promise.resolve([]);
     if (SEGL[pid]) return Promise.resolve(SEGL[pid]);
+    // null when the tape did not load here (a different fact from a tape
+    // with no lines, which is []) — a dark tape is asked for again next time
     return fetch(`${BASE}/m/${encodeURIComponent(pid)}/transcript.txt`)
-      .then(r => r.ok ? r.text() : "").catch(() => "")
-      .then(tx => { const l = parseSegLines(tx); if (l.length) SEGL[pid] = l; return l; });
+      .then(r => r.ok ? r.text() : null).catch(() => null)
+      .then(tx => { if (tx == null) return null; const l = parseSegLines(tx); if (l.length) SEGL[pid] = l; return l; });
   }
   function parseSegLines(tx) {
     const out = [];
@@ -3695,19 +3725,35 @@
   }
   /* the line at or before a time — the pressed text is whole seconds */
   const lineAt = (lines, t) => { let hit = null;
-    for (const l of lines) { if (l.t <= Math.floor(t) + 0.01) hit = l; else break; }
+    for (const l of (lines || [])) { if (l.t <= Math.floor(t) + 0.01) hit = l; else break; }
     return hit; };
+  /* the lines AT a second: the pressed tape stamps whole seconds, so two
+     short lines can share one — a quote by (pid, t) is every line the record
+     holds at that second, or the line running through it */
+  const linesAt = (lines, t) => {
+    const s = Math.floor(t), same = (lines || []).filter(l => l.t === s && l.text);
+    if (same.length) return same;
+    const l = lineAt(lines, t); return l && l.text ? [l] : [];
+  };
   /* C2 renders: every one a ref resolved against the record's own planes,
      in the paper palette; a plane that is not here says so in place */
   function renderQuote(b, mby, aux) {
     const m = mby[b.pid];
+    if (!m) return (aux.tried && aux.tried.m.has(b.pid)) ? paperGone(`a line of ${b.pid}`) : paperBudget("a quote");
     const lines = (aux.lines || {})[b.pid];
-    if (!m || !lines) return (aux.tried && aux.tried.m.has(b.pid)) || !m
-      ? paperGone(`a line of ${b.pid}`) : paperBudget("a quote");
-    const l = lineAt(lines, b.t);
-    if (!l || !l.text) return paperGone(`a line at ${hms(b.t)} of ${m.title || b.pid}`);
-    return `<blockquote class="pb-quote"><p>“${esc(l.text)}”</p>
-      <cite>${l.spk ? `<span class="pb-quote-spk">${esc(l.spk)}</span> · ` : ""}<a href="${BASE}/m/${esc(b.pid)}#t${Math.floor(b.t)}">${esc(m.title || b.pid)} · ${hms(b.t)}</a></cite></blockquote>`;
+    // three different facts, each said as itself: the tape did not load
+    // here (dark), the tape was past this page's fetch cap, the tape holds
+    // no line at that second
+    if (lines === null) return paperDark(`the tape of ${m.title || b.pid}`, `the line at ${hms(b.t)} reads on the meeting’s own page`);
+    if (!lines) return paperBudget("a quote");
+    const ls = linesAt(lines, b.t);
+    if (!ls.length) return paperGone(`a line at ${hms(b.t)} of ${m.title || b.pid}`);
+    const spk = [...new Set(ls.map(l => l.spk).filter(Boolean))];
+    const body = ls.length === 1 ? `<p>“${esc(ls[0].text)}”</p>`
+      : ls.map(l => `<p>${l.spk ? `<span class="pb-quote-spk">${esc(l.spk)}:</span> ` : ""}“${esc(l.text)}”</p>`).join("");
+    const cite = `${BASE}/m/${esc(b.pid)}#t${Math.floor(b.t)}`;
+    return `<figure class="pb-quote"><blockquote>${body}</blockquote>
+      <figcaption>${ls.length === 1 && spk.length ? `<span class="pb-quote-spk">${esc(spk[0])}</span> · ` : ""}<a href="${cite}" data-cite="${esc(location.origin)}${cite}">${esc(m.title || b.pid)} · ${hms(b.t)}</a></figcaption></figure>`;
   }
   function renderDoc(b, mby, tried) {
     const m = mby[b.pid];
@@ -3718,25 +3764,31 @@
       + `<b>${esc(d.title || b.doc)}</b>`
       + `<span class="pb-doc-m">${esc([m.title || b.pid, d.date, d.pages ? `${d.pages} page${d.pages === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "))}</span>`;
     return d.url
-      ? `<a class="pb-doc" href="${esc(d.url)}" target="_blank" rel="noopener">${inner}</a>`
+      ? `<a class="pb-doc" href="${esc(d.url)}" target="_blank" rel="noopener"
+           aria-label="${esc(d.kind || "document")} — ${esc(d.title || b.doc)} (opens in a new tab)">${inner}</a>`
       : `<div class="pb-doc">${inner}</div>`;
   }
   function renderDigest(b, iby, tried) {
     const it = iby[b.slug];
     if (!it) return tried.i.has(b.slug) ? paperGone(`an issue (${b.slug})`) : paperBudget("a digest");
-    const nodes = (it.timeline || []).slice(-b.n).reverse();
-    if (!nodes.length) return paperGone(`appearances of ${it.name || b.slug}`);
+    // the timeline parks undated meetings at its tail — "the last n" means
+    // the newest n BY DATE, and the undated are counted, not ranked
+    const tl = (it.timeline || []).filter(n => n && typeof n === "object");
+    const undated = tl.filter(n => !n.date).length;
+    const nodes = tl.filter(n => n.date).sort((a, c) => (c.date > a.date ? 1 : c.date < a.date ? -1 : 0)).slice(0, b.n);
+    if (!nodes.length) return paperGone(`dated appearances of ${it.name || b.slug}`);
     const rows = nodes.map(n => {
       const bead = (n.beads || [])[0];
-      return `<a class="pb-dg" href="${BASE}/m/${esc(n.pid)}${bead ? `#t${Math.floor(bead.t)}` : ""}">
-        <span class="pb-dg-d">${esc(n.date || "undated")}</span>
+      const at = `${BASE}/m/${esc(n.pid)}${bead ? `#t${Math.floor(bead.t)}` : ""}`;
+      return `<a class="pb-dg" href="${at}" data-cite="${esc(location.origin)}${at}">
+        <span class="pb-dg-d">${esc(n.date)}</span>
         <span class="pb-dg-b">${esc(n.body || n.title || n.pid)} · ${n.n || 0} moment${n.n === 1 ? "" : "s"}</span>
         ${bead ? `<span class="pb-dg-q">${esc((bead.text || "").slice(0, 140))}</span>` : ""}</a>`;
     }).join("");
     return `<section class="pb-digest">
       <div class="sectionhead"><span class="kicker">what changed — <a href="${BASE}/i/${esc(b.slug)}">${esc(it.name || b.slug)}</a>, the last ${nodes.length === 1 ? "appearance" : nodes.length + " appearances"}</span></div>
       <div class="pb-dgs">${rows}</div>
-      <p class="pb-chartsrc">computed from the issue’s own timeline when this paper rendered — the full long view reads on the issue’s page</p>
+      <p class="pb-chartsrc">computed from the issue’s own timeline when this paper rendered${undated ? ` — ${undated} undated appearance${undated === 1 ? "" : "s"} not ranked here` : ""} — the full long view reads on the issue’s page</p>
     </section>`;
   }
   function renderPaperBlock(b, mby, iby, tried, aux) {
@@ -4116,6 +4168,8 @@
   const paperGone = what => `<p class="pb-gone">This paper cites ${esc(what)} `
     + `that isn’t in this pressing of the record — it may have been curated `
     + `away, or pressed under a different id.</p>`;
+  const paperDark = (what, where) => `<p class="pb-gone">${esc(what)} didn’t load here — `
+    + `${esc(where)}. Nothing was judged gone.</p>`;
   const paperBudget = what => `<p class="pb-gone">This paper cites more of the `
     + `record than one page fetches at once — ${esc(what)} here was left `
     + `unfetched, not judged gone. The record itself holds it.</p>`;
@@ -4156,12 +4210,13 @@
       <span class="kicker">the editor’s note</span>
       <textarea class="cz-ednote" data-i="${i}" rows="4" maxlength="${PAPER_NOTE_MAX}"
         placeholder="your own words — why this matters"
-        aria-label="note ${i + 1} — your own words">${esc(b.text)}</textarea></div>`;
+        aria-label="note ${i + 1} — your own words">${esc(b.text)}</textarea>
+      <div class="cz-ednote-print" aria-hidden="true">${(b.text || "").trim().split(/\n+/).map(t => `<p>${esc(t)}</p>`).join("")}</div></div>`;
   function edRow(html, b, i, n) {
     const act = (a, glyph, label, dis) =>
       `<button type="button" class="cz-edact" data-czed="${a}" data-i="${i}"
         aria-label="${esc(label)}" title="${esc(label)}"${dis ? " disabled" : ""}>${glyph}</button>`;
-    return `<div class="cz-edrow" data-i="${i}">
+    return `<div class="cz-edrow" data-i="${i}" data-layout="${esc(b.layout || "")}">
       <div class="cz-edbar">
         <button type="button" class="cz-edhandle" data-i="${i}"
           aria-label="block ${i + 1} of ${n} — drag to move, or press ↑ ↓"
@@ -4506,15 +4561,20 @@
   }
   /* a meeting's documents on demand — the one button becomes one per filing */
   async function docChooser(btn, pid) {
-    const m = await getJSON(`${BASE}/meetings/${encodeURIComponent(pid)}.json`) || {};
+    const m = await getJSON(`${BASE}/meetings/${encodeURIComponent(pid)}.json`);
     if (!btn.isConnected) return;
     const span = document.createElement("span"); span.className = "cz-eddocs";
-    span.innerHTML = (m.documents || []).length
-      ? (m.documents || []).slice(0, 6).map(d => `<button type="button" class="btn" data-czed="hit" data-kind="dd"
+    const docs = (m && Array.isArray(m.documents)) ? m.documents : [];
+    // a plane that did not load is a different fact from a meeting that
+    // filed nothing — and either way the keyboard lands on something
+    span.innerHTML = !m
+      ? `<span class="cz-edhit-in" tabindex="-1">this meeting’s plane didn’t load — try again</span>`
+      : docs.length
+      ? docs.slice(0, 6).map(d => `<button type="button" class="btn" data-czed="hit" data-kind="dd"
           data-ref="${esc(pid)}~${esc(d.doc_id)}" aria-label="add the ${esc(d.kind || "document")} “${esc(d.title || d.doc_id)}”">📄 ${esc(d.kind || "document")}${d.title ? ` — ${esc(cut(d.title, 28))}` : ""}</button>`).join("")
-      : `<span class="cz-edhit-in">no documents filed for this meeting</span>`;
+      : `<span class="cz-edhit-in" tabindex="-1">no documents filed for this meeting</span>`;
     btn.replaceWith(span);
-    const first = $("button", span); if (first) first.focus();
+    const first = $("button, [tabindex]", span); if (first) first.focus();
   }
   let ED_INDEX = null;   // the static index, read once per page
   /* total over whatever arrives (decodeReel's law): a plane that did not
@@ -4571,19 +4631,14 @@
     }
     const dark = idx.dark.m ? " · the meetings index didn’t load"
                : idx.dark.i ? " · the issues index didn’t load" : "";
-    // the tape's lines, by the same words (C2) — searched first so the
-    // status line can count them with the rest
-    const ls = terms.length ? await linesSearch(terms, q.value) : [];
-    if (!$(".cz-edhits", slot)) return;   // closed while the lines loaded
-    if (count) count.textContent = (is.length || ms.length || ls.length)
+    // every keystroke is a generation; only the newest paints. The index
+    // hits paint at once; the tape's lines (C2 — a bigger plane) land after
+    const gen = slot._edgen = (slot._edgen || 0) + 1;
+    const countLine = ls => (is.length || ms.length || ls.length)
       ? `${n(is.length, "issue", "issues")} · ${n(ms.length, "meeting", "meetings")}`
         + (ls.length ? ` · ${n(ls.length, "line", "lines")}` : "") + (terms.length ? " match" : "") + dark
       : `no match${dark}`;
-    // a meeting's documents, on demand: the button becomes one per filing
-    const docChooserHTML = (pid, docs) => docs.length
-      ? docs.slice(0, 6).map(d => `<button type="button" class="btn" data-czed="hit" data-kind="dd"
-          data-ref="${esc(pid)}~${esc(d.doc_id)}" aria-label="add the ${esc(d.kind || "document")} “${esc(d.title || d.doc_id)}”">📄 ${esc(d.kind || "document")}${d.title ? ` — ${esc(cut(d.title, 28))}` : ""}</button>`).join("")
-      : `<span class="cz-edhit-in">no documents filed</span>`;
+    if (count) count.textContent = countLine([]);
     const hit = h => {
       const ref = h.kind === "m" ? { story: "meeting", pid: h.ref } : { story: "issue", slug: h.ref };
       const on = storyIndex(p, ref) >= 0;
@@ -4596,7 +4651,7 @@
           <button type="button" class="btn" data-czed="hit" data-kind="${h.kind === "m" ? "cm" : "ci"}" data-ref="${esc(h.ref)}"
             aria-label="add a ${h.kind === "m" ? "framing" : "reach"} chart for “${esc(h.title)}”">▤ ${h.kind === "m" ? "framing" : "reach"}</button>
           ${h.kind === "m"
-            ? `<button type="button" class="btn" data-czed="hit" data-kind="d" data-ref="${esc(h.ref)}" aria-label="a document of “${esc(h.title)}”">📄 a document</button>`
+            ? `<button type="button" class="btn" data-czed="hit" data-kind="d" data-ref="${esc(h.ref)}" aria-label="a document — choose one of “${esc(h.title)}”’s filings to add">📄 a document</button>`
             : `<button type="button" class="btn" data-czed="hit" data-kind="g" data-ref="${esc(h.ref)}" aria-label="what changed in “${esc(h.title)}” — a digest">⟳ what changed</button>`}
         </span></div>`; };
     // a line of the tape, by the same words a search finds — quoted whole
@@ -4604,14 +4659,20 @@
         <span class="cz-edhit-t"><b>“${esc(cut(l.text, 110))}”</b><span class="cz-edhit-m">${esc(l.title)} · ${hms(l.t)}${l.date ? ` · ${esc(l.date)}` : ""}</span></span>
         <span class="cz-edhit-a"><button type="button" class="btn" data-czed="hit" data-kind="q"
           data-ref="${esc(l.pid)}:${r1(l.t)}" data-text="${esc(cut(l.text, 120))}"
-          aria-label="quote this line in your paper">❝ quote</button></span></div>`;
-    box.innerHTML = (!ms.length && !is.length && !ls.length)
-      ? `<p class="cz-hint">nothing among the record’s ${n(idx.meetings.length, "meeting", "meetings")},
-           ${n(idx.issues.length, "issue", "issues")} or their lines matches “${esc(q.value.trim())}”${esc(dark)}</p>`
-      : (!ms.length && !is.length) ? ""
-      : (is.length ? `<span class="cz-edgroup">issues</span>${is.map(hit).join("")}` : "")
-        + (ms.length ? `<span class="cz-edgroup">meetings</span>${ms.map(hit).join("")}` : "");
-    if (ls.length) box.innerHTML += `<span class="cz-edgroup">lines of the tape</span>${ls.map(lineHit).join("")}`;
+          aria-label="quote — the line at ${hms(l.t)} of ${esc(l.title)}, in your paper">❝ quote</button></span></div>`;
+    const nothing = ls => `<p class="cz-hint">nothing among the record’s ${n(idx.meetings.length, "meeting", "meetings")},
+           ${n(idx.issues.length, "issue", "issues")}${ls ? " or their lines" : ""} matches “${esc(q.value.trim())}”${esc(dark)}</p>`;
+    box.innerHTML = (is.length ? `<span class="cz-edgroup">issues</span>${is.map(hit).join("")}` : "")
+      + (ms.length ? `<span class="cz-edgroup">meetings</span>${ms.map(hit).join("")}` : "");
+    if (!terms.length) { if (!ms.length && !is.length) box.innerHTML = nothing(false); return; }
+    if (!ms.length && !is.length) box.innerHTML = `<p class="cz-hint cz-edlines-wait">searching the tape’s own lines…</p>`;
+    const ls = await linesSearch(terms, q.value);
+    const box2 = $(".cz-edhits", slot);
+    if (slot._edgen !== gen || !box2) return;   // a newer query painted, or the panel closed
+    const wait = $(".cz-edlines-wait", box2); if (wait) wait.remove();
+    if (count) count.textContent = countLine(ls);
+    if (ls.length) box2.innerHTML += `<span class="cz-edgroup">lines of the tape</span>${ls.map(lineHit).join("")}`;
+    else if (!ms.length && !is.length) box2.innerHTML = nothing(true);
   }
 
   /* ================= SEARCH ================= */

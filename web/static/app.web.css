@@ -602,10 +602,11 @@ h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
   border-left:3px solid var(--accent);background:var(--tint-1);border-radius:var(--radius-sm)}
 .pb-quote p{font-size:var(--text-lg);line-height:1.35;color:var(--text-primary);
   font-weight:var(--weight-medium);margin:0 0 var(--space-2);max-width:60ch;overflow-wrap:break-word}
-.pb-quote cite{display:block;font-style:normal;font-family:var(--font-mono);font-size:var(--text-xs);
+.pb-quote blockquote{margin:0}
+.pb-quote figcaption{display:block;font-style:normal;font-family:var(--font-mono);font-size:var(--text-xs);
   color:var(--text-secondary)}
-.pb-quote cite a{color:var(--text-primary);text-decoration:underline;text-underline-offset:2px}
-.pb-quote cite a:hover{color:var(--accent)}
+.pb-quote figcaption a{color:var(--text-primary);text-decoration:underline;text-underline-offset:2px}
+.pb-quote figcaption a:hover{color:var(--accent)}
 .pb-quote-spk{color:var(--text-primary);font-weight:var(--weight-bold)}
 .pb-doc{display:flex;flex-direction:column;gap:3px;margin:var(--space-4) 0;
   padding:var(--space-3) var(--space-4);background:var(--surface-card);
@@ -1033,14 +1034,33 @@ table.twin a{color:var(--accent)}
   .pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}
   .mcard,.pb-note,.pb-quote,.pb-doc,.pb-chart,.pb-reel{border-color:#999;background:#fff}
   .reelcite,.pb-dg{background:#fff;border-color:#999}
-  .reelcite::after,.pb-quote cite a::after,.pb-doc[href]::after,.pb-dg::after{
-    content:" " attr(href);font-family:var(--font-mono);font-size:9px;color:#444;word-break:break-all}
+  .reelcite::after,.pb-doc[href]::after,.pb-head a:not([href^="/"])::after{
+    content:" " attr(href);font-family:var(--font-mono);font-size:8pt;color:#444;word-break:break-all;
+    text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
+  /* a relative citation prints whole: the site (a custom property the
+     renderer sets on the paper) + the path — story cards, section heads,
+     pull-quotes and digest rows alike; an address is never upper-cased */
+  .paperbody .mcard[href^="/"]::after,.pb-head a[href^="/"]::after,.pb-quote figcaption a[href^="/"]::after,.pb-dg[href^="/"]::after{
+    content:" " var(--site,"") attr(href);font-family:var(--font-mono);font-size:8pt;color:#444;word-break:break-all;
+    text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
+  .pb-dg::after{grid-column:1/-1}
+  .paperbody .mcard{flex-wrap:wrap}
+  .paperbody .mcard::after{flex-basis:100%}
   .pb-chartwrap{overflow:visible}
   .pb-chartwrap svg{max-width:100%;height:auto}
+  /* the editor prints as the paper it is editing: its chrome goes, its
+     studio borders and rings go (these outrank the studio's own rules,
+     which carry html.cz-m-studio), a note prints whole from a text twin
+     the screen never shows, two half rows share a row */
   .cz-editing .cz-edbar,.cz-editing .cz-edslot{display:none !important}
-  .cz-editing .cz-edrow{border:0;padding:0}
-  .cz-editing .cz-edtitle{border:0;padding:0;font-size:34px}
-  .cz-editing .cz-ednote{border:0;padding:0;resize:none}
+  html.cz-m-studio .cz-editing .cz-edrow{border:0;padding:0}
+  html.cz-m-studio .cz-editing .cz-edtitle,html.cz-m-studio .cz-editing .cz-edtitle:focus-visible{
+    border:0;padding:0;font-size:34px;outline:0;box-shadow:none}
+  html.cz-m-studio .cz-editing .cz-edhead{border-bottom-color:#000}
+  html.cz-m-studio .cz-editing .cz-ednote{display:none}
+  html.cz-m-studio .cz-editing .cz-ednote-print{display:block}
+  html.cz-m-studio .cz-editing .cz-edrow[data-layout="half"]{display:inline-block;width:48%;vertical-align:top}
+  html.cz-m-studio .cz-editing .cz-edrow[data-layout="half"] .cz-edbody{width:auto}
   a{color:#000}
 }
 
@@ -1377,6 +1397,8 @@ html.cz-m-studio .cz-ednote{width:100%;box-sizing:border-box;resize:vertical;min
   background:var(--surface-card);border:var(--border-w) dashed var(--border-strong);
   border-radius:var(--radius-sm);padding:7px 9px}
 html.cz-m-studio .cz-ednote::placeholder{color:var(--text-secondary)}
+.cz-ednote-print{display:none}
+html.cz-m-studio .cz-edrow[data-layout="half"] .cz-edbody{width:50%;min-width:0}
 /* the insertion point: a dashed rule with a ＋ in it; a drop thickens it */
 html.cz-m-studio .cz-edslot{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);
   margin:var(--space-2) 0;min-height:24px}
