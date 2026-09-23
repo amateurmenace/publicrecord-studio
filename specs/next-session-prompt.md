@@ -6,10 +6,29 @@
 system python may be 3.14, too new). `CLAUDE.md` carries the laws;
 `specs/24-two-paths.md` is the newest scope (BUILT + LIVE); `specs/23` is
 done. **Memory from the last machine does not travel — this file is the
-state.** Written 2026-09-23, late.
+state.** Written 2026-09-23, late; the topic-story branch noted later that night.
 
 ## Where things stand
 
+- **BUILT, on branch `topic-story` (not merged, not deployed): a word, over
+  time** (`specs/25-a-word-over-time.md`) — Stephen's UX verdict of
+  2026-09-23 answered: the front page leads with *How Brookline talks about
+  AI* (a counted story pressed from the transcripts by `web/topic.py` +
+  `web/story.py::topic` + three new pictures in `web/charts.py`, with a
+  supercut in the viewer's own link grammar and a "make one of these"
+  close); the story has its own page (`/app/topic/ai/`) and plane
+  (`topics/ai.json`); the search page tells the same story live for any
+  word (`app.js` tpAggregate / sqStory — a node twin holds it equal to the
+  press's `aggregate`), with a progress line that moves at real stages, a
+  range switch (month · six months · year · all), ▶ play all as a reel, ✂
+  put every clip on my tray, and an empty state that explains search in
+  three steps; the reel viewer has the Highlighter's transport (prev · play
+  · next, the counter, a segment per clip that fills with the tape's own
+  time reports, keys, share, an end card). `search/meta.json` carries
+  `duration`. Reviewed adversarially (fourteen findings folded, the folds
+  re-reviewed, six more folded). 623 tests. **Next: rebase on main, deploy as v2.1.21 / r44** (v2.1.20 / r43 is
+  the embed-budget deploy; OPERATING §5 — press `--version 2.1.21`; the version bump is the cache
+  key; parity-check the ten files, now including `web/topic.py`).
 - **LIVE: v2.1.20 / r43** — tag `v2.1.20` at the deployed commit. v2.1.20:
   the first night with every switch on landed one meeting and sat silent for
   an hour — the embedding endpoint had slowed to a batch a minute, one
@@ -94,6 +113,12 @@ state.** Written 2026-09-23, late.
 7. Still his alone: stored free text beyond title + notes, re-pointing
    sources, spend over $100/mo, paper-as-homepage (declined), brand questions,
    deleting anything, a `record` template for the over-time story.
+8. **Ship `topic-story`** (specs/25 §4): rebase on main, press `--version
+   2.1.21`, r44 (every job moved), the Pages sync, the tag. Then read the live front page's three tabs
+   and the search for "AI" on a phone.
+9. **A second featured word** — one line in `web/topic.py::FEATURED` (a
+   name, a search, its phrases); the front page grows a fourth tab. And a
+   `chart·topic` paper block (a new stored kind — his sign-off first).
 
 ## Another session, same checkout
 
@@ -115,10 +140,10 @@ the next image tag and press version, and move every job.
 3. Any change: review (lenses → skeptics → fold → re-review the fixes,
    executed twins over token pins), deploy by OPERATING §5 — **one image tag
    per deploy, every job moved, press `--version` bumped**, parity-check the
-   nine files (`web/static/app.js`, `web/static/app.web.css`, `web/emit.py`,
-   `web/bake.py`, `web/story.py`, `web/charts.py`, `record/papers.py`,
-   `record/press.py`, `record/connectors/youtube.py`), Pages sync with the
-   gunzip loop, verify `sw.js`, tag, push.
+   ten files (`web/static/app.js`, `web/static/app.web.css`, `web/emit.py`,
+   `web/bake.py`, `web/story.py`, `web/charts.py`, `web/topic.py`,
+   `record/papers.py`, `record/press.py`, `record/connectors/youtube.py`),
+   Pages sync with the gunzip loop, verify `sw.js`, tag, push.
 
 ## Repairing a meeting (a one-off pipeline execution, never from a Mac)
 
@@ -170,3 +195,18 @@ the file is written first).
 - The main checkout may be on someone else's branch with uncommitted work —
   check `git worktree list` and `git status` before anything; build from a
   worktree on a branch of your own.
+- The pane keeps the service worker between local presses: a re-press at
+  a new local version still served the old `app.js` until the SW was
+  unregistered and the caches deleted from the page
+  (`navigator.serviceWorker.getRegistrations()` + `caches.keys()`), then a
+  fresh navigation. Do that before trusting any pane check of new JS.
+- The pane's screenshots of a scrolled front page come back blank (the fake
+  clipping CLAUDE.md names); JS geometry (`getBoundingClientRect`,
+  `scrollWidth > clientWidth`) is the check that tells the truth.
+- In `buildViewer` the viewer's state (`REELPLAY = {…}`) is assigned AFTER
+  the stage's HTML — anything wired into the stage that reads `REELPLAY`
+  must be built after that line (a live catch: the transport threw and the
+  cite list never rendered).
+- The reviewer's story counts differ by search: the pressed AI story counts
+  "AI" or "artificial intelligence"; the search page's story counts the
+  word typed. Both say what they counted beneath the lede.

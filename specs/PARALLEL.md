@@ -157,6 +157,13 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (later still, on branch `topic-story`) — **a word, over time**
+  (specs/25) is BUILT, not yet merged or deployed: the front page leads with
+  *How Brookline talks about AI*, the search page tells the same story live
+  for any word (progress line, range switch, ▶ play all, ✂ tray), the reel
+  viewer has a transport and a segmented bar, the search page explains
+  itself. Reviewed (fourteen findings folded, the folds re-reviewed, six more folded), 623 tests. Targets v2.1.21 / r44 (r43 / v2.1.20 is the embed budget) — Stephen's to ship (OPERATING
+  §5; the version bump is the cache key).
 - 2026-09-23 (last) — **v2.1.20 / r43 is LIVE**: a landed meeting spends a
   two-minute budget on its meaning vectors inside the pipeline
   (`RECORD_EMBED_BUDGET_S`), and `record-embed` is scheduled nightly at

@@ -2,6 +2,48 @@
 
 ## unreleased
 
+### A word, over time — the search told as a story, the supercut, the player's transport, and a search page that explains itself — 2026-09-23 (v2.1.21)
+
+A citizen's question of the record is usually one word. The search page
+answered with eighty lines and no shape; the reel — the record's most
+powerful tool — hid behind an unlabeled tick; the front page told two
+stories, neither of which showed what a search could become. Now **a search
+is a story**, told three times. The press tells it for a featured word
+(`web/topic.py`, specs/25): the front page leads with **How Brookline talks
+about AI** — the first time anyone said it on the record and the two
+meetings that passed without it, the night it peaked and how many minutes
+that took, the mentions across the town's meetings and the bodies that
+said them, the words said in the same breath, the latest word, and
+Boston's, counted as elsewhere. Then the pictures: mentions month by month
+with a dot per meeting (filled where the word came up, hollow where not),
+one term across every tape slice by slice, the words beside it, the first
+time it came up each night (each a cuttable moment), and **the supercut** —
+one clip per night, and the full cut of every clip — in the viewer's own
+link grammar, decoded by the reader's own decoder in a twin test. It closes
+with how to make one: search a word, see how it was said, cut it and share
+it. The story has its own page (`/app/topic/ai/`) and its plane; every
+sentence is counted from the transcripts, never modeled, and says so.
+
+The search page tells the same story live for any word (the JS twin of
+the engine, held equal to the press by a node test): a progress line that
+moves at real stages, a range switch (the last month · six months · a year ·
+the whole record), the counted lede, **▶ play all as a reel**, **✂ put every
+clip on my tray**, the link to the search; and an empty state that says in
+three lines what a search can do here, with six of the record's own words
+to try. The reel viewer grows the Highlighter's transport, in the paper:
+prev · play/pause · next, the clip counter, a segment per clip that fills
+with the tape's own time reports, keys, a share row, and an end card. The
+search index's `meta.json` carries each tape's length now. Nothing touches
+a server on the make path; nothing is stored; no model is used. An
+adversarial review found fourteen defects — the story's own page never grew
+its ticks, a malformed date could stop the press, a meeting with no town
+could lead a story under an empty name, a replay was dead on an audio-only
+first clip, the transport painted its own state instead of the tape's —
+every one folded, with tests; the folds re-reviewed and six more folded
+(a cite pressed while paused left the page; a segment pressed before play
+on a reel across meetings loaded the wrong tape; "the latest" is a dated
+night). 623 tests.
+
 ### The night lands every tape — 2026-09-23 (v2.1.20)
 
 The first night with every switch on landed one meeting and then sat

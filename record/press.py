@@ -220,6 +220,9 @@ def press(corpus, out_dir: str, version: str = "",
     officials = b.bake_officials(meetings)
     b.bake_votes(meetings)
     analytics = b.bake_analytics(meetings)
+    # a word, over time (specs/25) — the featured topic stories, counted from
+    # the transcripts; a stage in web/bake.py is a stage here too
+    topics = b.bake_topics(meetings)
     graph = b.bake_graph(issues)
     b.bake_urls(meetings)
     idx = b.bake_search(meetings)
@@ -229,7 +232,7 @@ def press(corpus, out_dir: str, version: str = "",
     emit.emit_assets(out, version, manifest)
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
-                    towns=towns, tombstones=tombstones, kits=kits)
+                    towns=towns, tombstones=tombstones, kits=kits, topics=topics)
 
     pressing = _write_pressing(out, manifest, fingerprint)
 

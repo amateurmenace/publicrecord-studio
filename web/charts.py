@@ -464,3 +464,123 @@ def lens_bars(lenses: Sequence[dict]) -> str:
         f'<span class="lensbar"><i style="width:{round(100 * int(l["count"]) / mx)}%"></i></span>'
         f'<span class="lensn">{int(l["count"])}</span>'
         f'<span class="lensdrift">{DRIFT.get(l.get("drift"), "")}</span></div>' for l in ls) + "</div>"
+
+
+# --------------------------------------------------------------------------
+# a word, over time (specs/25) — the topic story's three pictures
+# --------------------------------------------------------------------------
+
+MONTH_ABBR = ("", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])")     # a month the story can place; anything else is undated
+DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def is_month(d) -> bool:
+    return bool(MONTH_RE.match(str(d or "")))
+
+
+def _mname(mo: str) -> str:
+    if not is_month(mo):
+        return "undated"
+    return f"{MONTH_ABBR[int(mo[5:7])]} {mo[:4]}"
+
+
+def search_url(q: str, town: str = "", base: str = "/app") -> str:
+    """The record's search for a word, as a URL: the query percent-encoded
+    whole (a '#', an '&', a '+' in a topic stay inside the query), the town
+    likewise. Raw — escape '&' to '&amp;' when writing it into an attribute."""
+    from urllib.parse import quote
+    u = f"{base}/s?q={quote(str(q), safe='')}"
+    if town:
+        u += f"&town={quote(str(town), safe='')}"
+    return u
+
+
+def month_bars(months: Sequence[dict], rows: Sequence[dict], base: str = "/app") -> str:
+    """Mentions month by month — one column per month from the first to the
+    last month the town met, contiguous, so a silent month is a visible gap:
+    a bar for the mentions (its count above it), under it one dot per meeting
+    that month (filled where the word came up, hollow where it did not, none
+    where the town did not meet). A bar with mentions opens the tape at the
+    month's first mention. The JS twin is app.js tpMonthBars."""
+    ms = [x for x in months if x.get("month")]
+    if not ms:
+        return '<p class="hint">no dated meeting says it yet</p>'
+    mx = max(int(x.get("mentions") or 0) for x in ms) or 1
+    first_of: Dict[str, dict] = {}
+    for r in rows:
+        if r.get("n") and is_month(r.get("date")):
+            first_of.setdefault(str(r["date"])[:7], r)
+    cols, trows, prev_year = [], [], None
+    for x in ms:
+        mo, n = x["month"], int(x.get("mentions") or 0)
+        meets, said = int(x.get("meetings") or 0), int(x.get("said") or 0)
+        h = 6 + round(58 * n / mx) if n else 2
+        tip = (f'{_mname(mo)}: {n_of(n, "mention")} in {said} of {n_of(meets, "meeting")}' if meets
+               else f'{_mname(mo)}: no meeting on the record')
+        dots = "".join('<i class="tp-dot on"></i>' for _ in range(said)) + \
+               "".join('<i class="tp-dot"></i>' for _ in range(meets - said))
+        yr = mo[:4]
+        label = f'<label>{esc(MONTH_ABBR[int(mo[5:7])] if is_month(mo) else "?")}' + (f'<small>{esc(yr)}</small>' if yr != prev_year else "") + '</label>'
+        prev_year = yr
+        inner = (f'<b>{n if n else ""}</b><span class="tp-bar" style="height:{h}px"></span>'
+                 f'<span class="tp-dots">{dots}</span>{label}')
+        r0 = first_of.get(mo)
+        if n and r0:
+            cols.append(f'<a class="tp-mcol" href="{base}/m/{esc(r0["pid"])}#t{int(float(r0.get("first_t") or 0))}" '
+                        f'title="{esc(tip)}" aria-label="{esc(tip)}">{inner}</a>')
+        else:
+            cols.append(f'<span class="tp-mcol{"" if meets else " tp-nomeet"}" title="{esc(tip)}" aria-label="{esc(tip)}">{inner}</span>')
+        trows.append(f'<tr><td>{esc(_mname(mo))}</td><td>{meets}</td><td>{said}</td><td>{n}</td></tr>')
+    return (f'<div class="tp-months" role="group" aria-label="mentions month by month">{"".join(cols)}</div>'
+            + twin("".join(trows), "<th>month</th><th>meetings</th><th>said it</th><th>mentions</th>"))
+
+
+def term_tapes(rows: Sequence[dict], base: str = "/app", bins: int = 48) -> str:
+    """Where on each night the word fell: one row per meeting that said it,
+    the tape as a run of slices, a taller bar where it came up more; every bar
+    opens the tape at that slice. The highlighter's sparkline search, one term
+    across every tape. The JS twin is app.js tpTapes."""
+    said = [r for r in rows if r.get("n")]
+    if not said:
+        return ""
+    out, trows = [], []
+    for r in said:
+        dur = max(float(r.get("duration") or 0), 1.0)
+        counts = list(r.get("bins") or [0] * bins)
+        mx = max(counts) or 1
+        bars = "".join(
+            f'<a class="fp-sbar" href="{base}/m/{esc(r["pid"])}#t{int(dur * i / len(counts))}" '
+            f'title="{hms(dur * i / len(counts))}–{hms(dur * (i + 1) / len(counts))}: {n_of(c, "line")}">'
+            f'<i style="height:{2 + round(20 * c / mx) if c else 1}px"></i></a>'
+            for i, c in enumerate(counts))
+        date = str(r.get("date") or "")
+        when = esc(date[5:10]) if DAY_RE.match(date) else "undated"
+        label = f'{when} · {esc(r.get("body") or "")}'
+        out.append(f'<div class="fp-spark"><a class="fp-sterm" href="{base}/m/{esc(r["pid"])}" '
+                   f'title="{esc(r.get("title") or r["pid"])}">{label}</a>'
+                   f'<span class="fp-sbars">{bars}</span>'
+                   f'<span class="fp-sn">{n_of(int(r["n"]), "line")}</span></div>')
+        trows.append(f'<tr><td><a href="{base}/m/{esc(r["pid"])}#t{int(float(r.get("first_t") or 0))}">'
+                     f'{esc(r.get("date") or "undated")}</a></td><td>{esc(r.get("body") or "")}</td>'
+                     f'<td>{int(r["n"])}</td><td>{hms(r.get("first_t") or 0)}</td><td>{hms(r.get("last_t") or 0)}</td></tr>')
+    return (f'<div class="fp-sparks tp-tapes">{"".join(out)}</div>'
+            + twin("".join(trows), "<th>meeting</th><th>body</th><th>lines</th><th>first at</th><th>last at</th>"))
+
+
+def coword_bars(words: Sequence[dict], q: str, base: str = "/app", town: str = "") -> str:
+    """The words said beside the word — magnitude bars; each opens the
+    record's search for the two together."""
+    ws = [w for w in words if str(w.get("word") or "").strip()]
+    if not ws:
+        return ""
+    mx = max(int(w.get("count") or 0) for w in ws) or 1
+    rows = []
+    for w in ws:
+        both = f'{q} {w["word"]}'
+        href = search_url(both, town, base).replace("&", "&amp;")
+        rows.append(f'<div class="lensrow"><a class="lenslabel fp-topic" href="{href}" '
+                    f'title="search the record for “{esc(both)}”">{esc(w["word"])}</a>'
+                    f'<span class="lensbar"><i style="width:{round(100 * int(w["count"]) / mx)}%"></i></span>'
+                    f'<span class="lensn">{int(w["count"])}</span><span class="lensdrift"></span></div>')
+    return f'<div class="lenses fp-topics tp-cowords">{"".join(rows)}</div>'

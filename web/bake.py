@@ -1007,6 +1007,24 @@ class Bake:
         self.note("analytics.json", _gz_of(doc))
         return doc
 
+    # -- a word, over time (specs/25): the featured topic stories ----------
+    def bake_topics(self, meetings, featured=None):
+        """The record's search for a featured word, counted into a story —
+        the plane the front page and /app/topic/<slug>/ press from. Pure over
+        the meetings' own transcripts (web/topic.py); a topic that does not
+        clear the floor presses nothing, and the front page leads with the
+        record over time as before."""
+        from . import topic as _topic
+        stories = _topic.featured(meetings, featured)
+        (self.out / "topics").mkdir(parents=True, exist_ok=True)
+        for t in stories:
+            _json(self.out / "topics" / f'{t["slug"]}.json', t)
+            self.note(f'topics/{t["slug"]}.json', _gz_of(t))
+        _json(self.out / "topics" / "index.json",
+              [{"slug": t["slug"], "name": t["name"], "q": t["q"], "town": t["town"],
+                "mentions": t["mentions"], "n_meetings": t["n_meetings"]} for t in stories])
+        return stories
+
     # -- the graph: issues that share a room (co-occurrence) --------------
     def bake_graph(self, issues):
         """The issue graph — issues that appear in the same meeting are tied,
@@ -1066,10 +1084,13 @@ class Bake:
         # own hits: the index is one flat posting list over every town, and
         # without the town on each meeting the reader would have to fetch a
         # meeting document per hit to find out whether to show it.
+        # `duration` rides along too (specs/25): the search page's story
+        # needs each tape's length to place a hit on it and to end a clip
         meta = [{"pid": m["pid"], "title": m["title"], "body": m["body"],
                  "town": m["town"], "date": m["date"],
                  "video_id": m["video_id"],
-                 "source_kind": m["source_kind"]} for m in meetings]
+                 "source_kind": m["source_kind"],
+                 "duration": m["duration"] or 0} for m in meetings]
         segs = []                       # [mi, t, speaker, text] — segId = index
         index = {}                      # term -> [segId,...]
         for mi, m in enumerate(meetings):
@@ -1229,6 +1250,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     officials = b.bake_officials(meetings)
     b.bake_votes(meetings)
     analytics = b.bake_analytics(meetings)
+    topics = b.bake_topics(meetings)
     graph = b.bake_graph(issues)
     b.bake_urls(meetings)
     idx = b.bake_search(meetings)
@@ -1239,7 +1261,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     emit.emit_assets(out, version, manifest)
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
-                    towns=towns, tombstones=tombstones, kits=kits)
+                    towns=towns, tombstones=tombstones, kits=kits, topics=topics)
 
     print(f"  {len(towns['towns'])} town(s) · {len(towns['bodies'])} bodies · "
           f"{len(meetings)} meetings · {len(issues)} issues · "

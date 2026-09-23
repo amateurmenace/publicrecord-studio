@@ -103,13 +103,25 @@ def say(html_: str) -> str:
 # the toggle
 # --------------------------------------------------------------------------
 
-def tabs(latest_title: str = "") -> str:
-    """Two tabs, as links: with JavaScript off they are in-page anchors and
-    both stories stand; the reader's script turns them into a toggle that
-    shows one story at a time and says which is showing."""
-    return f'''  <nav class="stab" aria-label="the front page’s two stories">
-    <a class="stab-a" href="#over-time" data-story="over-time" aria-current="true"><b>Over time</b><span>how the record moved</span></a>
-    <a class="stab-a" href="#latest" data-story="latest"><b>The latest meeting</b><span>{esc(latest_title or "what happened")}</span></a>
+def tabs(latest_title: str = "", topics: Sequence[dict] = ()) -> str:
+    """The front page's stories as tabs, as links: with JavaScript off they
+    are in-page anchors and every story stands; the reader's script turns
+    them into a toggle that shows one story at a time and says which is
+    showing. A featured topic story (specs/25) leads when the record holds
+    one — the front page opens on how the town talks about a word."""
+    items = []
+    for t in topics:
+        items.append(f'<a class="stab-a" href="#topic-{esc(t["slug"])}" data-story="topic-{esc(t["slug"])}">'
+                     f'<b>A word, over time</b><span>how {esc(t["town"])} talks about {esc(t["name"])}</span></a>')
+    items.append('<a class="stab-a" href="#over-time" data-story="over-time"><b>Over time</b><span>how the record moved</span></a>')
+    items.append(f'<a class="stab-a" href="#latest" data-story="latest"><b>The latest meeting</b><span>{esc(latest_title or "what happened")}</span></a>')
+    items[0] = items[0].replace('<a class="stab-a" ', '<a class="stab-a" aria-current="true" ', 1) \
+        if items[0].startswith('<a class="stab-a" href="#topic') else \
+        items[0].replace('data-story="over-time"', 'data-story="over-time" aria-current="true"', 1)
+    n = len(items)
+    label = "the front page’s two stories" if n == 2 else f"the front page’s {n} stories"
+    return f'''  <nav class="stab" aria-label="{label}">
+    {chr(10).join("    " + i for i in items).strip()}
   </nav>
 '''
 
@@ -452,6 +464,186 @@ def latest(m: dict, base: str = "/app") -> str:
     <p class="fp-told">{" ".join(told)}</p>
     <p class="decksrc">counted from the meeting’s own pressed plane — no model wrote a line of it; every number opens the tape</p>
     </div>{still}</div>
+    {"".join(parts)}
+    {close}
+  </article>
+'''
+
+
+# --------------------------------------------------------------------------
+# story three — a word, over time (specs/25): the search, told as a story
+# --------------------------------------------------------------------------
+
+def _span_words(sec: float) -> str:
+    sec = float(sec or 0)
+    if sec < 90:
+        return "in under two minutes"
+    if sec < 3600:
+        return f"in {max(2, int(round(sec / 60)))} minutes"
+    h, m = int(sec // 3600), int((sec % 3600) // 60)
+    return f"over {h} h {m} min" if m else f"over {h} h"
+
+
+def _month_words(d: str) -> str:
+    return month_name(d) or "an undated meeting"
+
+
+def _day_words(d: str) -> str:
+    """'June 18, 2026', or 'an undated meeting' — never the bare word, and
+    never a garbage date printed as one (February 30 is undated)."""
+    try:
+        _dt.datetime.strptime(str(d or "")[:10], "%Y-%m-%d")
+    except ValueError:
+        return "an undated meeting"
+    return day_name(d)
+
+
+def _town_words(t: str) -> str:
+    return f"{t}’s bodies" if t else "meetings with no town recorded"
+
+
+def topic_issue(d: dict, issues: Sequence[dict]) -> Optional[dict]:
+    """The issue the record already tracks under this word, if any: an issue
+    whose name or an alias IS one of the topic's phrases (case-blind)."""
+    want = {str(p).lower() for p in d.get("phrases") or []}
+    want.add(str(d.get("long") or "").lower())
+    for i in sorted(issues, key=lambda i: (-int(i.get("n_meetings") or 0), str(i.get("slug") or ""))):
+        names = {str(i.get("name") or "").lower()} | {str(a).lower() for a in (i.get("aliases") or [])}
+        if names & want:
+            return i
+    return None
+
+
+def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Sequence[str] = (),
+          own_page: bool = True) -> str:
+    """The topic story, pressed whole (specs/25 §2): a counted headline and
+    lede, the numbers, mentions month by month, where on each night the word
+    fell, the words said beside it, the first time it came up each night (each
+    a cuttable moment), the supercut, and how to make one of these. Every
+    number a receipt; no model wrote a line of it."""
+    from . import topic as _topic
+    q, town, name = d["q"], d["town"], d["name"]
+    key = f'topic-{d["slug"]}'
+    at = lambda pid, t: f'{base}/m/{esc(pid)}#t{int(float(t or 0))}'
+    search_raw = _topic.search_url(q, town, base)          # for cells that escape their own href
+    search = search_raw.replace("&", "&amp;")               # for hrefs written inline
+    search_all = _topic.search_url(q, "", base)
+    first, latest, peak = d["first"], d["latest"], d["peak"]
+    # -- the lede, counted -------------------------------------------------
+    lede = []
+    lede.append(f'The first time anyone said “{esc(q)}” on {esc(town)}’s record was '
+                f'<a href="{at(first["pid"], first["t"])}">{esc(_day_words(first["date"]))}</a>, '
+                f'{hms(first["t"])} into a {esc(first["body"] or "meeting")} meeting: '
+                f'“{esc(first["quote"])}”.')
+    gap = int(d.get("gap") or 0)
+    if gap == 1:
+        lede.append("The next meeting passed without it.")
+    elif gap > 1:
+        lede.append(f"{gap} meetings then passed without it.")
+    share = round(100 * peak["mentions"] / max(1, d["mentions"]))
+    if peak["pid"] != first["pid"]:
+        lede.append(f'It peaked on <a href="{at(peak["pid"], peak["t"])}">{esc(_day_words(peak["date"]))}</a>, '
+                    f'when the {esc(peak["body"] or "board")} said it {n_of(peak["mentions"], "time")} '
+                    f'{_span_words(peak["span"])} — {share}% of every mention on the record.')
+    else:
+        lede.append(f'That night is still the peak: {n_of(peak["mentions"], "mention")} '
+                    f'{_span_words(peak["span"])}, {share}% of every one on the record.')
+    bodies = the_list([f'the {b["body"]}' for b in d["bodies"] if b["body"] and b["body"] != "—"])
+    cw = [w["word"] for w in d.get("cowords") or []][:4]
+    lede.append(f'In all, <a href="{search}">{n_of(d["mentions"], "mention")}</a> across '
+                f'{d["n_meetings"]} of {esc(town)}’s <a href="{base}/s">{n_of(d["n_town_meetings"], "meeting")}</a>'
+                + (f', by {esc(bodies)}' if bodies else "")
+                + (f'; the words said beside it most: {esc(", ".join(cw))}' if cw else "") + '.')
+    if latest["pid"] != first["pid"] or latest["t"] != first["t"]:
+        lede.append(f'The latest was <a href="{at(latest["pid"], latest["t"])}">{esc(_day_words(latest["date"]))}</a>: '
+                    f'“{esc(latest["quote"])}”.')
+    for e in (d.get("elsewhere") or [])[:2]:
+        lede.append(f'{esc(_town_words(e["town"]))} said it in {n_of(e["moments"], "line")} across '
+                    f'{n_of(e["meetings"], "meeting")} — <a href="{esc(search_all)}">the whole record’s search</a> reads them together.')
+    # -- the pictures -------------------------------------------------------
+    reel = d["reel"]
+    cells = [(d["mentions"], "mentions", search_raw),
+             (f'{d["n_meetings"]} of {d["n_town_meetings"]}', "meetings", f"{base}/s"),
+             (len(d["bodies"]), "bodies", f"{base}/analytics"),
+             (_month_words(first["date"]).replace(" ", "\u00a0"), "first said", at(first["pid"], first["t"])),
+             (_month_words(latest["date"]).replace(" ", "\u00a0"), "latest", at(latest["pid"], latest["t"])),
+             (hms(reel["short_runtime"]), "the supercut", reel["short"])]
+    parts: List[str] = []
+    parts.append(f'<section class="fp-part">{kicker(f"“{esc(q)}”, by the numbers")}{charts.numbers_strip(cells)}</section>')
+    busiest = max(d["months"], key=lambda x: (int(x.get("mentions") or 0), x["month"])) if d["months"] else None
+    silent = [x for x in d["months"] if x.get("meetings") and not x.get("said")]
+    msay = ""
+    if busiest and busiest.get("mentions"):
+        msay = say(f'{esc(month_name(busiest["month"] + "-01"))} was the loudest month — '
+                   f'{n_of(int(busiest["mentions"]), "mention")} in {busiest["said"]} of {n_of(int(busiest["meetings"]), "meeting")}'
+                   + (f'; in {n_of(len(silent), "month")} the town met and never said it' if silent else "")
+                   + '. A dot is a meeting: filled where the word came up, hollow where it did not. Every bar opens the tape at the month’s first mention.')
+    parts.append(f'<section class="fp-part">{kicker("mentions, month by month")}'
+                 + charts.month_bars(d["months"], d["meetings"], base=base) + msay + "</section>")
+    tapes = charts.term_tapes(d["meetings"], base=base)
+    if tapes:
+        parts.append(f'<section class="fp-part">{kicker("where it fell — every night that said it, slice by slice")}' + tapes
+                     + say(f'Each row is a tape, start to end; a taller bar is a slice where “{esc(q)}” came up more. '
+                           f'On {esc(_day_words(peak["date"]))} the {esc(peak["body"] or "board")} said it '
+                           f'{n_of(peak["mentions"], "time")} {_span_words(peak["span"])} — one stretch of the night. Every bar opens the tape there.') + "</section>")
+    if d.get("cowords"):
+        w0 = d["cowords"][0]
+        parts.append(f'<section class="fp-part">{kicker("the words beside it — what was said in the same breath")}'
+                     + charts.coword_bars(d["cowords"], q, base=base, town=town)
+                     + say(f'Counted in each line that says “{esc(q)}” and the lines either side of it, civic stopwords out: '
+                           f'“{esc(w0["word"])}” led with {n_of(int(w0["count"]), "mention")}. Each word opens the record’s search for the two together.') + "</section>")
+    # the chapters — the first time it came up, each night; cuttable
+    chs = []
+    for ch in d["chapters"]:
+        chs.append(
+            f'<div class="tq-wrap"><a class="tq" href="{at(ch["pid"], ch["t"])}" data-pid="{esc(ch["pid"])}" '
+            f'data-t="{_topic._r1(ch["t"])}" data-quote="{esc(cut_words(ch["quote"], 120))}" '
+            f'data-mtitle="{esc(ch["title"])}" data-body="{esc(ch["body"])}" data-town="{esc(town)}" data-date="{esc(ch["date"])}">'
+            f'<span class="tq-when">{esc(_day_words(ch["date"]))} · {esc(ch["body"] or "meeting")}</span>'
+            f'<span class="tq-n">{n_of(ch["n"], "line")} that night</span>'
+            f'<span class="tq-q">“{esc(ch["quote"])}”</span>'
+            f'<span class="tq-ts"><span class="ts">{hms(ch["t"])}</span> on the tape</span></a></div>')
+    parts.append(f'<section class="fp-part">{kicker("the first time it came up, each night")}'
+                 f'<div class="tq-list">{"".join(chs)}</div>'
+                 + say(f'One line per meeting, in order — the moment the word first entered the room, with the line before and after it. '
+                       f'Every line opens the tape; the tick beside it cuts the line into your reel. '
+                       f'<a href="{search}">All {n_of(d["moments"], "line")} →</a>') + "</section>")
+    # the supercut
+    parts.append(
+        f'<section class="fp-part">{kicker("the supercut — every one of those moments, played in order")}'
+        f'<div class="tp-cut">'
+        f'<a class="btn primary tp-play" href="{esc(reel["short"])}">▶ play the supercut</a>'
+        f'<span class="tp-cutmeta">{n_of(reel["short_n"], "clip")}, one per night · {hms(reel["short_runtime"])}</span>'
+        f'<a class="btn tp-full" href="{esc(reel["full"])}">the full cut — {n_of(reel["full_n"], "clip")} · {hms(reel["full_runtime"])}</a>'
+        f'</div>'
+        + say('A reel plays the tape clip to clip, in this browser, and the whole reel lives in its link — copy the address and it is shared; '
+              'open it and press <b>make this reel yours</b> to re-cut it. Nothing is uploaded, nothing about you is kept.')
+        + "</section>")
+    # how to make one of these
+    tries = "".join(f'<a class="btn tp-try" href="{esc(charts.search_url(str(x), "", base))}">{esc(x)}</a>' for x in examples[:6])
+    parts.append(
+        f'<section class="fp-part tp-howto">{kicker("make one of these — this story came from one search")}'
+        f'<ol class="tp-steps">'
+        f'<li><b>Search a word.</b> A program, a street, a worry — “{esc(q)}” was this one. Three letters is enough; the record searches as you type.</li>'
+        f'<li><b>See how it was said.</b> The record counts every line of every transcript that says it and draws the count — month by month, night by night, the words beside it. Nothing modeled; every number opens the tape.</li>'
+        f'<li><b>Cut it, share it.</b> Press ▶ and the moments play as a reel. Press ✂ on any line to cut your own — from a search, a transcript, an issue. The link is the share: no account, nothing uploaded.</li>'
+        f'</ol>'
+        + (f'<p class="tp-tries"><span class="kicker">try one</span>{tries}</p>' if tries else "")
+        + "</section>")
+    # the close
+    iss = topic_issue(d, issues)
+    close = (f'<div class="fp-close"><a class="btn primary" href="{search}">search “{esc(q)}” yourself →</a>'
+             + (f'<a class="btn" href="{base}/topic/{esc(d["slug"])}/">this story’s own page →</a>' if own_page
+                else f'<a class="btn" href="{base}/">← the record’s front page</a>')
+             + (f'<a class="btn" href="{base}/i/{esc(iss["slug"])}">the thread the record tracks: {esc(iss["name"])} →</a>' if iss else "")
+             + '</div>')
+    headline = f'How {esc(town)} talks about {esc(name)}'
+    said = " or ".join(f"“{esc(p)}”" for p in d["phrases"])
+    return f'''  <article class="fp-story tp-story" id="{key}" aria-labelledby="fp-{key}-hl">
+    <span class="kicker">a word, over time — the record’s search for “{esc(q)}”, told as a story</span>
+    <h2 class="fp-hl" id="fp-{key}-hl">{headline}</h2>
+    <p class="fp-lede">{" ".join(lede)}</p>
+    <p class="decksrc">counted from the transcripts themselves when this edition was pressed — every line that says {said}, whole-word; no model wrote a line of it; every number opens the tape</p>
     {"".join(parts)}
     {close}
   </article>
