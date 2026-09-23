@@ -157,7 +157,7 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
-- 2026-09-23 (night, last) — **v2.1.18 / r40 is LIVE**: a hosted meeting
+- 2026-09-23 (night, last) — **v2.1.18 / r41 is LIVE**: a hosted meeting
   keeps its name and day (the feed's title, YouTube's own details with the
   key), the hosted model lane is bridged (summaries were extractive while
   the page said Gemini — a live catch), the reading is drafted at ingest and

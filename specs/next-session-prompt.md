@@ -10,7 +10,7 @@ state.** Written 2026-09-23, late.
 
 ## Where things stand
 
-- **LIVE: v2.1.18 / r40** — tag `v2.1.18` at the deployed commit. v2.1.18:
+- **LIVE: v2.1.18 / r41** — tag `v2.1.18` at the deployed commit. v2.1.18:
   a hosted meeting keeps its title and day (the feed's title from the
   submission's note, YouTube's own `videos.list` when the key is at hand —
   the pipeline job carries `RECORD_YOUTUBE_API_KEY` too); the pipeline
@@ -18,7 +18,9 @@ state.** Written 2026-09-23, late.
   labeled Gemini paragraphs the constitution names; **the reading is
   drafted** at ingest (`analysis.draft`, specs/24 §4) and shown under the
   model's name on the meeting page, the front page and in papers; the
-  ledger's summaries row names the earlier desk lane. v2.1.17 was the
+  ledger's summaries row names the earlier desk lane; the seam's default
+  Gemini model is the one the API names (`gemini-3.6-flash` — the old
+  default had been retired and the hosted lane failed silently). v2.1.17 was the
   toggle/scope hot fix. v2.1.16 shipped two things together:
   1. **The front page is the story** (specs/24): two pressed stories behind a
      toggle — *the record, over time* (counted headline and lede, the record
