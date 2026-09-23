@@ -37,6 +37,42 @@ def portable(title="Overrides, watched", blocks=None):
 
 
 
+
+class TestC2Kinds(unittest.TestCase):
+    """specs/23 C2: three more kinds, refs only — a pull-quote is (pid, t)
+    and never its words; a document is (pid, doc id); a digest is an issue
+    and a window. Exact keys, strict values, no free text anywhere."""
+
+    def _doc(self, block):
+        return {"schema": papers.SCHEMA, "title": "", "blocks": [block]}
+
+    def test_the_three_kinds_are_accepted_as_refs(self):
+        for block, want in (
+            ({"kind": "quote", "pid": "vid1", "t": 12.04}, '"kind":"quote","pid":"vid1","t":12'),
+            ({"kind": "doc", "pid": "vid1", "doc": "doc:budget"}, '"doc":"doc:budget","kind":"doc","pid":"vid1"'),
+            ({"kind": "digest", "slug": "s", "n": 3}, '"kind":"digest","n":3,"slug":"s"')):
+            self.assertIn(want, papers.canonical(self._doc(block)))
+
+    def test_a_quote_never_carries_its_words(self):
+        with self.assertRaises(papers.PaperError):
+            papers.canonical(self._doc({"kind": "quote", "pid": "v", "t": 1, "text": "words"}))
+        with self.assertRaises(papers.PaperError):
+            papers.canonical(self._doc({"kind": "quote", "pid": "v", "t": -1}))
+        with self.assertRaises(papers.PaperError):
+            papers.canonical(self._doc({"kind": "quote", "pid": "v"}))
+
+    def test_a_document_and_a_digest_are_strict(self):
+        for bad in ({"kind": "doc", "pid": "v", "doc": ""},
+                    {"kind": "doc", "pid": "v", "doc": "a b"},
+                    {"kind": "doc", "pid": "v", "doc": "x", "title": "t"},
+                    {"kind": "digest", "slug": "s", "n": 0},
+                    {"kind": "digest", "slug": "s", "n": 13},
+                    {"kind": "digest", "slug": "s", "n": "3"},
+                    {"kind": "digest", "slug": "s", "n": True},
+                    {"kind": "digest", "slug": "s"}):
+            with self.assertRaises(papers.PaperError, msg=repr(bad)):
+                papers.canonical(self._doc(bad))
+
 class TestLayouts(unittest.TestCase):
     """specs/23 C1: a block may carry one layout — an enum, strictly one of
     LAYOUTS, refused otherwise; the canonical form carries it, so the same

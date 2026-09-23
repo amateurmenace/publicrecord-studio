@@ -595,6 +595,45 @@ h1{font-family:var(--font-mono);font-weight:var(--weight-bold);
 .pb-bar .pb-n{font-family:var(--font-mono);color:var(--text-primary);
   white-space:nowrap}
 
+/* C2 blocks — the paper palette only: a pull-quote (the tape's own words,
+   read at render), a document (one of the meeting's filings), a digest
+   (what changed — the issue's latest appearances) */
+.pb-quote{margin:var(--space-5) 0;padding:var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  border-left:3px solid var(--accent);background:var(--tint-1);border-radius:var(--radius-sm)}
+.pb-quote p{font-size:var(--text-lg);line-height:1.35;color:var(--text-primary);
+  font-weight:var(--weight-medium);margin:0 0 var(--space-2);max-width:60ch;overflow-wrap:break-word}
+.pb-quote cite{display:block;font-style:normal;font-family:var(--font-mono);font-size:var(--text-xs);
+  color:var(--text-secondary)}
+.pb-quote cite a{color:var(--text-primary);text-decoration:underline;text-underline-offset:2px}
+.pb-quote cite a:hover{color:var(--accent)}
+.pb-quote-spk{color:var(--text-primary);font-weight:var(--weight-bold)}
+.pb-doc{display:flex;flex-direction:column;gap:3px;margin:var(--space-4) 0;
+  padding:var(--space-3) var(--space-4);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-left:var(--border-w-strong) solid var(--accent);
+  border-radius:var(--radius-sm);color:var(--text-primary)}
+a.pb-doc:hover b{color:var(--accent);text-decoration:underline}
+.pb-doc-k{font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:var(--tracking-label);
+  text-transform:uppercase;color:var(--text-secondary)}
+.pb-doc b{font-family:var(--font-mono);font-size:var(--text-base)}
+.pb-doc-m{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)}
+.pb-digest{margin:var(--space-5) 0}
+.pb-digest .kicker a{color:var(--text-primary);text-decoration:underline;text-underline-offset:2px}
+.pb-dgs{display:grid;gap:var(--space-2)}
+.pb-dg{display:grid;grid-template-columns:92px 1fr;gap:2px var(--space-3);
+  padding:var(--space-2) var(--space-3);background:var(--surface-card);
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);color:var(--text-primary)}
+.pb-dg:hover{border-color:var(--accent)}
+.pb-dg-d{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary);grid-row:span 2}
+.pb-dg-b{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-secondary)}
+.pb-dg-q{font-size:var(--text-sm);color:var(--text-primary)}
+@media (max-width:720px){.pb-dg{grid-template-columns:1fr}.pb-dg-d{grid-row:auto}}
+/* the tray's quote press, and the editor's document chooser (studio chrome) */
+.cz-rquotebtn{font:var(--weight-bold) 10px/1 var(--font-mono);background:none;
+  border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);
+  color:var(--text-secondary);cursor:pointer;padding:3px 6px;margin-right:4px;min-height:24px}
+.cz-rquotebtn:hover{color:var(--studio-accent-text, var(--accent));border-color:var(--studio-accent, var(--accent))}
+.cz-eddocs{display:inline-flex;flex-wrap:wrap;gap:4px}
+
 /* /app/p — the featured papers (specs/21 P3): the empty state's front door.
    Pressed at press time as plain links, rendered outside #paperbody, hidden
    by the renderer the moment a real paper stands. The paper palette only —
@@ -973,6 +1012,36 @@ table.twin a{color:var(--accent)}
   body{color:#000;background:#fff}
   .transcript{border:0;padding:0}
   .seg .ts{color:#000}
+  /* a rendered paper prints as a paper (specs/23 C2): the nameplate stays,
+     the studio and its chrome go, the pressed lede and the reader's
+     controls go, the title runs the page, blocks flow in two columns, a
+     lead and a section head start a fresh line, every citation prints its
+     address so the receipts survive on paper */
+  .cz-studio,.cz-toast,.pfeat,.paper-page .back,.paper-page .presslede,
+  .paper-page .pfrom,.pb-play,.pb-pv,.cz-mk,.graphtwin summary,.rv-take{display:none !important}
+  html.cz-m-studio body{padding-left:0}
+  .paper-page h1{display:none}
+  .phead{border-bottom:3px solid #000;margin-top:0}
+  .ptitle{font-size:34px}
+  /* one printed column, paged where the browser pages it: a multicolumn
+     body would start on a fresh page in Chrome the moment a block spans
+     it, so the columns on paper are the editor's own — two half-width
+     blocks share a row here as they do on screen */
+  .paperbody>*{break-inside:avoid}
+  .pb-lead{break-after:avoid}
+  .pb-head{break-after:avoid;margin-top:18px}
+  .pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .mcard,.pb-note,.pb-quote,.pb-doc,.pb-chart,.pb-reel{border-color:#999;background:#fff}
+  .reelcite,.pb-dg{background:#fff;border-color:#999}
+  .reelcite::after,.pb-quote cite a::after,.pb-doc[href]::after,.pb-dg::after{
+    content:" " attr(href);font-family:var(--font-mono);font-size:9px;color:#444;word-break:break-all}
+  .pb-chartwrap{overflow:visible}
+  .pb-chartwrap svg{max-width:100%;height:auto}
+  .cz-editing .cz-edbar,.cz-editing .cz-edslot{display:none !important}
+  .cz-editing .cz-edrow{border:0;padding:0}
+  .cz-editing .cz-edtitle{border:0;padding:0;font-size:34px}
+  .cz-editing .cz-ednote{border:0;padding:0;resize:none}
+  a{color:#000}
 }
 
 /* the kits — Publisher's reading half (specs/20 §6, §7.9 P2). Quiet like the

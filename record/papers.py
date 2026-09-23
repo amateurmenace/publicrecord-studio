@@ -59,6 +59,13 @@ CHARTS = ("votes", "reach", "framing", "topics")
 # block with no layout reads as it always did; any other value is refused —
 # the store holds no layout the reader would have to guess at.
 LAYOUTS = ("lead", "head", "half")
+# The C2 kinds (specs/23 C2) — refs only, every one. A pull-quote is a
+# transcript line named by (pid, t): the words are fetched from the pressed
+# tape at render, never stored. A document is a meeting's own filing named
+# by its id. A digest is an issue and a window (how many of its latest
+# appearances to show), computed at render from the issue's own timeline.
+DIGEST_MAX = 12
+_DOC_REF = re.compile(r"[A-Za-z0-9_:.-]{1,160}")   # a document id ("doc:budget")
 
 # A pid or an issue slug. The bake mints pids to 80 chars and issue slugs to
 # 96 (web/bake.py pid()/islug()); 128 leaves headroom and matches the reader's
@@ -200,8 +207,30 @@ def _block_kind(b, i):
             return {"kind": "chart", "chart": "framing", "pid": pid}
         _exact_keys(b, {"kind", "chart"}, what)
         return {"kind": "chart", "chart": chart}
+    if kind == "quote":
+        _exact_keys(b, {"kind", "pid", "t"}, what)
+        pid = b.get("pid")
+        if not isinstance(pid, str) or not _REF.fullmatch(pid):
+            raise PaperError(f"{what}: not a meeting id")
+        return {"kind": "quote", "pid": pid, "t": _t(b.get("t"), f"{what} t")}
+    if kind == "doc":
+        _exact_keys(b, {"kind", "pid", "doc"}, what)
+        pid, doc = b.get("pid"), b.get("doc")
+        if not isinstance(pid, str) or not _REF.fullmatch(pid):
+            raise PaperError(f"{what}: not a meeting id")
+        if not isinstance(doc, str) or not _DOC_REF.fullmatch(doc):
+            raise PaperError(f"{what}: not a document id")
+        return {"kind": "doc", "pid": pid, "doc": doc}
+    if kind == "digest":
+        _exact_keys(b, {"kind", "slug", "n"}, what)
+        slug, n = b.get("slug"), b.get("n")
+        if not isinstance(slug, str) or not _REF.fullmatch(slug):
+            raise PaperError(f"{what}: not an issue slug")
+        if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= DIGEST_MAX:
+            raise PaperError(f"{what}: a digest's window is 1 to {DIGEST_MAX} appearances")
+        return {"kind": "digest", "slug": slug, "n": n}
     raise PaperError(f"{what}: unknown kind {kind!r} — this store holds "
-                     "stories, reels, charts and notes")
+                     "stories, reels, charts, notes, quotes, documents and digests")
 
 
 def canonical(doc) -> str:

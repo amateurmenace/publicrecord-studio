@@ -683,8 +683,15 @@ class TestBakeEdition(unittest.TestCase):
         self.assertIn('id="paperbody"', stub)        # the renderer's mount
         # the paper's own classes ship in the stylesheet the stub loads
         css = (self.out / "app.css").read_text()
-        for cls in (".phead", ".ptitle", ".pb-gone", ".cz-ptitle", ".cz-prow"):
+        for cls in (".phead", ".ptitle", ".pb-gone", ".cz-ptitle", ".cz-prow",
+                    # C1/C2: the layouts, the three ref blocks, and a print
+                    # sheet that makes a rendered paper a printable page
+                    ".pb-lead", ".pb-head", ".pb-pair", ".pb-quote", ".pb-doc",
+                    ".pb-digest", ".pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}"):
             self.assertIn(cls, css, f"{cls} missing from the pressed CSS")
+        prn = css[css.index("@media print{"):]
+        for rule in (".cz-studio", ".paperbody>*{break-inside:avoid}", 'content:" " attr(href)'):
+            self.assertIn(rule, prn, f"the print sheet lost {rule!r}")
         # the make surfaces belong to the offline shell (specs/21 §5: the
         # covenant's own case is composing with the servers gone) — the SW
         # precaches /app/p and /app/r beside the sibling stubs, in the
@@ -2322,6 +2329,9 @@ class TestPaper(unittest.TestCase):
             self.lift(r"const noteText = .+?;"),
             self.lift(r"const PAPER_LAYOUTS = .+?;"),
             self.lift(r"const LAYOUT_LABEL = .+?;"),
+            self.lift(r"const C2_KINDS = .+?;"),
+            self.lift(r"const DOC_REF = .+?;"),
+            self.lift(r"const DIGEST_MAX = .+?;"),
             self.lift(r"const withLayout = .+?;"),
             self.lift(r"function chartRecordURL\(b\) \{.+?\n  \}"),
             self.lift(r"function normalizePaper\(p\) \{.+?\n  \}"),
@@ -3011,6 +3021,50 @@ class TestPaper(unittest.TestCase):
         self.assertEqual(r.returncode, 0,
                          f"layouts misbehaved:\n{r.stdout}{r.stderr}")
 
+    def test_the_c2_kinds_are_refs_that_travel_and_never_carry_words(self):
+        """specs/23 C2: a pull-quote is (pid, t) — its words ride the DRAFT
+        for the panel's label and no traveling form; a document is (pid,
+        doc id); a digest is (slug, n) with n clamped to 1..12. Each rides
+        the link in its own grammar (q.<pid>:<t>, d.<pid>~<doc>, g.<slug>:<n>),
+        lifts the link to v=3, round-trips, and degrades — a mangled part
+        drops, never throws. The receipt names each block's record page."""
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const p = { title: 'refs', blocks: [",
+            "  {kind:'quote',pid:'vid1',t:907.44,text:'the words',title:'Select Board'},",
+            "  {kind:'doc',pid:'vid1',doc:'doc:budget',title:'Agenda',dkind:'Agenda'},",
+            "  {kind:'digest',slug:'budget-override',n:99,name:'budget override'},",
+            "  {kind:'digest',slug:'other',n:'x'},",
+            "  {kind:'quote',pid:'bad id',t:1}, {kind:'doc',pid:'vid1',doc:'a b'}, {kind:'digest',slug:''} ] };",
+            "const n = normalizePaper(p);",
+            "if (n.blocks.length !== 4) fail('bad refs must drop: ' + JSON.stringify(n.blocks));",
+            "if (n.blocks[0].t !== 907.4 || n.blocks[0].text !== 'the words') fail('quote normalize: ' + JSON.stringify(n.blocks[0]));",
+            "if (n.blocks[2].n !== 12 || n.blocks[3].n !== 3) fail('digest window clamp: ' + n.blocks[2].n + '/' + n.blocks[3].n);",
+            "const port = portablePaper(p);",
+            "if (JSON.stringify(port.blocks[0]) !== JSON.stringify({kind:'quote',pid:'vid1',t:907.4})) fail('a quote must travel as a ref only: ' + JSON.stringify(port.blocks[0]));",
+            "if (JSON.stringify(port.blocks[1]) !== JSON.stringify({kind:'doc',pid:'vid1',doc:'doc:budget'})) fail('doc portable: ' + JSON.stringify(port.blocks[1]));",
+            "if (JSON.stringify(port.blocks[2]) !== JSON.stringify({kind:'digest',slug:'budget-override',n:12})) fail('digest portable: ' + JSON.stringify(port.blocks[2]));",
+            "const qs = encodePaperQS(p);",
+            "if (!qs.startsWith('v=3')) fail('C2 kinds travel as v=3: ' + qs);",
+            "if (!qs.includes('b=q.vid1:907.4,d.vid1~doc%3Abudget,g.budget-override:12,g.other:3')) fail('grammar: ' + qs);",
+            "const d = decodePaper('?' + qs);",
+            "if (JSON.stringify(d.blocks) !== JSON.stringify(port.blocks)) fail('round trip: ' + JSON.stringify(d.blocks));",
+            "for (const bad of ['q.vid1', 'q.vid1:-1', 'q.vid1:abc', 'q.%E0:1', 'd.vid1', 'd.vid1~', 'd.vid1~a%20b', 'g.slug', 'g.slug:0', 'g.slug:13', 'g.slug:x', 'q.:1', 'd.~x']) {",
+            "  const dd = decodePaper('?v=3&b=' + bad + ',m.vid1');",
+            "  if (dd.blocks.length !== 1 || dd.blocks[0].kind !== 'story') fail('a mangled part must drop alone: ' + bad + ' → ' + JSON.stringify(dd.blocks));",
+            "}",
+            "const j = paperJSON(p);",
+            "if (!j.blocks[0].url.endsWith('/app/m/vid1#t907') || j.blocks[0].text) fail('receipt quote: ' + JSON.stringify(j.blocks[0]));",
+            "if (!j.blocks[2].url.endsWith('/app/i/budget-override')) fail('receipt digest: ' + JSON.stringify(j.blocks[2]));",
+            "const plain = { title: 't', blocks: [{kind:'story',story:'meeting',pid:'vid1'},{kind:'note',text:'n'}] };",
+            "if (!encodePaperQS(plain).startsWith('v=2')) fail('a paper without C2 kinds or layouts stays v=2');",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"the C2 kinds misbehaved:\n{r.stdout}{r.stderr}")
+
     def test_the_editor_helpers_are_pure_and_total(self):
         """specs/23 A3: the on-page editor's three pure helpers, in node —
         insertBlock lands at the index it is given (or the end) and refuses
@@ -3097,6 +3151,12 @@ class TestPaper(unittest.TestCase):
                       "function newPaper(", "function switchPaper(", "function deletePaper(",
                       'data-cz="pnew"', 'data-cz="pdelete"', "function paintLayouts(",
                       "function renderHead(", "function setBlockLayout(", "cz-edlayout",
+                      # C2: the three ref kinds, their renders and adds, the
+                      # lines search over the static index, the print sheet
+                      "function renderQuote(", "function renderDoc(", "function renderDigest(",
+                      "function addQuoteRef(", "function addDocRef(", "function addDigestRef(",
+                      "function linesSearch(", "function docChooser(", "function segLines(",
+                      'data-cz="pquote"',
                       "const PAPER_VS = [\"1\", \"2\", \"3\"]"):
             self.assertIn(token, self.JS, f"{token!r} drifted in app.js")
 
