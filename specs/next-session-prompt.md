@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, ⟦TIME⟧ — v2.2.5 / r52 IS LIVE: no one named beside an issue whom the record does not already name
+## 2026-09-24, 18:53Z — v2.2.5 / r52 IS LIVE: no one named beside an issue whom the record does not already name
 
 A fix to v2.2.4, found on the live planes after a session restart: two
 chips named people the record does not otherwise aggregate (specs/17's
@@ -157,12 +157,31 @@ public comment). The CHANGELOG entry says what; the shape:
   reaches a pressed story, the rule goes there too, pressed and live alike.
   A peer suggested the rule on every co-word surface; the *Who and when*
   column is the names plane itself, so it already agrees.
-- **Tests**: ⟦TESTS⟧.
-- **Deploy**: r52 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
-  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.5`
-  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.5` at ⟦TAGAT⟧.
-- **Reviewed**: ⟦REVIEW⟧.
+- **Tests**: 1006 (110 PG-backed skip without a DSN). New in
+  `tests/test_web_beside.py`: what counts as ordinary (casing that means
+  something, the calendar, acronyms, a quarter of the capitals), a name the
+  record does not show held back and one it shows counted, ALL-CAPS captions
+  and a person of ordinary words, a name of everyday words known by its
+  capitals, the lower-case vouch weighed against capitals, what counts as a
+  capital (a line's first word, *Mr.*, a shy captioner, *I'm*), and the press
+  handing the rule the names plane and the roll calls; in
+  `tests/test_web_bake.py`: a meeting's reading labelled as a reading. Each
+  new case fails with its rule reverted.
+- **Deploy**: r52 (image `sha256:6e0e92d5…`, built from 3195099) on the service
+  (revision record-api-00044-mzh) and all six jobs; the press at `--version 2.2.5`
+  (execution record-press-txgzq, 18:51Z); Pages a94282f (the workflow carried it, run 36044046829); `sw.js` key `cz-record-2.2.5-9eb9be490f17df4c`;
+  tag `v2.2.5` at 3195099.
+- **Reviewed**: one adversarial pass (six findings, six folded: the page
+  promising more than the rule keeps — a name of everyday words passed; the
+  paper block's empty state; the session notes and fixtures naming people
+  the record does not list; a lone word's reasoning; a meeting's reading
+  labelled as the meeting; a casing gate a captioner could fool) — then a
+  skeptic on the folds (six, folded: rule-made capitals such as *I'm*
+  reopening the gate; the lower-case vouch releasing an analyzer-found
+  person; the history still naming people — the branch was squashed so no
+  commit does; a test that proved nothing; holidays held back as names;
+  three imprecise counts). Live after the deploy: 159 chips, none naming
+  the people the rule withholds.
 - **Next, in order** (corrected: *housing* has been the second featured
   word since specs/27; the phone board was built in P0, and a fresh read
   of the front page at 375 wide against it is still worth an hour): prove
