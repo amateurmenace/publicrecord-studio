@@ -155,7 +155,7 @@ def _no_sidecars(tool: str) -> Path:
 
 
 def press(corpus, out_dir: str, version: str = "",
-          site_base: str = "", api: str = "") -> dict:
+          site_base: str = "", api: str = "", stills=None) -> dict:
     """Press the specs/16 edition out of a store — here, a `PgCorpus`.
 
     This is `web.bake.bake()` with its two desk-shaped assumptions replaced:
@@ -168,6 +168,11 @@ def press(corpus, out_dir: str, version: str = "",
     Returns the bake's own report, plus `fingerprint`, `pressed_at`, `out`
     and `sidecars` — the last of which is False and means it: no edition
     pressed from the cloud carries translated or described tracks yet.
+
+    `stills` is the picture desk (record/stills.py) — the hosted press's
+    default is one with a cache seeded from the edition bucket, so each
+    tape's poster and frames are fetched from YouTube once and never again
+    (specs/29 §P0.2); None presses no stills.
     """
     from web import bake as _bake
     from web import emit
@@ -198,9 +203,12 @@ def press(corpus, out_dir: str, version: str = "",
     # edition as fresher than it is.
     fingerprint = corpus_fingerprint(corpus)
 
-    b = _bake.Bake(corpus, out, version, _no_sidecars)
+    b = _bake.Bake(corpus, out, version, _no_sidecars, stills=stills)
 
     print("pressing the edition…")
+    # the pictures first (specs/29 §P0.2): the poster and three frames of
+    # every tape, from the cache the bucket seeded, else fetched once
+    b.bake_stills()
     meetings = b.bake_meetings()
     # Publisher's reading half — an extractive kit per meeting with a video and
     # moments (specs/20 §7.9 P2). A stage in web/bake.py is a stage here too, or
@@ -232,10 +240,13 @@ def press(corpus, out_dir: str, version: str = "",
     emit.emit_assets(out, version, manifest)
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
-                    towns=towns, tombstones=tombstones, kits=kits, topics=topics)
+                    towns=towns, tombstones=tombstones, kits=kits, topics=topics,
+                    stills=b.have_stills)
 
     pressing = _write_pressing(out, manifest, fingerprint)
 
+    if stills:
+        print(f"  stills: {len(b.have_stills)} meeting(s) with pictures — {stills.note()}")
     print(f"  {len(towns['towns'])} town(s) · {len(meetings)} meetings · "
           f"{len(issues)} issues · "
           f"{idx['segments']} segments indexed ({idx['terms']} terms) · "
@@ -608,13 +619,29 @@ def main(argv=None):
                          "RECORD_API_BASE; omit for a purely static edition)")
     ap.add_argument("--force", action="store_true",
                     help="press even when the record has not moved")
+    ap.add_argument("--no-stills", action="store_true",
+                    help="press no pictures (the poster and frames are "
+                         "fetched once and cached under RECORD_STILLS_DIR "
+                         "otherwise; the bucket seeds the cache)")
     args = ap.parse_args(argv)
 
     from .settings import settings
+    from .stills import Stills
     from .store import PgCorpus
 
     out_dir = args.out or settings.edition_dir
     bucket = args.bucket or settings.edition_bucket
+
+    stills = None
+    if not args.no_stills:
+        # the picture desk: the cache is seeded from what the bucket already
+        # holds (a job's disk is new every night), so YouTube is asked only
+        # for the tapes that landed since the last pressing
+        stills = Stills(cache=Path(settings.stills_dir), fetch=True)
+        if bucket:
+            seeded = stills.seed_from_bucket(bucket, f"{args.prefix.strip('/')}/stills")
+            if seeded:
+                print(f"  stills: {seeded} seeded from gs://{bucket}")
 
     corpus = PgCorpus()
     try:
@@ -623,7 +650,8 @@ def main(argv=None):
             print(f"the record has not moved since the last pressing "
                   f"({corpus_fingerprint(corpus)}) — nothing to press")
             return 0
-        report = press(corpus, out_dir, args.version, args.base, api=args.api)
+        report = press(corpus, out_dir, args.version, args.base, api=args.api,
+                       stills=stills)
     finally:
         corpus.close()
 

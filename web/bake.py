@@ -496,16 +496,48 @@ _EXTRACTIVE_DELTA = re.compile(r"“.+?” returned.*?\. That is \d+ appearances
 # --------------------------------------------------------------------------
 
 class Bake:
-    def __init__(self, corpus, out: Path, version: str, media):
+    def __init__(self, corpus, out: Path, version: str, media, stills=None):
         self.c = corpus
         self.out = out
         self.version = version
         self.media = media
         self.budgets = []          # (label, gz_bytes)
         self.warnings = []
+        # the picture desk (record/stills.py) — None presses no stills, and
+        # every page that would show one shows the town's colour instead
+        self.stills = stills
+        self.have_stills = {}      # pid -> {"poster": bool, "frames": [1, 2, 3]}
 
     def note(self, label, gz):
         self.budgets.append((label, gz))
+
+    # -- stills (specs/29 §P0.2): the tape's own pictures, pressed -------
+    def bake_stills(self):
+        """The poster and three in-tape frames of every live meeting with a
+        tape, into app/stills/ — fetched once, cached across pressings, so
+        the reader page loads them from the edition and never from a third
+        party. Runs before the meeting planes so each plane can say whether
+        its still exists. Without a picture desk (the desk's default) it
+        presses nothing and the pages say so with a town-coloured card."""
+        self.have_stills = {}
+        if not self.stills:
+            return self.have_stills
+        rows = [(pid(m["id"]), m.get("video_id") or "")
+                for m in self.c.list_meetings(limit=2000)
+                if m.get("status") == "live" and m.get("video_id")]
+        self.have_stills = self.stills.press(rows, self.out / "stills")
+        return self.have_stills
+
+    def still_of(self, p: str, frame: int = 0) -> str:
+        """The edition path of a pressed still, or "" when none was pressed."""
+        rec = self.have_stills.get(p)
+        if not rec:
+            return ""
+        if frame and frame not in rec.get("frames", []):
+            return ""
+        if not frame and not rec.get("poster"):
+            return ""
+        return f"/app/stills/{p}{'-' + str(frame) if frame else ''}.jpg"
 
     # -- meetings ---------------------------------------------------------
     def bake_meetings(self):
@@ -524,7 +556,12 @@ class Bake:
             # itself — the desk's Highlighter analyzer, made static. Pure over
             # segments (no wall-clock), so the edition stays byte-idempotent.
             from highlighter import insight
+            from memory import analyze as _analyze
             framing = insight.framing(segs) if segs else {"lenses": [], "total": 0}
+            # the score of the night (specs/29 §P0.1): where each lens's
+            # words fell, sixty slices of the tape — counted with the same
+            # word lists, so a lane's bins sum to its lens's count
+            track = _analyze.framing_track(segs) if segs else {}
             quests = insight.questions(segs) if segs else []
             tension = insight.disagreements(segs) if segs else []
             # stored decisions, re-validated against the word-boundary matcher
@@ -552,6 +589,11 @@ class Bake:
                 "summary": m.get("summary", ""),
                 "summary_origin": m.get("summary_origin", ""),
                 "thumb": _thumb(m),
+                # the pressed still (specs/29 §P0.2) — the edition's own copy
+                # of the poster, or "" when none was pressed; `frames` counts
+                # the in-tape frames beside it (0–3)
+                "still": self.still_of(p),
+                "frames": len((self.have_stills.get(p) or {}).get("frames") or []),
                 "tracks": langs, "ad": bool(tr["ad"]),
                 "votes": [{"t": v["t"], "motion": v["motion"],
                            "outcome": v["outcome"], "tally": v["tally"],
@@ -575,9 +617,13 @@ class Bake:
                                     "drift": l["drift"],
                                     "first_half": l["first_half"],
                                     "second_half": l["second_half"],
+                                    # a sample of the lens's moments (a cap,
+                                    # never a count) — the score's clickable
+                                    # ticks; the lane itself is the track
                                     "moments": [{"t": mo["t"], "text": mo["text"],
                                                  "words": mo.get("words", [])}
-                                                for mo in l["moments"][:6]]}
+                                                for mo in l["moments"][:6]],
+                                    "track": list(track.get(l["lens"]) or [])}
                                    for l in framing.get("lenses", [])
                                    if l["count"] > 0],
                     },
@@ -1109,11 +1155,15 @@ class Bake:
         # meeting document per hit to find out whether to show it.
         # `duration` rides along too (specs/25): the search page's story
         # needs each tape's length to place a hit on it and to end a clip
+        # `still` (specs/29): whether the edition holds this tape's poster,
+        # so the search page and the spine's type-ahead can show it without
+        # a probe — 1 or 0, never a third-party address
         meta = [{"pid": m["pid"], "title": m["title"], "body": m["body"],
                  "town": m["town"], "date": m["date"],
                  "video_id": m["video_id"],
                  "source_kind": m["source_kind"],
-                 "duration": m["duration"] or 0} for m in meetings]
+                 "duration": m["duration"] or 0,
+                 "still": 1 if m.get("still") else 0} for m in meetings]
         segs = []                       # [mi, t, speaker, text] — segId = index
         index = {}                      # term -> [segId,...]
         for mi, m in enumerate(meetings):
@@ -1242,7 +1292,11 @@ class Bake:
 
 
 def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
-         api: str = "") -> dict:
+         api: str = "", stills=None) -> dict:
+    """Press the desk's edition. `stills` is a record.stills.Stills (the
+    picture desk) or None: the desk presses no stills unless asked (a test
+    bake must never touch the network), and every page that would show one
+    shows the town's colour instead."""
     from czcore.paths import media_dir
     from memory.store import Corpus
 
@@ -1260,9 +1314,12 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     out.mkdir(parents=True, exist_ok=True)
 
     corpus = Corpus(corpus_db) if corpus_db else Corpus()
-    b = Bake(corpus, out, version, media_dir)
+    b = Bake(corpus, out, version, media_dir, stills=stills)
 
     print("pressing the edition…")
+    # the pictures first (specs/29 §P0.2), so every plane can say whether
+    # its still exists; a press without a picture desk presses none
+    b.bake_stills()
     meetings = b.bake_meetings()
     kits = b.bake_kits(meetings)
     by_id = {m["id"]: m for m in meetings}
@@ -1284,8 +1341,11 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     emit.emit_assets(out, version, manifest)
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
-                    towns=towns, tombstones=tombstones, kits=kits, topics=topics)
+                    towns=towns, tombstones=tombstones, kits=kits, topics=topics,
+                    stills=b.have_stills)
 
+    if stills:
+        print(f"  stills: {len(b.have_stills)} meeting(s) with pictures — {stills.note()}")
     print(f"  {len(towns['towns'])} town(s) · {len(towns['bodies'])} bodies · "
           f"{len(meetings)} meetings · {len(issues)} issues · "
           f"{idx['segments']} segments indexed ({idx['terms']} terms) · "
@@ -1313,12 +1373,23 @@ def main(argv=None):
                          "edition: search then runs entirely in the browser "
                          "and the bytes are identical to a pressing from "
                          "before this flag existed.")
+    ap.add_argument("--stills", action="store_true",
+                    help="press each tape's poster and three frames into "
+                         "app/stills (fetched once from YouTube, cached under "
+                         "RECORD_STILLS_DIR or ~/.cache/publicrecord/stills). "
+                         "Off by default: a desk press touches no network.")
     args = ap.parse_args(argv)
     try:
         from suite import __version__ as version
     except Exception:
         version = "0"
-    r = bake(args.corpus, args.out, version, args.base, api=args.api)
+    stills = None
+    if args.stills:
+        import os
+        from record.stills import Stills
+        cache = os.environ.get("RECORD_STILLS_DIR") or str(Path.home() / ".cache" / "publicrecord" / "stills")
+        stills = Stills(cache=Path(cache), fetch=True)
+    r = bake(args.corpus, args.out, version, args.base, api=args.api, stills=stills)
     return 1 if r.get("busts") else 0
 
 

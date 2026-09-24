@@ -124,6 +124,16 @@ def set_edition(towns_plane) -> None:
     _EDITION.update(towns_plane or {})
 
 
+# The search spine's "try" words (specs/29) — the record's own widest issues
+# and recurring topics, set once per bake beside the edition; the masthead
+# presses them on the front page.
+_SPINE = {"tries": []}
+
+
+def set_spine(tries) -> None:
+    _SPINE["tries"] = [str(x) for x in (tries or [])][:6]
+
+
 def esc(s) -> str:
     return html.escape(str(s or ""), quote=True)
 
@@ -192,7 +202,7 @@ def head(title, desc, canonical, og_image="", version="0", feed=None):
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:url" content="{esc(canonical)}">{og}
-<meta name="theme-color" content="#f8fafc">
+<meta name="theme-color" content="#F3EEE3">
 <link rel="icon" href="/app/favicon.svg">
 <link rel="manifest" href="/app/manifest.webmanifest">
 {_feed_link(feed)}<link rel="alternate" type="application/rss+xml" title="The record — new meetings and resurfacings" href="/app/feeds/firehose.xml">
@@ -280,19 +290,23 @@ def folio(manifest):
 
 
 def masthead(current, manifest):
-    """The nameplate — the publicrecord keycap (byte-equal from brand/logos)
-    and the lowercase mono lockup — over the classic masthead rule pair, then
-    the folio and the section line. 'Get the desktop app' is demoted off the
-    masthead to /app/press and the footer (specs/20 §5)."""
-    return f"""<header class="masthead">
-  <div class="nameplate">
-    <a class="brand" href="/app/" aria-label="publicrecord.studio — the record">
-      <span class="brandmark">{_brand_mark()}</span>
-      <span class="wm">publicrecord<span class="tld">.studio</span></span>
-    </a>
-  </div>
-  {folio(manifest)}
-  {section_nav(current)}
+    """The broadsheet's chrome (specs/29): the thin top bar — the site's
+    name with the keycap (byte-equal from brand/logos, never redrawn), the
+    edition line, the READ stamp — then, on the front page, the nameplate
+    with the municipality switch and the search spine; then the section
+    line with its five reading words and one rust writing word. Off the
+    front page the top bar's name is the way back and the spine stays on
+    the search page."""
+    from . import broadsheet as _bs
+    top = _bs.topbar(manifest, current, _brand_mark())
+    if current == "home":
+        plate = _bs.nameplate(manifest, _EDITION.get("towns") or []) + _bs.spine(_SPINE["tries"])
+    else:
+        plate = ""
+    return f"""<header class="masthead bs-masthead">
+  {top}
+  {plate}
+  {_bs.primary_nav(current)}
 </header>"""
 
 
@@ -302,20 +316,19 @@ def footer(manifest):
     # any time", and a reader who has scrolled to the bottom of a four-hour
     # transcript should not have to scroll back up to leave a town. The anchor
     # works with JavaScript off, because it is only an anchor.
-    again = ('<a class="scopelink" href="#scope">town — change</a>'
+    again = ('<a class="scopelink" href="#scope">municipality — change</a>'
              if len(_EDITION.get("towns") or []) > 1 else "")
-    return f"""<footer class="foot">
-  <span class="foot-mark">{_brand_mark()}</span>
-  <a class="cov" href="/app/covenant">the covenant</a>
-  <a class="cov" href="/app/ai">Our AI Constitution</a>
-  <a class="cov" href="/app/press">the press · get the desktop app</a>
-  {again}
-  <span class="foot-credit">an open source project from
-    <a href="https://weirdmachine.org">weird machine</a> and
-    <a href="https://brooklineinteractive.org">brookline interactive group</a>.
-    this project uses AI in accordance with
-    <a href="/app/ai">Our AI Constitution</a>.</span>
-  <span class="ed">edition {esc(ed)} · v{esc(manifest.get('version',''))}</span>
+    return f"""<footer class="foot bs-foot">
+  <span class="bs-footline"><span class="foot-mark">{_brand_mark()}</span>publicrecord.studio · designed and developed by Stephen Walter with
+    <a href="https://brooklineinteractive.org">Brookline Interactive Group</a> &amp; Neighborhood AI</span>
+  <span class="bs-footline">readers are never logged in, counted or followed ·
+    <a class="cov" href="/app/covenant">the covenant</a> ·
+    <a class="cov" href="/app/ai">Our AI Constitution</a> ·
+    <a class="cov" href="/app/analytics">the record drawn</a> ·
+    <a class="cov" href="/app/watching">still watching</a> ·
+    <a class="cov" href="/app/press">the press · get the desktop app</a>
+    {(" · " + again) if again else ""} · CC BY-SA 4.0
+    <span class="ed">edition {esc(ed)} · v{esc(manifest.get('version',''))}</span></span>
 </footer>"""
 
 
@@ -487,72 +500,26 @@ def page_topic(t, issues, manifest, base, analytics=None):
                  version=manifest["version"])
 
 
-def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None, topics=None):
-    """The front page — two stories, one toggle (specs/24 §2.4).
+def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None, topics=None,
+              stills=None):
+    """The front page — the civic broadsheet (specs/29 P0).
 
-    The record's front page is a story, told by the press: the record over
-    time (votes, threads, framing, topics, the record in words — with a
-    counted commentary), and the latest meeting, what happened (its numbers,
-    its shape, the moments that decided it, its roll calls, framing,
-    questions, words, names, filings). Both are pressed as real HTML; the
-    reader's script shows one at a time and remembers the choice in this
-    browser; with JavaScript off both stand in order. Each ends where the
-    making half begins — "make this story yours" opens the same story as a
-    draft in the studio — and the two paths section beneath says the rest.
-    The briefs and the access ledger close the page."""
-    from . import story
-    ms = sorted(meetings, key=lambda m: (m.get("date") or ""), reverse=True)
-    lead = ms[0] if ms else None
-    over = story.over_time(meetings, issues, stats, analytics, base="/app")
-    latest = (story.latest(lead, base="/app") if lead else
-              '  <article class="fp-story fp-latest" id="latest"><span class="kicker">the latest meeting on the record</span>'
-              '<p class="hint">The record is empty — no meetings pressed yet.</p></article>\n')
-    # a word, over time (specs/25): the featured topic leads the page when the
-    # record holds one — the search, told as a story, pressed whole
-    topics = topics or []
-    examples = _examples(analytics, issues)
-    told = "".join(story.topic(t, base="/app", issues=issues, examples=examples) for t in topics)
-    tabs = story.tabs(lead["title"] if lead else "", topics)
-
-    # -- briefs: the next few meetings --
-    briefs = "".join(_brief_card(m) for m in ms[1:6]) or \
-        '<p class="hint">just the one meeting, so far</p>'
-
-    # -- the access ledger: captioned / translated / described, honest zeros --
-    langs = stats["languages"]
-    translated = (", ".join(f'{esc(l["name"])} {l["pct"]}%' for l in langs)
-                  if langs else
-                  "0 — no meeting is translated yet; the drain fills this in")
-    access = (
-        f'<div class="acc"><span class="acc-l">captioned</span>'
-        f'<b class="acc-n">{stats["access"]["captioned_pct"]}%</b>'
-        f'<span class="acc-w">every live meeting ships its words</span></div>'
-        f'<div class="acc"><span class="acc-l">translated</span>'
-        f'<span class="acc-w">{translated}</span></div>'
-        f'<div class="acc"><span class="acc-l">described</span>'
-        f'<b class="acc-n">{stats["access"]["described_pct"]}%</b>'
-        f'<span class="acc-w">audio description arrives with the drain</span></div>')
-
-    # -- the two paths into a story of your own (specs/24; the front door of specs/23 A1) --
-    door = _story_paths(ms, stats, featured)
-
+    In the order of board 1: the masthead with the municipality switch and
+    the READ stamp and the search spine (both the shell's, on this page);
+    tonight's tape — the frame large, the score of the night, the counted
+    headline and lede, money named on the tape, the filmstrip; the year in
+    tapes with its four chapters; four columns to delve into; how the talk
+    flowed; the front pages the press built; this week; the threads; and
+    the three doors into writing. Every picture is pressed SVG with its
+    numbers beside it; every control is an anchor; with scripts off the page
+    reads whole. web/broadsheet.py lays it out; web/story.py writes the
+    words; web/charts.py draws."""
+    from . import broadsheet as _bs
+    body = _bs.page_body(meetings, issues, stats, base="/app", featured=featured,
+                         analytics=analytics, topics=topics, stills=stills,
+                         bodies_html=body_strip())
     c = stats["counts"]
-    body = f"""
-  <form class="askform frontsearch" action="/app/s" method="get">
-    <input name="q" placeholder="ask the record — a phrase, a topic, a street name…" aria-label="Search the record">
-    <button class="btn primary" type="submit">Search</button>
-    <a class="addline" href="/app/add">＋ Add a meeting</a>
-  </form>
-  <p class="scopeline" id="scopeline" hidden></p>
-{tabs}{told}{over}{latest}{door}  {body_strip()}
-  <div class="storyrow">
-    <section class="story"><div class="sectionhead"><span class="kicker">also on the record</span></div>
-      <div class="mcards briefs">{briefs}</div></section>
-    <section class="story"><div class="sectionhead"><span class="kicker">the access ledger</span></div>
-      <div class="accled">{access}</div></section>
-  </div>
-"""
-    return shell("The record — publicrecord.studio",
+    return shell("The Public Record — publicrecord.studio",
                  f"{c['meetings']} meetings, {c['hours']} hours, {c['issues']} issues "
                  "tracked across the record — open in any browser.",
                  f"{base}/app/", body, "home", manifest, version=manifest["version"])
@@ -592,10 +559,13 @@ def page_meeting(m, manifest, base, terms=None):
             f'<a class="ts" href="#t{int(t)}">{hms(t)}</a> '
             f'{head_spk}<span class="sx">{esc(s.get("text"))}</span></p>')
     transcript = "\n".join(rows)
-    thumb = m["thumb"]
+    # the tape's poster is the edition's own still when the press pressed
+    # one (specs/29 §P0.2) — the page loads nothing from a third party;
+    # a still-less press shows the town's colour and the play button
+    thumb = m.get("still") or ""
     player = ""
     if m["source_kind"] == "youtube" and m["video_id"]:
-        player = (f'<div class="player facade" data-video="{esc(m["video_id"])}">'
+        player = (f'<div class="player facade" data-video="{esc(m["video_id"])}" style="--town:{_charts_town_light(m.get("town"))}">'
                   + (f'<img src="{esc(thumb)}" alt="" class="pfacade-img">' if thumb else "")
                   + '<button class="playbtn" type="button" aria-label="Play (loads YouTube)">▶</button>'
                   '<span class="phint">tap to load the tape · nothing plays until you do</span></div>')
@@ -813,6 +783,7 @@ def page_meeting(m, manifest, base, terms=None):
              ("framing", "the framing", bool(framing_html)), ("questions", "the questions", bool(questions_html)),
              ("words", "in words", bool(words_html)), ("transcript", "the transcript", True),
              ("downloads", "downloads", True)]
+    jumps.insert(1, ("score", "the shape of the tape", True))
     jump = ('<nav class="mp-jump" aria-label="on this page"><span class="kicker">on this page</span>'
             + "".join(f'<a href="#{k}">{esc(label)}</a>' for k, label, have in jumps if have) + '</nav>')
     # the words this meeting uses that the glossary explains (specs/27 §3.4) —
@@ -821,10 +792,27 @@ def page_meeting(m, manifest, base, terms=None):
         jump += ('<p class="mp-terms"><span class="kicker">words this meeting uses</span> '
                  + " · ".join(f'<a href="/app/glossary/#{esc(t["slug"])}">{esc(t["term"])}</a>' for t in terms)
                  + ' — <a href="/app/glossary/">the glossary</a> says what they mean</p>')
+    # the score as the jump bar (specs/29 board 4): the tape as a timeline —
+    # decisions as dots, questions as ticks, tension in rust, the lens lanes —
+    # click to seek with the script on, an anchor into the tape without it
+    from . import charts as _charts
+    score_html = (f'<section class="card bs-scorecard mp-score" id="score"><div class="bs-scorehead">'
+                  f'<span class="kicker">the shape of the tape — click anywhere to jump</span>'
+                  f'<span class="bs-legend">● a decision, sized by weight · | a question · ▮ tension · $ money named · the eight lanes: where each lens’s words fell</span></div>'
+                  + _charts.score(m, base="/app", questions=True) + '</section>') if m.get("duration") else ""
+    # find in this meeting (specs/26 §2.2, on the broadsheet): a real form
+    # that searches the record without the script; with it, the transcript
+    # folds to the lines that say the word (app.js wireFind adopts this form)
+    find_html = ('<form class="mp-find bs-find" id="find" role="search" action="/app/s" method="get">'
+                 '<label for="mp-q">Find in this meeting</label>'
+                 '<input id="mp-q" type="search" name="q" placeholder="a word, a name, a street — every hit becomes a jump" autocomplete="off">'
+                 '<button class="btn" type="submit">Find</button>'
+                 '<span class="mp-findn" aria-live="polite"></span><div class="mp-found" hidden></div></form>')
+    kick = " · ".join(x for x in (m["town"], m["body"]) if x)
     body = f"""
   <article class="meeting" data-pid="{esc(m["pid"])}" data-town="{esc(m["town"])}" data-body="{esc(m["body"])}" data-end="{tape_end}">
-    <div class="mhead">
-      <a class="back" href="/app/">← the record</a>
+    <div class="mhead bs-mhead" style="--town:{_charts_town_color(m.get("town"))}">
+      <span class="kicker bs-mkick">{esc(kick or "meeting")}</span>
       <h1>{esc(m["title"])}</h1>
       <div class="mmeta">{esc(meta)}</div>
       <div class="chips">{langs}
@@ -832,6 +820,8 @@ def page_meeting(m, manifest, base, terms=None):
     </div>
     {jump}
     <div id="tape">{player}</div>
+    {score_html}
+    {find_html}
     {cut_html}
     {summ}
     {moments_html}
@@ -852,8 +842,19 @@ def page_meeting(m, manifest, base, terms=None):
 """
     desc = (f'{m["body"]} · {m["date"] or "undated"} · '
             f'{int(round((m["duration"] or 0)/60))} min · read on the record')
+    og = f'{base}{thumb}' if thumb else ""
     return shell(m["title"], desc, f"{base}/app/m/{m['pid']}", body,
-                 "memory", manifest, og_image=thumb, version=manifest["version"])
+                 "memory", manifest, og_image=og, version=manifest["version"])
+
+
+def _charts_town_color(town) -> str:
+    from .charts import town_color
+    return town_color(town)
+
+
+def _charts_town_light(town) -> str:
+    from .charts import town_light
+    return town_light(town)
 
 
 def page_meeting_txt(m):
@@ -1129,6 +1130,7 @@ def featured_papers(meetings, issues, stats):
         m = ms[0]
         out.append({
             "title": "the latest meeting, covered",
+            "pid": m["pid"], "town": m.get("town") or "",
             "sub": f'{m.get("title") or m["pid"]} — as a story: its numbers, '
                    "its shape, its framing, the record's reading, and what "
                    "keeps coming back record-wide",
@@ -1424,10 +1426,11 @@ def page_search(manifest, base, examples=None, topics=None):
       <p class="sq-keys"><span class="kicker">keys</span> <kbd>/</kbd> search from any page · <kbd>j</kbd> <kbd>k</kbd> walk the hits · <kbd>enter</kbd> opens the tape · <kbd>c</kbd> cuts the hit under the cursor</p>
     </div>'''
     body = f"""
-  <section class="searchpage">
+  <section class="searchpage bs-searchpage">
+    <span class="kicker">Search a word over time</span>
     <h1>Search the record</h1>
-    <form class="askform" id="searchform" action="/app/s" method="get">
-      <input name="q" id="q" placeholder="a phrase, a topic, a street name…" aria-label="Search">
+    <form class="askform bs-searchform" id="searchform" action="/app/s" method="get">
+      <input name="q" id="q" placeholder="a word, a name, a street, a vote…" aria-label="Search">
       <button class="btn primary" type="submit">Search</button>
     </form>
     {filters}
@@ -2152,16 +2155,19 @@ _COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 # The two critical first-paint faces (body + headline) preloaded in <head>; the
 # rest swap in. font-display:swap means the system stack is the visible
 # fallback, never a blank. CSP stays font-src 'self' — every byte is ours.
-_FONTS = [("Inter", 400, "inter-400"), ("Inter", 500, "inter-500"),
-          ("Inter", 700, "inter-700"),
-          ("JetBrains Mono", 400, "jetbrains-mono-400"),
-          ("JetBrains Mono", 700, "jetbrains-mono-700"),
-          ("JetBrains Mono", 800, "jetbrains-mono-800")]
-_PRELOAD_FONTS = ["inter-400", "jetbrains-mono-700"]
+_FONTS = [
+    # (family, weight or range, style, file) — the broadsheet's three faces
+    ("Fraunces", "300 700", "normal", "fraunces-300-700"),
+    ("Fraunces", "300 700", "italic", "fraunces-italic-300-700"),
+    ("IBM Plex Sans", "400 600", "normal", "plex-sans-400-600"),
+    ("IBM Plex Mono", "400", "normal", "plex-mono-400"),
+    ("IBM Plex Mono", "500", "normal", "plex-mono-500"),
+]
+_PRELOAD_FONTS = ["plex-sans-400-600", "fraunces-300-700"]
 _FONT_FACES = "".join(
-    f"@font-face{{font-family:'{fam}';font-style:normal;font-weight:{w};"
+    f"@font-face{{font-family:'{fam}';font-style:{style};font-weight:{w};"
     f"font-display:swap;src:url('/app/fonts/{file}.woff2') format('woff2');}}"
-    for fam, w, file in _FONTS)
+    for fam, w, style, file in _FONTS)
 
 
 def _brand_vars(name) -> dict:
@@ -2185,29 +2191,34 @@ def _brand_inner(name) -> str:
 
 
 def _brand_tokens() -> str:
-    """The publicrecord :root — the quiet set, drawn byte-faithfully from
-    brand/. This supersedes the desk-token concatenation (specs/20 §8):
-    brand/ is the single source for the record's face, and the desk keeps its
-    own. Only the neutrals + deep green cross this line. The pop accents
-    (fuchsia, purple) and the whole warm desk palette never enter this file —
-    publicrecord is the quietest property, and its stylesheet has to prove it:
-    no forbidden hex ever appears, not even as an unused variable."""
-    c = _brand_vars("colors.css")
+    """The publicrecord :root — the civic broadsheet's set (specs/29), drawn
+    byte-faithfully from brand/tokens/broadsheet.css: paper and ink, rust for
+    writing, a municipality's colour for what belongs to it, and the three
+    faces. The semantic names the stylesheet has always used (--surface-page,
+    --text-primary, --accent, --state…) are kept and re-pointed, so every
+    older rule reads on paper without being re-typed. The pop accents
+    (fuchsia, purple) and the desk palette never enter this file — the
+    stylesheet has to prove it: no forbidden hex ever appears."""
+    b = _brand_vars("broadsheet.css")
     colours = (
-        f"--surface-page:{c['offwhite']};--surface-card:{c['white']};"
-        f"--surface-inverse:{c['ink']};"
-        f"--text-primary:{c['ink']};--text-secondary:{c['slate']};"
-        f"--text-muted:{c['slate-soft']};--text-inverse:{c['offwhite']};"
-        f"--border-hairline:{c['border-hairline']};--border-strong:{c['slate-soft']};"
-        # the accent, and the whole accent (deep green); emerald is state only
-        f"--accent:{c['green-deep']};--state:{c['green-emerald']};"
-        # measurement tints (green scale) — backgrounds in graphics only. The
-        # two lightest (green-50/100) are named in specs/20 §4; the two brighter
-        # come straight from brand (green-soft, green-bright).
-        f"--tint-1:#f0fdf4;--tint-2:#dcfce7;"
-        f"--tint-3:{c['green-soft']};--tint-4:{c['green-bright']};")
-    return (":root{" + colours + _brand_inner("typography.css") + " "
-            + _brand_inner("spacing.css") + "}")
+        f"--surface-page:{b['paper']};--surface-card:{b['paper-card']};"
+        f"--surface-inverse:{b['ink-record']};"
+        f"--text-primary:{b['ink-record']};--text-secondary:{b['ink-2']};"
+        f"--text-muted:{b['ink-muted']};--text-inverse:{b['paper']};"
+        f"--border-hairline:{b['rule']};--border-strong:{b['ink-muted']};"
+        # measurement and controls are ink; rust is the one action colour and
+        # the state light (the focus ring keeps its --state fallback)
+        f"--accent:{b['ink-record']};--state:{b['rust']};--write:{b['rust']};--write-light:{b['rust-light']};"
+        f"--paper:{b['paper']};--card:{b['paper-card']};--rule:{b['rule']};--rust:{b['rust']};"
+        f"--ink:{b['ink-record']};--ink-2:{b['ink-2']};--muted:{b['ink-muted']};"
+        f"--boston:{b['boston']};--boston-light:{b['boston-light']};"
+        f"--brookline:{b['brookline']};--brookline-light:{b['brookline-light']};"
+        # paper tints — the marks a reader leaves in a transcript
+        f"--tint-1:{b['paper-tint-1']};--tint-2:{b['paper-tint-2']};"
+        f"--tint-3:{b['rule']};--tint-4:{b['ink-muted']};"
+        f"--font-display:{b['font-display']};--font-sans:{b['font-sans']};--font-mono:{b['font-mono']};")
+    return (":root{" + _brand_inner("typography.css") + " " + _brand_inner("spacing.css") + " "
+            + colours + "}")
 
 
 def emit_assets(out: Path, version, manifest):
@@ -2241,7 +2252,7 @@ def _write_pwa(out: Path, manifest):
         "description": "A town's whole spoken life, cross-linked and searchable "
                        "— open in any browser.",
         "start_url": "/app/", "scope": "/app/", "display": "standalone",
-        "background_color": "#f8fafc", "theme_color": "#f8fafc",
+        "background_color": "#F3EEE3", "theme_color": "#F3EEE3",
         "icons": [{"src": "/app/favicon.svg", "sizes": "any",
                    "type": "image/svg+xml"}],
     }
@@ -2272,7 +2283,9 @@ def _write_pwa(out: Path, manifest):
         "/app/officials/", "/app/p/", "/app/r/", "/app/ai/",
         # the editor's add-search reads these two (specs/23 A3) — small, and
         # with them in the shell a paper can be assembled with the host gone
-        "/app/search/meta.json", "/app/issues/index.json"],
+        "/app/search/meta.json", "/app/issues/index.json",
+        # the municipality switch reads the edition's towns on every page
+        "/app/towns.json"],
         separators=(",", ":"))
     sw = f"""'use strict';
 // the record's service worker — precache the shell, keep last-read meetings,
@@ -2316,7 +2329,7 @@ self.addEventListener('fetch', e => {{
 
 def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
                analytics=None, graph=None, towns=None, tombstones=None,
-               kits=None, topics=None):
+               kits=None, topics=None, stills=None):
     v = manifest["version"]
     # before a single stub renders: the chrome needs to know what it may offer
     set_edition(towns)
@@ -2324,12 +2337,14 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     # written once at the end — the desk bake and the hosted press share this
     from . import pictures as _pictures
     _pictures.reset(base, manifest.get("edition_date") or "")
+    # …and what the search spine should suggest (specs/29): the record's own words
+    set_spine(_examples(analytics, issues))
     # the featured papers are computed HERE, from arguments bake and press
     # already pass identically — so the two pressings cannot drift apart
     featured = featured_papers(meetings, issues, stats)
     (out / "index.html").write_text(
         page_home(meetings, issues, stats, manifest, base, featured=featured,
-                  analytics=analytics, topics=topics),
+                  analytics=analytics, topics=topics, stills=stills or {}),
         encoding="utf-8")
     # a word, over time — each featured topic story at an address of its own
     for t in (topics or []):

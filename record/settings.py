@@ -119,6 +119,11 @@ class Settings:
     papers_bucket: str = field(default_factory=lambda: _env("RECORD_PAPERS_BUCKET"))
     edition_dir: str = field(default_factory=lambda: _env(
         "RECORD_EDITION_DIR", "/tmp/record-edition"))
+    # Where the press keeps the tapes' pictures between pressings (specs/29
+    # §P0.2). Outside the edition dir on purpose: the press wipes that whole
+    # directory on every run, and a cache that dies with it is not a cache.
+    stills_dir: str = field(default_factory=lambda: _env(
+        "RECORD_STILLS_DIR", "/tmp/record-stills"))
 
     @property
     def has_neural(self) -> bool:

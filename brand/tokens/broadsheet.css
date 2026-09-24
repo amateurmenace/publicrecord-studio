@@ -1,0 +1,17 @@
+:root{
+  /* publicrecord.studio — the civic broadsheet (specs/29). Paper and ink; a
+     municipality's colour on everything that belongs to it; rust for the one
+     action — writing — and for the failed vote, the pushback, the playhead.
+     The lens hues stay the analyzer's own and never enter a stylesheet. */
+  --paper:#F3EEE3; --paper-card:#FBF9F4;
+  --ink-record:#191712; --ink-2:#4B473E; --ink-muted:#6F6A5B; --rule:#D9D1BF;
+  --rust:#B23A1D; --rust-light:#F6E2DB;
+  --boston:#1F4E79; --boston-light:#DEE8F3; --brookline:#1E5E3F; --brookline-light:#DDEBE1;
+  /* paper tints — the marks a reader leaves (a line found, a line in the reel) */
+  --paper-tint-1:#ECE5D4; --paper-tint-2:#E4DBC6;
+  /* type: Fraunces for display (headlines, card titles, the wordmark),
+     IBM Plex Sans for reading, IBM Plex Mono for numbers, kickers, receipts */
+  --font-display:'Fraunces',Georgia,'Times New Roman',serif;
+  --font-sans:'IBM Plex Sans','Helvetica Neue',Arial,sans-serif;
+  --font-mono:'IBM Plex Mono',Menlo,Consolas,monospace;
+}

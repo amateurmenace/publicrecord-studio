@@ -145,3 +145,39 @@ def _prompt(segments: List[dict], info: Optional[dict], budget: int = 40000,
         body = "\n".join(lines[::stride])
     head = f"Meeting: {title}\n\n" if title else ""
     return f"{head}Transcript passages:\n{body}\n\n{ask}"
+
+
+# --------------------------------------------------------------------------
+# the score of the night (specs/29 §P0.1) — where each lens's words fell
+# --------------------------------------------------------------------------
+
+TRACK_BINS = 60
+
+
+def framing_track(segments: List[dict], bins: int = TRACK_BINS) -> dict:
+    """Where each lens's words fell along the tape: for every civic lens, the
+    count of its words in each of `bins` equal slices of the meeting — the
+    eight lanes the front page's score reads. Counted with the lenses' own
+    word lists exactly as `highlighter.insight.framing` counts them, over the
+    same tape length (the last caption's end), so a lane's bins sum to the
+    lens's count and the two never disagree. Pure over the segments: no
+    model, no clock — two presses of one tape agree byte for byte."""
+    import re
+
+    from highlighter.insight import FRAMING_LENSES
+
+    bins = max(1, int(bins or 0))
+    out = {name: [0] * bins for name, _color, _words in FRAMING_LENSES}
+    if not segments:
+        return out
+    dur = max(float(s.get("end", 0) or 0) for s in segments) or 1.0
+    for name, _color, words in FRAMING_LENSES:
+        rx = re.compile(r"\b(?:" + "|".join(map(re.escape, words)) + r")", re.I)
+        row = out[name]
+        for s in segments:
+            n = len(rx.findall(str(s.get("text", ""))))
+            if not n:
+                continue
+            t = float(s.get("start", 0) or 0)
+            row[min(bins - 1, max(0, int(bins * t / dur)))] += n
+    return out

@@ -20,10 +20,32 @@ import math
 import re
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
-GREEN = "#052e16"     # measurement (the record's deep green)
-INK = "#0f172a"       # text
-SLATE = "#475569"     # labels
-HAIR = "#e2e8f0"      # rules
+# The broadsheet's palette (specs/29): paper and ink, a municipality's
+# colour on what belongs to it, rust for the one action — writing — and for
+# the failed vote, the pushback, the playhead. The lens hues stay the
+# analyzer's own (highlighter.insight.FRAMING_LENSES). Measurement is ink.
+PAPER = "#F3EEE3"     # the page
+CARD = "#FBF9F4"      # a card, a chart's ground
+INK = "#191712"       # text, measurement
+INK2 = "#4B473E"      # second ink — labels, ledes
+MUTED = "#6F6A5B"     # muted — axes, receipts
+RULE = "#D9D1BF"      # rules, hairlines
+RUST = "#B23A1D"      # writing; the failed vote; tension; the playhead
+MONEY = "#7A5A10"     # a dollar figure's label (the financial lens, darkened to AA)
+GREEN = INK           # the old name for measurement — ink now; callers keep the name
+SLATE = INK2
+HAIR = RULE
+# a municipality's colour, on every card top, kicker and dot that belongs to
+# it — (the colour, its light) by town name, case-blind; an unknown town is ink
+TOWNS = {"boston": ("#1F4E79", "#DEE8F3"), "brookline": ("#1E5E3F", "#DDEBE1")}
+
+
+def town_color(town) -> str:
+    return TOWNS.get(str(town or "").strip().lower(), (INK, RULE))[0]
+
+
+def town_light(town) -> str:
+    return TOWNS.get(str(town or "").strip().lower(), (INK, RULE))[1]
 
 # transcript artifacts a story must not mistake for a topic
 ARTIFACTS = {"clears throat", "music", "applause", "laughter", "mhm", "um", "uh",
@@ -771,3 +793,737 @@ def coword_bars(words: Sequence[dict], q: str, base: str = "/app", town: str = "
                     f'<span class="lensbar"><i style="width:{round(100 * int(w["count"]) / mx)}%"></i></span>'
                     f'<span class="lensn">{int(w["count"])}</span><span class="lensdrift"></span></div>')
     return f'<div class="lenses fp-topics tp-cowords">{"".join(rows)}</div>'
+
+
+# ==========================================================================
+# the broadsheet (specs/29) — the pictures of the front page, the meeting
+# page's score and the search page's timeline. Pure and deterministic:
+# every function is a rule over the pressed planes, writes plain SVG, and
+# carries its numbers beside it as data-bs-* JSON so app.js can re-light
+# the picture (a click moves the playhead; a chapter re-lights the year)
+# without a second fetch. With scripts off every picture is a still and
+# every control an anchor into the meeting or the search.
+# ==========================================================================
+
+import json as _json
+
+LENS_ORDER = ("financial", "safety", "community", "environmental",
+              "legal", "equity", "infrastructure", "process")
+LENS_COLOR = {"financial": "#A97A16", "safety": "#B0542D", "community": "#3FA9D0",
+              "environmental": "#1E7F63", "legal": "#7E5B8E", "equity": "#C77BA6",
+              "infrastructure": "#B08968", "process": "#7E7D75"}
+MONTH_DAYS = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+MONO = "font-family:var(--font-mono)"
+
+
+def data_attr(name: str, obj) -> str:
+    """A picture's numbers, beside it: data-bs-<name>='<json>' — sorted keys,
+    no spaces, HTML-escaped once, so two presses agree byte for byte and the
+    attribute cannot break out of its quotes."""
+    return f'data-bs-{name}="{esc(_json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False))}"'
+
+
+def still_src(stills: Optional[dict], pid: str, frame: int = 0, base: str = "/app") -> str:
+    """The edition path of a pressed still, or "" — never a third party."""
+    rec = (stills or {}).get(pid)
+    if not rec:
+        return ""
+    if frame:
+        return f"{base}/stills/{pid}-{frame}.jpg" if frame in (rec.get("frames") or []) else ""
+    return f"{base}/stills/{pid}.jpg" if rec.get("poster") else ""
+
+
+def month_axis(months: Sequence[str], width: float) -> Callable[[str], float]:
+    """x along a run of months: a date lands at its month's column plus its
+    day's share of it; an undated or out-of-range day lands at the edge."""
+    ms = list(months)
+    colw = width / max(1, len(ms))
+    idx = {m: i for i, m in enumerate(ms)}
+    def x(date: str) -> float:
+        d = str(date or "")
+        mo = d[:7]
+        if mo not in idx:
+            return 0.0 if (not ms or d < ms[0]) else width
+        day = 1
+        if DAY_RE.match(d):
+            day = max(1, min(31, int(d[8:10])))
+        days = MONTH_DAYS[int(mo[5:7])] or 30
+        return (idx[mo] + (day - 1) / days) * colw
+    return x
+
+
+def month_range(months: Sequence[str]) -> List[str]:
+    """Every month from the first to the last, contiguous — a silent month is
+    a visible gap on an axis, never a missing column."""
+    ms = sorted({str(m)[:7] for m in months if is_month(m)})
+    if not ms:
+        return []
+    y, mo = int(ms[0][:4]), int(ms[0][5:7])
+    y1, mo1 = int(ms[-1][:4]), int(ms[-1][5:7])
+    out = []
+    while (y, mo) <= (y1, mo1):
+        out.append(f"{y:04d}-{mo:02d}")
+        mo += 1
+        if mo > 12:
+            y, mo = y + 1, 1
+    return out
+
+
+def month_short(mo: str) -> str:
+    return MONTH_ABBR[int(mo[5:7])] if is_month(mo) else "?"
+
+
+def day_short(d: str) -> str:
+    """'2026-06-18' → 'Jun 18'."""
+    d = str(d or "")
+    return f"{MONTH_ABBR[int(d[5:7])]} {int(d[8:10])}" if DAY_RE.match(d) else "undated"
+
+
+def money_label(name: str) -> str:
+    """'$97 MILLION' → '$97 million' — the room's figure, in the paper's case."""
+    s = " ".join(str(name or "").split())
+    if not s:
+        return ""
+    head, _, tail = s.partition(" ")
+    return head + (" " + tail.lower() if tail else "")
+
+
+def _lens_rows(lenses: Sequence[dict]) -> Dict[str, dict]:
+    return {str(l.get("lens") or ""): l for l in (lenses or []) if isinstance(l, dict)}
+
+
+def score_moments(m: dict) -> List[dict]:
+    """The dots of the score: the meeting's scored decisions, roll calls and
+    pushback (the moments plane), in tape order — never the questions."""
+    out = []
+    for mo in (m.get("moments") or []):
+        if mo.get("t") is None or mo.get("kind") not in ("vote", "decision", "tension"):
+            continue
+        out.append({"t": round(float(mo["t"]), 1), "kind": str(mo["kind"]),
+                    "quote": cut_words(mo.get("quote"), 120), "reason": str(mo.get("reason") or ""),
+                    "score": round(max(0.0, min(1.0, float(mo.get("score") or 0))), 3)})
+    out.sort(key=lambda d: (d["t"], d["kind"]))
+    return out
+
+
+def loudest_t(m: dict) -> float:
+    """Where the score opens: the loudest scored moment, else the tape's start."""
+    mos = score_moments(m)
+    if not mos:
+        return 0.0
+    return max(mos, key=lambda d: (d["score"], -d["t"]))["t"]
+
+
+def _third_label(i: int, span: float) -> str:
+    mins = int(round(span / 60))
+    what = "hour" if 50 <= mins <= 70 else n_of(mins, "minute")
+    return ("The first", "The second", "The last")[i] + " " + what
+
+
+def thirds_of(m: dict) -> List[dict]:
+    """The tape in three, with the decisions that fall in each — the
+    filmstrip's three frames (YouTube's own hq1–3 sit near each third's middle)."""
+    dur = max(1.0, float(m.get("duration") or 0))
+    mos = score_moments(m)
+    out = []
+    for i in range(3):
+        t0, t1 = dur * i / 3, dur * (i + 1) / 3
+        inside = [d for d in mos if t0 <= d["t"] < t1 or (i == 2 and d["t"] >= t1)]
+        out.append({"i": i, "t0": round(t0, 1), "t1": round(t1, 1), "mid": round((t0 + t1) / 2, 1),
+                    "label": _third_label(i, dur / 3), "span": f"{hms(t0)} – {hms(t1)}",
+                    "decisions": [{"t": d["t"], "kind": d["kind"], "quote": cut_words(d["quote"], 70)}
+                                  for d in inside[:3]]})
+    return out
+
+
+def score_data(m: dict, width: int = 880) -> dict:
+    """The score's numbers — what app.js re-lights from (the JS twin of
+    score_state reads exactly this)."""
+    an = m.get("analysis") or {}
+    dur = max(1.0, float(m.get("duration") or 0))
+    ticks = []
+    for l in ((an.get("framing") or {}).get("lenses") or []):
+        for mo in (l.get("moments") or []):
+            if mo.get("t") is None:
+                continue
+            ticks.append({"t": round(float(mo["t"]), 1), "lens": str(l.get("lens") or ""),
+                          "text": cut_words(mo.get("text"), 90)})
+    ticks.sort(key=lambda k: (k["t"], k["lens"]))
+    money = []
+    for e in ((an.get("entities") or {}).get("money") or []):
+        if e.get("t") is None or not e.get("name"):
+            continue
+        money.append({"t": round(float(e["t"]), 1), "label": money_label(e["name"]),
+                      "count": int(e.get("count") or 0)})
+    money.sort(key=lambda x: (x["t"], x["label"]))
+    return {"pid": str(m.get("pid") or ""), "dur": round(dur, 1), "w": int(width),
+            "t": loudest_t(m), "ticks": ticks, "money": money,
+            "decisions": score_moments(m), "thirds": thirds_of(m)}
+
+
+def score_state(data: dict, t: float) -> dict:
+    """What the score shows at a time t — the playhead's x, the nearest
+    decision (ties to the earlier), the third the frame shows. The JS twin
+    is app.js bsScoreState; the node twin test holds them equal."""
+    dur = max(1.0, float(data.get("dur") or 1))
+    w = int(data.get("w") or 880)
+    t = max(0.0, min(dur, float(t or 0)))
+    near = None
+    for i, d in enumerate(data.get("decisions") or []):
+        if near is None or abs(float(d["t"]) - t) < abs(float((data["decisions"][near])["t"]) - t):
+            near = i
+    return {"x": int(round(t / dur * w)), "near": near, "third": min(2, int(t / dur * 3)),
+            "mmss": hms(t)}
+
+
+def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False,
+          data: Optional[dict] = None) -> str:
+    """The score of the night: the tape as a timeline — decisions as dots
+    sized by their score (tension in rust), every dollar figure the room
+    named as a labelled tick, eight lanes (one per lens) showing where that
+    lens's words fell (the sixty-bin track), the sample moments as clickable
+    ticks, and a rust playhead. Click anything and the playhead, the caption
+    card and the frame move together (app.js bsScore); with scripts off
+    every mark is an anchor into the tape. `questions` adds the questions
+    as ticks (the meeting page's shape of the tape)."""
+    d = data or score_data(m, width)
+    pid, dur, W = d["pid"], float(d["dur"]), int(d["w"])
+    an = m.get("analysis") or {}
+    x = lambda t: W * max(0.0, min(1.0, float(t) / dur))
+    at = lambda t: f'{base}/m/{esc(pid)}#t{int(float(t))}'
+    lanes_y0, lane_h, lane_gap = 56, 9, 11
+    out = [f'<rect x="0" y="{lanes_y0}" width="{W}" height="{8 * lane_gap + 2}" fill="{PAPER}" rx="4"/>']
+    rows = _lens_rows((an.get("framing") or {}).get("lenses") or [])
+    bins_n = 0
+    for i, lens in enumerate(LENS_ORDER):
+        y = lanes_y0 + i * lane_gap
+        color = LENS_COLOR[lens]
+        out.append(f'<text x="-6" y="{y + 8}" font-size="9" fill="{color}" text-anchor="end" style="{MONO}">{lens}</text>')
+        track = list((rows.get(lens) or {}).get("track") or [])
+        bins_n = max(bins_n, len(track))
+        mx = max(track) if track else 0
+        if mx:
+            # one path per lane — a bar per slice that has words, its height
+            # the slice's share of the lane's loudest slice
+            bw = W / len(track)
+            bar_w = max(1.0, bw - 0.6)
+            dpath = "".join(f"M{_r(b * bw)},{_r(y + lane_h - max(2.0, lane_h * c / mx))}h{_r(bar_w)}v{_r(max(2.0, lane_h * c / mx))}h-{_r(bar_w)}z"
+                            for b, c in enumerate(track) if c)
+            out.append(f'<path class="bs-lane" data-lens="{lens}" d="{dpath}" fill="{color}" opacity=".55">'
+                       f'<title>{esc(lens)} — {n_of(sum(track), "word")}, where they fell along the tape</title></path>')
+    for k in d["ticks"]:
+        y = lanes_y0 + LENS_ORDER.index(k["lens"]) * lane_gap if k["lens"] in LENS_ORDER else lanes_y0
+        out.append(f'<a href="{at(k["t"])}" class="bs-tick" data-t="{_r(k["t"])}" data-lens="{esc(k["lens"])}" data-text="{esc(k["text"])}">'
+                   f'<rect x="{_r(x(k["t"]) - 1.5)}" y="{y}" width="3" height="{lane_h}" fill="{LENS_COLOR.get(k["lens"], INK)}">'
+                   f'<title>{hms(k["t"])} · {esc(k["lens"])}: “{esc(k["text"])}”</title></rect></a>')
+    for i, mo in enumerate(d["money"]):
+        ly = 34 + (i % 2) * 11
+        anchor = "end" if x(mo["t"]) > W - 60 else "start"
+        out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
+                   f'<line x1="{_r(x(mo["t"]))}" y1="54" x2="{_r(x(mo["t"]))}" y2="{ly}" stroke="{LENS_COLOR["financial"]}" stroke-width="1"/>'
+                   f'<text x="{_r(x(mo["t"]))}" y="{ly}" font-size="10" fill="{MONEY}" text-anchor="{anchor}" style="{MONO}">{esc(mo["label"])}'
+                   f'<title>{esc(mo["label"])} — said {n_of(mo["count"], "time")}, first at {hms(mo["t"])}</title></text></a>')
+    if questions:
+        for q in (an.get("questions") or []):
+            if q.get("t") is None:
+                continue
+            out.append(f'<a href="{at(q["t"])}" class="bs-q" data-t="{_r(q["t"])}">'
+                       f'<line x1="{_r(x(q["t"]))}" y1="24" x2="{_r(x(q["t"]))}" y2="31" stroke="{MUTED}" stroke-width="1"/>'
+                       f'<title>{hms(q["t"])} · a question: “{esc(cut_words(q.get("text"), 100))}”</title></a>')
+    for i, dc in enumerate(d["decisions"]):
+        r = 5.0 + 3.0 * dc["score"]
+        fill = RUST if dc["kind"] == "tension" else INK
+        out.append(f'<a href="{at(dc["t"])}" class="bs-dec" data-i="{i}" data-t="{_r(dc["t"])}" data-kind="{esc(dc["kind"])}">'
+                   f'<circle cx="{_r(x(dc["t"]))}" cy="44" r="{_r(r)}" fill="{fill}" opacity=".9">'
+                   f'<title>{hms(dc["t"])} · {esc(SHAPE_KINDS.get(dc["kind"], dc["kind"]))}: “{esc(dc["quote"])}”</title></circle></a>')
+    st = score_state(d, d["t"])
+    out.append(f'<g class="bs-playhead"><line x1="{st["x"]}" y1="32" x2="{st["x"]}" y2="150" stroke="{RUST}" stroke-width="2"/>'
+               f'<text x="{st["x"]}" y="164" font-size="11" fill="{RUST}" text-anchor="middle" style="{MONO}">{st["mmss"]}</text></g>')
+    step = 1800.0
+    t = 0.0
+    while t < dur - 60:
+        out.append(f'<text x="{_r(x(t))}" y="166" font-size="10" fill="{MUTED}" text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}">{hms(t)}</text>')
+        t += step
+    svg = (f'<svg class="bs-score-svg" width="{W}" height="168" viewBox="-70 0 {W + 80} 168" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="the shape of the meeting along the tape: {n_of(len(d["decisions"]), "scored moment")}, '
+           f'{n_of(len(d["money"]), "dollar figure")}, eight lanes of lens words">' + "".join(out) + "</svg>")
+    trows = "".join(f'<tr><td><a href="{at(dc["t"])}">{hms(dc["t"])}</a></td><td>{esc(SHAPE_KINDS.get(dc["kind"], dc["kind"]))}</td>'
+                    f'<td>{esc(dc["quote"])}</td></tr>' for dc in d["decisions"])
+    trows += "".join(f'<tr><td><a href="{at(mo["t"])}">{hms(mo["t"])}</a></td><td>money</td>'
+                     f'<td>{esc(mo["label"])} — said {n_of(mo["count"], "time")}</td></tr>' for mo in d["money"])
+    return (f'<div class="bs-score" {data_attr("score", d)}><div class="fp-chartwrap">{svg}</div>'
+            + twin(trows, "<th>time</th><th>kind</th><th>the moment</th>") + "</div>")
+
+
+def filmstrip(m: dict, stills: Optional[dict] = None, base: str = "/app",
+              data: Optional[dict] = None) -> str:
+    """Three real frames from inside the tape (YouTube's hq1–3, pressed into
+    the edition), each with the decisions that fall in its third. Each frame
+    is an anchor into the tape at its third's middle; app.js turns a click
+    into the playhead's move. A frame the edition lacks is the town's colour."""
+    d = data or score_data(m)
+    pid = d["pid"]
+    st = score_state(d, d["t"])
+    out = []
+    for th in d["thirds"]:
+        src = still_src(stills, pid, th["i"] + 1, base)
+        pic = (f'<img src="{esc(src)}" alt="" loading="lazy" width="480" height="270">' if src
+               else f'<span class="bs-nostill" style="background:{town_light(m.get("town"))}"></span>')
+        decs = "".join(f'<span class="bs-fdec"><span class="ts">{hms(x["t"])}</span><span>“{esc(x["quote"])}…”</span></span>'
+                       for x in th["decisions"])
+        on = " on" if th["i"] == st["third"] else ""
+        none = '<span class="bs-fdec bs-fnone">no scored decision in this third</span>'
+        out.append(f'<a class="bs-frame{on}" href="{base}/m/{esc(pid)}#t{int(th["mid"])}" data-i="{th["i"]}" data-t="{_r(th["mid"])}">'
+                   f'{pic}<span class="bs-fhead"><b>{esc(th["label"])}</b><span class="bs-fspan">{esc(th["span"])}</span></span>'
+                   f'{decs or none}</a>')
+    return f'<div class="bs-filmstrip">{"".join(out)}</div>'
+
+
+# --------------------------------------------------------------------------
+# the year in tapes
+# --------------------------------------------------------------------------
+
+def tape_width(hours: float) -> int:
+    return int(max(56, min(140, round(60 + 10.3 * float(hours or 0)))))
+
+
+def year_layout(meetings: Sequence[dict], width: int = 1328, height: int = 300) -> Tuple[List[str], List[dict]]:
+    """Every dated meeting as a still on the year's month axis, sized by its
+    length, packed upward so no two overlap — a pure layout, so the JS and
+    the press agree on where each tape sits."""
+    dated = sorted((m for m in meetings if is_month(m.get("date"))),
+                   key=lambda m: (str(m.get("date")), str(m.get("pid"))))
+    months = month_range([str(m["date"])[:7] for m in dated]) if dated else []
+    x_of = month_axis(months, width)
+    colw = width / max(1, len(months))
+    floor_y, gap = height - 34, 6
+    placed: List[dict] = []
+    # `fan` lets a crowded month's tapes overlap like a fanned deck (each
+    # still shows its top 45%) — used only when strict rows would more than
+    # half again the strip's height; strict rows first, always
+    fan = [0.0]
+    hits = lambda x, y, w, h: any(x < p["x"] + p["w"] + gap and x + w + gap > p["x"]
+                                   and y < p["y"] + p["h"] * (1 - fan[0]) + gap and y + h * (1 - fan[0]) + gap > p["y"]
+                                   for p in placed)
+    for m in dated:
+        hours = float(m.get("duration") or 0) / 3600
+        w = tape_width(hours)
+        h = int(round(w * 9 / 16))
+        x0 = max(0.0, min(width - w, x_of(m["date"]) - w / 2))
+        # the lowest free slot: first the tape's own day, then a step to
+        # either side within its month, then the row above — a crowded month
+        # packs into sub-columns before it climbs
+        ys = sorted({floor_y - h} | {p["y"] - h * (1 - fan[0]) - gap for p in placed}, reverse=True)
+        steps = [0.0] + [s * d for s in (0.5, 1.0) for d in (colw / 2, -colw / 2)]
+        x, y = x0, floor_y - h
+        for cy in ys:
+            found = None
+            for dx in steps:
+                cx = max(0.0, min(width - w, x0 + dx))
+                if not hits(cx, cy, w, h):
+                    found = cx
+                    break
+            if found is not None:
+                x, y = found, cy
+                break
+        placed.append({"pid": str(m.get("pid") or ""), "x": round(x, 1), "y": round(y, 1), "w": w, "h": h,
+                       "month": str(m["date"])[:7], "date": str(m["date"]), "town": str(m.get("town") or ""),
+                       "body": str(m.get("body") or ""), "title": str(m.get("title") or m.get("pid") or ""),
+                       "hours": round(hours, 1)})
+    # a year too crowded for the strip's height fans its tapes (once), then
+    # grows the strip rather than losing a tape
+    lowest = min((p["y"] for p in placed), default=0.0)
+    if lowest < -height * 0.6 and fan[0] == 0.0:
+        fan[0] = 0.55
+        return _refan(dated, months, width, height, fan[0])
+    if lowest < 0:
+        shift = -lowest + 4
+        for p in placed:
+            p["y"] = round(p["y"] + shift, 1)
+    return months, placed
+
+
+def _refan(dated, months, width, height, fanning):
+    """The same layout with the deck fanned — a second pass, one rule."""
+    x_of = month_axis(months, width)
+    colw = width / max(1, len(months))
+    floor_y, gap = height - 34, 6
+    placed: List[dict] = []
+    vis = 1 - fanning
+    hits = lambda x, y, w, h: any(x < p["x"] + p["w"] + gap and x + w + gap > p["x"]
+                                   and y < p["y"] + p["h"] * vis + gap and y + h * vis + gap > p["y"] for p in placed)
+    for m in dated:
+        hours = float(m.get("duration") or 0) / 3600
+        w = tape_width(hours)
+        h = int(round(w * 9 / 16))
+        x0 = max(0.0, min(width - w, x_of(m["date"]) - w / 2))
+        ys = sorted({floor_y - h} | {p["y"] - h * vis - gap for p in placed}, reverse=True)
+        steps = [0.0] + [s * d for s in (0.5, 1.0) for d in (colw / 2, -colw / 2)]
+        x, y = x0, floor_y - h
+        for cy in ys:
+            found = None
+            for dx in steps:
+                cx = max(0.0, min(width - w, x0 + dx))
+                if not hits(cx, cy, w, h):
+                    found = cx
+                    break
+            if found is not None:
+                x, y = found, cy
+                break
+        placed.append({"pid": str(m.get("pid") or ""), "x": round(x, 1), "y": round(y, 1), "w": w, "h": h,
+                       "month": str(m["date"])[:7], "date": str(m["date"]), "town": str(m.get("town") or ""),
+                       "body": str(m.get("body") or ""), "title": str(m.get("title") or m.get("pid") or ""),
+                       "hours": round(hours, 1)})
+    lowest = min((p["y"] for p in placed), default=0.0)
+    if lowest < 0:
+        shift = -lowest + 4
+        for p in placed:
+            p["y"] = round(p["y"] + shift, 1)
+    return months, placed
+
+
+def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optional[dict] = None,
+               base: str = "/app", width: int = 1328, height: int = 300) -> str:
+    """The year in tapes: every meeting as its own still on the month axis,
+    sized by its hours, town-coloured on its top edge, rows to avoid overlap;
+    the last chapter lit and the rest dimmed (the pressed state; the chapter
+    pills re-light it with the script on, and click a still to name it).
+    Every still is an anchor into its meeting."""
+    months, tapes = year_layout(meetings, width, height)
+    if not tapes:
+        return '<p class="hint">no dated meeting on the record yet</p>'
+    height = int(max(height, max(t["y"] + t["h"] for t in tapes) + 34))
+    x_of = month_axis(months, width)
+    lit = set()
+    if chapters:
+        lit = set(chapters[-1].get("months") or [])
+    colw = width / len(months)
+    out = []
+    for i, mo in enumerate(months):
+        x0 = i * colw
+        out.append(f'<line x1="{_r(x0)}" y1="0" x2="{_r(x0)}" y2="{height - 24}" stroke="{RULE}" stroke-dasharray="2 4"/>'
+                   f'<text x="{_r(x0 + 6)}" y="{height - 8}" font-size="12" fill="{MUTED}" style="{MONO}">{month_short(mo)}</text>')
+    for t in tapes:
+        dim = "" if (not lit or t["month"] in lit) else " bs-dim"
+        src = still_src(stills, t["pid"], 0, base)
+        pic = (f'<image href="{esc(src)}" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" preserveAspectRatio="xMidYMid slice"/>'
+               if src else
+               f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="{town_light(t["town"])}" rx="2"/>'
+               f'<text x="{_r(t["x"] + t["w"] / 2)}" y="{_r(t["y"] + t["h"] / 2 + 4)}" font-size="11" fill="{town_color(t["town"])}" text-anchor="middle" style="{MONO}">{esc(day_short(t["date"]))}</text>')
+        tip = f'{t["title"]} — {t["date"]} · {t["town"]} · {t["body"]} · {t["hours"]} h'
+        out.append(f'<a href="{base}/m/{esc(t["pid"])}" class="bs-tape{dim}" data-pid="{esc(t["pid"])}" data-month="{esc(t["month"])}">'
+                   f'<title>{esc(tip)}</title>{pic}'
+                   f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="4" fill="{town_color(t["town"])}"/>'
+                   f'<rect class="bs-tape-ring" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="none" stroke="none" stroke-width="2.5" rx="2"/></a>')
+    svg = (f'<svg class="bs-year-svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="every meeting on the record as its own still, placed on the year — {n_of(len(tapes), "tape")}">' + "".join(out) + "</svg>")
+    trows = "".join(f'<tr><td><a href="{base}/m/{esc(t["pid"])}">{esc(t["date"])}</a></td><td>{esc(t["town"])}</td>'
+                    f'<td>{esc(t["body"])}</td><td>{esc(t["title"])}</td><td>{t["hours"]}</td></tr>' for t in tapes)
+    payload = {"tapes": tapes, "chapters": [{k: v for k, v in c.items() if k != "html"} for c in chapters], "months": months}
+    return (f'<div class="bs-year" {data_attr("year", payload)}><div class="fp-chartwrap">{svg}</div>'
+            + twin(trows, "<th>date</th><th>town</th><th>body</th><th>meeting</th><th>hours</th>") + "</div>")
+
+
+# --------------------------------------------------------------------------
+# the four columns' pictures
+# --------------------------------------------------------------------------
+
+def town_shares(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str]) -> List[dict]:
+    """Each town's share of its framed words by lens, from the analytics
+    framing matrix — the butterfly's numbers; towns by meetings, most first."""
+    tot: Dict[str, Dict[str, float]] = {}
+    n: Dict[str, int] = {}
+    for r in framing_rows:
+        town = towns_by_pid.get(str(r.get("pid") or ""), "")
+        if not town:
+            continue
+        n[town] = n.get(town, 0) + 1
+        d = tot.setdefault(town, {})
+        for l, c in (r.get("lenses") or {}).items():
+            d[l] = d.get(l, 0.0) + float(c or 0)
+    out = []
+    for town in sorted(tot, key=lambda t: (-n[t], t)):
+        s = sum(tot[town].values()) or 1.0
+        out.append({"town": town, "color": town_color(town), "n": n[town],
+                    "shares": {l: round(tot[town].get(l, 0.0) / s, 3) for l in LENS_ORDER}})
+    return out
+
+
+def butterfly(shares: Sequence[dict], width: int = 290) -> str:
+    """Two towns, two vocabularies: each lens's share of everything a town's
+    meetings say under a lens, one town to the left of the spine and one to
+    the right (a single town reads to the right alone)."""
+    ts = list(shares)[:2]
+    if not ts:
+        return '<p class="hint">the lenses need a read meeting</p>'
+    mid = width / 2 + 5 if len(ts) == 2 else 110
+    rowh, top = 24, 22
+    mx = max((v for t in ts for v in t["shares"].values()), default=0.0) or 1.0
+    scale = (mid - 20) / mx
+    out = []
+    if len(ts) == 2:
+        out.append(f'<text x="{_r(mid - 4)}" y="10" font-size="10" fill="{ts[0]["color"]}" text-anchor="end" style="{MONO}">{esc(ts[0]["town"])}</text>'
+                   f'<text x="{_r(mid + 4)}" y="10" font-size="10" fill="{ts[1]["color"]}" style="{MONO}">{esc(ts[1]["town"])}</text>')
+    else:
+        out.append(f'<text x="{_r(mid + 4)}" y="10" font-size="10" fill="{ts[0]["color"]}" style="{MONO}">{esc(ts[0]["town"])}</text>')
+    trows = []
+    for i, lens in enumerate(LENS_ORDER):
+        y = top + i * rowh
+        out.append(f'<text x="{_r(mid)}" y="{y - 3}" font-size="10" fill="{MUTED}" text-anchor="middle">{lens}</text>')
+        if len(ts) == 2:
+            a, b = ts[0]["shares"].get(lens, 0), ts[1]["shares"].get(lens, 0)
+            wa, wb = a * scale, b * scale
+            out.append(f'<rect x="{_r(mid - 4 - wa)}" y="{y}" width="{_r(wa)}" height="14" fill="{ts[0]["color"]}" opacity=".85"/>'
+                       f'<rect x="{_r(mid + 4)}" y="{y}" width="{_r(wb)}" height="14" fill="{ts[1]["color"]}" opacity=".85"/>'
+                       f'<text x="{_r(mid - 8 - wa)}" y="{y + 11}" font-size="10" fill="{INK2}" text-anchor="end" style="{MONO}">{round(100 * a)}%</text>'
+                       f'<text x="{_r(mid + 8 + wb)}" y="{y + 11}" font-size="10" fill="{INK2}" style="{MONO}">{round(100 * b)}%</text>')
+            trows.append(f'<tr><td>{lens}</td><td>{round(100 * a)}%</td><td>{round(100 * b)}%</td></tr>')
+        else:
+            a = ts[0]["shares"].get(lens, 0)
+            wa = a * scale
+            out.append(f'<rect x="{_r(mid + 4)}" y="{y}" width="{_r(wa)}" height="14" fill="{ts[0]["color"]}" opacity=".85"/>'
+                       f'<text x="{_r(mid + 8 + wa)}" y="{y + 11}" font-size="10" fill="{INK2}" style="{MONO}">{round(100 * a)}%</text>')
+            trows.append(f'<tr><td>{lens}</td><td>{round(100 * a)}%</td></tr>')
+    H = top + rowh * len(LENS_ORDER)
+    svg = (f'<svg class="bs-butterfly" width="{width}" height="{H}" viewBox="0 0 {width} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="each town’s share of words by lens">' + "".join(out) + "</svg>")
+    head = "<th>lens</th>" + "".join(f'<th>{esc(t["town"])}</th>' for t in ts)
+    return f'<div class="fp-chartwrap">{svg}</div>' + twin("".join(trows), head)
+
+
+def who_when(names: Sequence[dict], months: Sequence[str], towns_by_pid: Dict[str, str],
+             base: str = "/app", width: int = 290, people: int = 3, places: int = 3) -> str:
+    """Who, and when: the names the record hears, month by month — a dot is
+    a month the name was said, bigger where it was said in more meetings,
+    in the colour of the town that says it most. Each name is a search."""
+    ms = [m for m in months if is_month(m)]
+    picked = [n for n in names if n.get("kind") == "people"][:people] + \
+             [n for n in names if n.get("kind") == "places"][:places]
+    if not picked or not ms:
+        return '<p class="hint">the record needs two read meetings to know who keeps coming up</p>'
+    left, rowh = 120.0, 22
+    step = (width - left - 6) / len(ms)
+    cx = lambda i: left + step * (i + 0.5)
+    out, trows = [], []
+    for i, mo in enumerate(ms):
+        out.append(f'<text x="{_r(cx(i))}" y="{rowh * len(picked) + 10}" font-size="9" fill="{MUTED}" text-anchor="middle" style="{MONO}">{month_short(mo)[0]}</text>')
+    for r, n in enumerate(picked):
+        y = rowh * r + 4
+        by: Dict[str, int] = {}
+        towns: Dict[str, int] = {}
+        for mt in (n.get("meetings") or []):
+            mo = str(mt.get("date") or "")[:7]
+            if is_month(mo):
+                by[mo] = by.get(mo, 0) + 1
+            tw = towns_by_pid.get(str(mt.get("pid") or ""), "")
+            if tw:
+                towns[tw] = towns.get(tw, 0) + 1
+        town = max(towns, key=lambda t: (towns[t], t)) if towns else ""
+        col = town_color(town) if n.get("kind") == "places" else (town_color(town) if len({towns_by_pid.get(str(mt.get("pid") or ""), "") for mt in (n.get("meetings") or [])} - {""}) == 1 else INK)
+        href = search_url(str(n.get("name") or ""), "", base).replace("&", "&amp;")
+        out.append(f'<a href="{href}"><text x="0" y="{y + 20}" font-size="12" fill="{INK}">{esc(cut_words(n.get("name"), 22))}</text></a>')
+        for i, mo in enumerate(ms):
+            k = by.get(mo, 0)
+            if k:
+                out.append(f'<circle cx="{_r(cx(i))}" cy="{y + 16}" r="{_r(min(7.2, 3.0 + 1.4 * k))}" fill="{col}" opacity=".85">'
+                           f'<title>{esc(n.get("name"))} · {month_short(mo)}: {n_of(k, "meeting")}</title></circle>')
+            else:
+                out.append(f'<circle cx="{_r(cx(i))}" cy="{y + 16}" r="1.2" fill="{RULE}"/>')
+        trows.append(f'<tr><td><a href="{href}">{esc(n.get("name"))}</a></td><td>{esc(n.get("kind"))}</td>'
+                     f'<td>{n_of(len(n.get("meetings") or []), "meeting")}</td><td>{int(n.get("count") or 0)}</td></tr>')
+    H = rowh * len(picked) + 16
+    svg = (f'<svg class="bs-whowhen" width="{width}" height="{H}" viewBox="0 0 {width} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="who was named, month by month">' + "".join(out) + "</svg>")
+    return f'<div class="fp-chartwrap">{svg}</div>' + twin("".join(trows), "<th>name</th><th>kind</th><th>meetings</th><th>mentions</th>")
+
+
+def ayes_of(v: dict) -> int:
+    """The ayes in a roll call: the roll's yes votes, else the tally's first number."""
+    roll = v.get("roll") or []
+    if roll:
+        return sum(1 for r in roll if str(r.get("vote") or "").lower() in ("yes", "aye", "y"))
+    m = re.match(r"\s*(\d+)", str(v.get("tally") or ""))
+    return int(m.group(1)) if m else 0
+
+
+def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
+    """The roll calls: a square per vote, month by month, the ayes in each,
+    the one that failed in rust; every square opens the tape where the vote
+    was taken. `votes` rows carry pid, date, t, outcome, tally, roll."""
+    vs = sorted((v for v in votes if v.get("pid") and is_month(v.get("date"))),
+                key=lambda v: (str(v.get("date")), str(v.get("pid")), float(v.get("t") or 0)))
+    if not vs:
+        return '<p class="hint">No roll call has been read from a tape yet.</p>'
+    months = month_range([str(v["date"])[:7] for v in vs])
+    by: Dict[str, List[dict]] = {}
+    for v in vs:
+        by.setdefault(str(v["date"])[:7], []).append(v)
+    sq, gap, cols = 16, 3, 4
+    x0 = 0.0
+    out, trows = [], []
+    maxrows = 1
+    for mo in months:
+        ms = by.get(mo, [])
+        ncols = max(1, min(cols, len(ms)))
+        out.append(f'<text x="{_r(x0)}" y="10" font-size="10" fill="{MUTED}" style="{MONO}">{month_short(mo)} · {len(ms)}</text>')
+        for i, v in enumerate(ms):
+            r, c = divmod(i, cols)
+            maxrows = max(maxrows, r + 1)
+            x, y = x0 + c * (sq + gap), 16 + r * (sq + gap + 1)
+            out_ = str(v.get("outcome") or "")
+            fill, op = (RUST, ".95") if out_ == "fails" else (INK, ".8") if out_ == "passes" else (INK, ".45")
+            tip = f'{v.get("date")} · {out_}' + (f' {v["tally"]}' if v.get("tally") else "") + f' — {cut_words(v.get("motion"), 100)}'
+            out.append(f'<a href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}"><rect x="{_r(x)}" y="{y}" width="{sq}" height="{sq}" rx="3" fill="{fill}" opacity="{op}"/>'
+                       f'<text x="{_r(x + sq / 2)}" y="{y + 12}" font-size="8" fill="{PAPER}" text-anchor="middle" style="{MONO}">{ayes_of(v)}</text><title>{esc(tip)}</title></a>')
+            trows.append(f'<tr><td><a href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}">{esc(v.get("date"))}</a></td>'
+                         f'<td>{esc(cut_words(v.get("motion"), 90))}</td><td>{esc(out_)}</td><td>{esc(v.get("tally") or "")}</td></tr>')
+        x0 += ncols * (sq + gap) + 14
+    W, H = int(x0), 16 + maxrows * (sq + gap + 1) + 4
+    svg = (f'<svg class="bs-votegrid" width="{W}" height="{H}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
+           f'aria-label="{n_of(len(vs), "roll call")} by month">' + "".join(out) + "</svg>")
+    return f'<div class="fp-chartwrap">{svg}</div>' + twin("".join(trows), "<th>date</th><th>motion</th><th>outcome</th><th>tally</th>")
+
+
+def thread_spark(dates: Sequence[str], months: Sequence[str], color: str = INK,
+                 width: int = 200, height: int = 44, label: str = "") -> str:
+    """A thread's sparkline: the meetings that took it up, month by month —
+    the small multiple every thread card and the type-ahead's over-time box
+    carry. The JS twin is app.js bsSpark."""
+    ms = [m for m in months if is_month(m)]
+    if not ms:
+        return ""
+    counts = [0] * len(ms)
+    idx = {m: i for i, m in enumerate(ms)}
+    for d in dates:
+        mo = str(d or "")[:7]
+        if mo in idx:
+            counts[idx[mo]] += 1
+    step = (width - 8) / max(1, len(ms) - 1)
+    pts = [(4 + i * step, height - 6 - min(2, c) * 15) for i, c in enumerate(counts)]
+    line = " ".join(f"{_r(x)},{_r(y)}" for x, y in pts)
+    dots = "".join(f'<circle cx="{_r(x)}" cy="{_r(y)}" r="3" fill="{color}"><title>{month_short(ms[i])}: {n_of(counts[i], "meeting")}</title></circle>'
+                   for i, (x, y) in enumerate(pts) if counts[i])
+    return (f'<svg class="bs-spark" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" role="img" '
+            f'aria-label="{esc(label or "meetings that took it up, month by month")}">'
+            f'<polyline points="{line}" fill="none" stroke="{color}" stroke-width="1.5" opacity=".55"/>{dots}</svg>')
+
+
+# --------------------------------------------------------------------------
+# how the talk flowed — the lens river
+# --------------------------------------------------------------------------
+
+def _smooth(pts: Sequence[Tuple[float, float]]) -> str:
+    """A path through the points, quadratic through the midpoints — the
+    band's edge; the same expression forwards and, reversed, backwards."""
+    if len(pts) < 2:
+        return ""
+    out = [f"M{_r(pts[0][0])},{_r(pts[0][1])}"]
+    for i in range(1, len(pts) - 1):
+        mx, my = (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2
+        out.append(f"Q{_r(pts[i][0])},{_r(pts[i][1])} {_r(mx)},{_r(my)}")
+    out.append(f"L{_r(pts[-1][0])},{_r(pts[-1][1])}")
+    return " ".join(out)
+
+
+def river_data(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str]) -> dict:
+    rows = sorted((r for r in framing_rows if r.get("pid")),
+                  key=lambda r: (str(r.get("date") or "9999"), str(r.get("pid"))))
+    ms = []
+    for r in rows:
+        tot = float(r.get("total") or 0) or 1.0
+        ms.append({"pid": str(r["pid"]), "date": str(r.get("date") or ""), "town": towns_by_pid.get(str(r["pid"]), ""),
+                   "total": int(float(r.get("total") or 0)),
+                   "shares": {l: round(float((r.get("lenses") or {}).get(l) or 0) / tot, 4) for l in LENS_ORDER}})
+    joins = None
+    if ms:
+        first = ms[0]["town"]
+        for i, m in enumerate(ms):
+            if m["town"] and first and m["town"] != first:
+                joins = i
+                break
+    return {"meetings": ms, "joins": joins, "order": list(LENS_ORDER)}
+
+
+def lens_river(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str], base: str = "/app",
+               width: int = 1328, height: int = 260) -> str:
+    """How the talk flowed, meeting by meeting: eight bands, each a lens's
+    share of a night's framed words, stacked and smoothed, separated by a
+    hair of paper, each lens labelled at its widest point, a dashed line
+    where the second town joins the record. With the script on a label
+    isolates its lens (app.js bsRiver); the bands open the record drawn."""
+    d = river_data(framing_rows, towns_by_pid)
+    ms = d["meetings"]
+    if len(ms) < 2:
+        return '<p class="hint">the river needs two read meetings</p>'
+    top, bottom = 8.0, height - 22.0
+    plot = bottom - top
+    n = len(ms)
+    xs = [i * width / (n - 1) for i in range(n)]
+    # cumulative edges from the bottom up, lens by lens
+    base_y = [bottom] * n
+    out, labels, trows = [], [], []
+    for lens in LENS_ORDER:
+        tops = [base_y[i] - ms[i]["shares"][lens] * plot for i in range(n)]
+        fwd = _smooth(list(zip(xs, tops)))
+        back = _smooth(list(zip(xs, base_y))[::-1])
+        path = f'{fwd} L{_r(xs[-1])},{_r(base_y[-1])} {back[1:]} Z'
+        out.append(f'<a href="{base}/analytics"><path class="bs-band" data-lens="{lens}" d="{path}" fill="{LENS_COLOR[lens]}" '
+                   f'opacity=".86" stroke="{CARD}" stroke-width="1.2"><title>{lens} — its share of each night’s framed words</title></path></a>')
+        widest = max(range(n), key=lambda i: (base_y[i] - tops[i], -i))
+        if base_y[widest] - tops[widest] >= 9:
+            labels.append(f'<text class="bs-rlabel" data-lens="{lens}" x="{_r(xs[widest])}" y="{_r((base_y[widest] + tops[widest]) / 2 + 4)}" '
+                          f'font-size="11" fill="{PAPER}" text-anchor="middle" style="{MONO};paint-order:stroke" stroke="{LENS_COLOR[lens]}" stroke-width="3">{lens}</text>')
+        base_y = tops
+    if d["joins"] is not None:
+        j = d["joins"]
+        out.append(f'<line x1="{_r(xs[j])}" y1="4" x2="{_r(xs[j])}" y2="{_r(bottom - 4)}" stroke="{INK}" stroke-dasharray="3 4"/>'
+                   f'<text x="{_r(xs[j] + 6)}" y="16" font-size="13" fill="{INK}" class="bs-rjoin">{esc(ms[j]["town"])} joins the record</text>')
+    every = max(1, n // 6)
+    for i, m in enumerate(ms):
+        if i % every and i != n - 1:
+            continue
+        anchor = "start" if i == 0 else "end" if i == n - 1 else "middle"
+        out.append(f'<text x="{_r(xs[i])}" y="{height - 8}" font-size="11" fill="{MUTED}" text-anchor="{anchor}" style="{MONO}">{esc(day_short(m["date"]))}</text>')
+    for m in ms:
+        trows.append(f'<tr><td><a href="{base}/m/{esc(m["pid"])}">{esc(m["date"] or "undated")}</a></td><td>{esc(m["town"])}</td>'
+                     + "".join(f'<td>{round(100 * m["shares"][l])}%</td>' for l in LENS_ORDER) + "</tr>")
+    svg = (f'<svg class="bs-river-svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
+           f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="the share of each lens across every meeting">'
+           + "".join(out) + "".join(labels) + "</svg>")
+    head = "<th>meeting</th><th>town</th>" + "".join(f"<th>{l}</th>" for l in LENS_ORDER)
+    return (f'<div class="bs-river" {data_attr("river", d)}><div class="bs-riverwrap">{svg}</div>'
+            + twin("".join(trows), head) + "</div>")
+
+
+# --------------------------------------------------------------------------
+# a word over time — the timeline of meetings (the search page's, pressed)
+# --------------------------------------------------------------------------
+
+def timeline_dots(rows: Sequence[dict], base: str = "/app", width: int = 1160, height: int = 170,
+                  q: str = "") -> str:
+    """When it came up: each meeting that said the word as a dot on the month
+    axis, in its town's colour, the body above it and the day above that;
+    click one to jump to the first mention. The JS twin is app.js bsTimeline."""
+    said = [r for r in rows if r.get("n") and is_month(r.get("date"))]
+    months = month_range([str(r["date"])[:7] for r in rows if is_month(r.get("date"))])
+    if not said or not months:
+        return ""
+    x_of = month_axis(months, width)
+    colw = width / len(months)
+    base_y = 110
+    out = []
+    for i, mo in enumerate(months):
+        out.append(f'<text x="{_r(i * colw + 4)}" y="{height - 8}" font-size="11" fill="{MUTED}" style="{MONO}">{month_short(mo)}</text>'
+                   f'<line x1="{_r(i * colw)}" y1="{base_y - 6}" x2="{_r(i * colw)}" y2="{base_y + 6}" stroke="{RULE}"/>')
+    out.append(f'<line x1="0" y1="{base_y}" x2="{width}" y2="{base_y}" stroke="{RULE}" stroke-width="2"/>')
+    for r in sorted(said, key=lambda r: (str(r["date"]), str(r["pid"]))):
+        x = x_of(r["date"])
+        col = town_color(r.get("town"))
+        out.append(f'<a href="{base}/m/{esc(r["pid"])}#t{int(float(r.get("first_t") or 0))}" class="bs-tdot" data-pid="{esc(r["pid"])}">'
+                   f'<circle cx="{_r(x)}" cy="{base_y}" r="9" fill="{col}"><title>{esc(r.get("title") or r["pid"])} — {n_of(int(r["n"]), "line")}</title></circle>'
+                   f'<text x="{_r(x)}" y="{base_y - 22}" font-size="12" fill="{INK2}" text-anchor="middle">{esc(cut_words(r.get("body"), 24))}</text>'
+                   f'<text x="{_r(x)}" y="{base_y - 38}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{esc(day_short(r["date"]))}</text></a>')
+    label = f'when “{q}” came up' if q else "when it came up"
+    return (f'<div class="bs-timeline"><span class="kicker">{esc(label)} — each dot is a meeting; click one to jump</span>'
+            f'<div class="fp-chartwrap"><svg class="bs-timeline-svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+            f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="{esc(label)}">' + "".join(out) + "</svg></div></div>")
