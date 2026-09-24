@@ -2469,6 +2469,18 @@
     if (b) { e.preventDefault(); toggleCut(b); }
   });
 
+  /* a reel row's picture (specs/29 board 6; specs/26 §4's tray thumbnails):
+     the meeting's own pressed still — the room that night, from the edition
+     itself, never a third party's server — or the town's light colour where
+     the edition keeps none. It pictures the meeting, not the clip's frame,
+     so it is decorative (alt=""): the row's words name the moment. */
+  const reelStill = (still, town, cls) => still
+    ? `<img class="${cls}" src="${esc(still)}" alt="" loading="lazy" width="160" height="90">`
+    : `<span class="${cls} rc-nostill" style="background:${bsTownLight(town)}"></span>`;
+  // the tray's clips come from any meeting and carry no still path: the
+  // edition's own address for the meeting's poster, and a picture that fails
+  // to load simply leaves the row (the tray's captured error listener)
+  const trayStillOf = pid => PAPER_REF.test(String(pid || "")) ? `${BASE}/stills/${encodeURIComponent(pid)}.jpg` : "";
   function buildTray(focus) {
     let tray = $("#reeltray");
     if (!CREEL.clips.length) {
@@ -2484,14 +2496,19 @@
     if (!tray) {
       tray = document.createElement("section");
       tray.className = "card reeltray"; tray.id = "reeltray";
+      // a meeting the edition keeps no still for: its picture leaves the row
+      tray.addEventListener("error", e => { const im = e.target;
+        if (im && im.classList && im.classList.contains("rt-still")) im.remove(); }, true);
       (($(".moments")) || $(".meeting")).after(tray);
     }
     const clips = CREEL.clips;
     const multi = reelPids(clips).length > 1;
     const rows = clips.map((c, i) => {
       const other = c.pid && c.pid !== CREEL.pid;   // a clip from another meeting than the one on screen
+      const pic = trayStillOf(c.pid);
       return `<div class="rt-clip${other ? " rt-other" : ""}" data-i="${i}">
         <div class="rt-ord"${clips.length > 1 ? ` data-grip title="drag to move this clip — or use ↑ ↓"` : ""}>${clips.length > 1 ? '<span class="dg-grip" aria-hidden="true">⠿</span>' : ""}${i + 1}</div>
+        ${pic ? `<img class="rt-still" src="${esc(pic)}" alt="" loading="lazy" width="96" height="54">` : ""}
         <div class="rt-main">
           ${(multi || other) ? `<div class="rt-from">${esc(c.mtitle || c.pid || "another meeting")}</div>` : ""}
           <div class="rt-quote" tabindex="-1">${esc((c.quote || "").slice(0, 120)) || "(moment)"}</div>
@@ -5287,7 +5304,8 @@
         return { ...c, end, t: mo ? r1(mo.t) : c.start,
                  kind: mo ? mo.kind : "cut",
                  quote: mo ? mo.quote : (lines ? cut((lineAt(lines, c.start) || {}).text || "", 120) : ""),
-                 mtitle: m.title || "", video_id: m.video_id || "" };
+                 mtitle: m.title || "", video_id: m.video_id || "",
+                 still: typeof m.still === "string" ? m.still : "", town: m.town || "" };
       }).filter(Boolean);
       if (!clips.length)
         return b.clips.some(c => !tried.m.has(c.pid))
@@ -5299,7 +5317,7 @@
       // deep green, so the rendered paper stays as quiet as today
       const rows = clips.map((c, i) =>
         `<div class="pb-cite"><a class="reelcite" href="${BASE}/m/${esc(c.pid)}#t${Math.floor(c.t)}">
-          <span class="rc-ord">${i + 1}</span>
+          <span class="rc-ord">${i + 1}</span>${reelStill(c.still, c.town, "rc-still")}
           <span class="rc-body">${multi ? `<span class="rc-from">${esc(c.mtitle || c.pid)}</span>` : ""}
             <span class="rc-quote">${esc(c.quote || "(moment)")}</span>
             <span class="rc-meta"><span class="rt-kind">${esc(c.kind)}</span>

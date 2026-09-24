@@ -353,6 +353,44 @@ class TestTheChartsArePure(unittest.TestCase):
         self.assertIn('<line class="bs-rjoinline"', river)
         self.assertIn("Brookline joins the record", river)
 
+    def test_a_reel_row_pictures_its_meeting_from_the_edition_itself(self):
+        """Board 6 draws each reel row with a still, and specs/26 wished the
+        tray its thumbnails: both are the meeting's own pressed poster, from
+        the edition — never a third party's server (the covenant) — with the
+        town's light colour where the edition keeps none; decorative, since
+        the row's words name the moment."""
+        import subprocess
+        grab = lambda pat: re.search(pat, JS, re.S).group(0)
+        src = "\n".join([
+            'const BASE = "/app";',
+            'const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;" }[c]));',
+            grab(r"const PAPER_REF = [^\n]+"),
+            grab(r"const BS_TOWNS = [^\n]+"),
+            grab(r"const bsTownLight = [^\n]+"),
+            grab(r"const reelStill = \(still, town, cls\) => still[\s\S]*?;\n"),
+            grab(r"const trayStillOf = [^\n]+"),
+            'console.log(JSON.stringify([reelStill("/app/stills/vid1.jpg", "Brookline", "rc-still"), reelStill("", "Brookline", "rc-still"),',
+            '  reelStill("", "", "rc-still"), trayStillOf("vid1"), trayStillOf("has space"), trayStillOf(""), reelStill("/app/stills/a\\"b.jpg", "", "rc-still")]));'])
+        r = subprocess.run(["node", "-e", src], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout)
+        self.assertEqual(got[0], '<img class="rc-still" src="/app/stills/vid1.jpg" alt="" loading="lazy" width="160" height="90">')
+        self.assertIn('class="rc-still rc-nostill" style="background:#DDEBE1"', got[1])           # Brookline's light colour
+        self.assertIn('style="background:#D9D1BF"', got[2])                                       # no town: the rule's colour
+        self.assertEqual(got[3], "/app/stills/vid1.jpg")
+        self.assertEqual(got[4:6], ["", ""])                                                        # not a meeting id: no picture asked for
+        self.assertIn("a&quot;b.jpg", got[6])                                                       # escaped into the attribute
+        # the paper's reel rows read the plane's own still; the tray asks the edition and lets a failure go
+        self.assertIn('still: typeof m.still === "string" ? m.still : "", town: m.town || "" };', JS)
+        self.assertIn('<span class="rc-ord">${i + 1}</span>${reelStill(c.still, c.town, "rc-still")}', JS)
+        self.assertIn('<img class="rt-still" src="${esc(pic)}" alt="" loading="lazy" width="96" height="54">', JS)
+        self.assertIn('if (im && im.classList && im.classList.contains("rt-still")) im.remove(); }, true);', JS)
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        for rule in (".rc-still{flex:0 0 160px;width:160px;height:90px;", ".rt-still{flex:0 0 96px;width:96px;height:54px;",
+                     "@media (max-width:600px){.rt-still{display:none}}"):
+            self.assertIn(rule, css)
+        self.assertNotIn("i.ytimg.com", JS[JS.index("const reelStill"):JS.index("function buildTray")])   # nothing third-party
+
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
         ms = [{"pid": f"p{i}", "date": f"2026-0{1 + i % 9}-{10 + i % 15:02d}", "town": "Boston" if i % 2 else "Brookline",
