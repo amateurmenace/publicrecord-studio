@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## {STAMP} — v2.2.1 / r48 IS LIVE: writing in the same style (specs/29 P1)
+## 2026-09-24, 10:05Z — v2.2.1 / r48 IS LIVE: writing in the same style (specs/29 P1)
 
 The writing half of the broadsheet: the studio as the board (board 8), the
 templates board (board 7), a shared page as board 6. The CHANGELOG entry
@@ -173,9 +173,9 @@ says what shipped; the shape, for whoever touches it next:
   the five templates under dark planes and with two towns; the slug and
   palette twins; the search scope (`scopePids`, the pins). The resolver's
   twin lifts `resolveTown` and `scopePids` with `resolve`.
-- **Deploy**: r48 on the service ({REV}) and all six jobs; the press at
-  `--version 2.2.1` ({PRESS}); Pages {PAGES}; `sw.js` key `{SWKEY}`; tag
-  `v2.2.1` at {TAG}.
+- **Deploy**: r48 on the service (revision record-api-00040-qr6) and all six jobs; the press at
+  `--version 2.2.1` (execution record-press-ndrvh, 10:04Z); Pages b9a70e1 (the workflow carried it, run 35984850670); `sw.js` key `cz-record-2.2.1-9eb9be490f17df4c`; tag
+  `v2.2.1` at dca34a0.
 - **Reviewed**: four lenses (the store and codec; the reader's renders and
   editor; the boards, CSS and accessibility; editorial honesty and the
   covenant) — 59 findings, 55 folded, four noted; then two skeptics on the

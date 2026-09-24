@@ -81,8 +81,9 @@ read as *shared from a newer version* — `PAPER_VS` had never learned "4".
 It lists every version `paperV` can mint now, and a test holds the two
 equal. Tests: the six kinds round-trip the link and the store accepts the
 reader's own portable forms; the five templates under dark planes; the
-slug and palette twins; the search scope. Reviewed the house way before it
-shipped.
+slug and palette twins; the search scope. Reviewed the house way before it shipped: four lenses, then two skeptics
+on the folds, then a third on theirs — twenty regressions the fixes had
+introduced, every one folded.
 
 ### The civic broadsheet — the record as a front page, the tape as the sun, search as its spine — 2026-09-24 (v2.2.0)
 

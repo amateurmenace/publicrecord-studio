@@ -157,8 +157,8 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
-- {STAMP} — **v2.2.1 / r48 is LIVE: writing in the same style** (specs/29
-  P1; tag `v2.2.1` at {TAG}, the commit the image was built from; the
+- 2026-09-24, 10:05Z — **v2.2.1 / r48 is LIVE: writing in the same style** (specs/29
+  P1; tag `v2.2.1` at dca34a0, the commit the image was built from; the
   service and all six jobs on r48; the press at `--version 2.2.1`). The
   studio as the board (the block shelf, rust frames, the writing desk),
   six ref-only kinds (lead · week · threads · strip · names · search) and
