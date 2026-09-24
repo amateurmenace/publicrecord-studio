@@ -218,7 +218,7 @@
         <button type="button" class="btn" data-mp="tray">✂ put them on my tray</button>
         <button type="button" class="btn" data-mp="clear">show the whole transcript</button>
       </div>
-      <p class="hint">the lines that say “${esc(q)}” stay below, the rest fold away; every bar above opens the tape there</p>`;
+      <p class="hint">the lines that say “${esc(q)}” stay below, the rest fold away; every bar above opens the tape there · <a class="mp-jumplines" href="#transcript">the lines themselves ↓</a></p>`;
     $("[data-mp=tray]", found).onclick = () => mpTray();
     $("[data-mp=clear]", found).onclick = () => { MPF.input.value = ""; mpFind(""); MPF.input.focus(); };
     $$(".fp-sbar", found).forEach(a => a.addEventListener("click", ev => {
@@ -540,28 +540,47 @@
      (READ in ink, EDIT in rust) painted from shownMode() — the painted
      truth, never storage — and says what EDIT means. Paper mode keeps the
      pressed stamp as it is. */
+  let BS_STAMP_ORIGIN = false;   // the change came from the stamp: the keyboard stays there
   function paintModeBar() {
     const st = $("#bs-stamp"); if (!st) return;
     const m = shownMode(), edit = m === "studio";
-    st.dataset.mode = edit ? "edit" : "read";
+    if (m === "paper") {
+      // paper is just the record: the pressed stamp, untouched (un-wired if it was)
+      if (st.dataset.wired) {
+        st.innerHTML = st.dataset.pressed || "";
+        delete st.dataset.wired; st.removeAttribute("role"); st.removeAttribute("aria-label");
+      }
+      st.dataset.mode = "read";
+      return;
+    }
     if (!st.dataset.wired) {
+      st.dataset.pressed = st.innerHTML;
       st.dataset.wired = "1";
       st.setAttribute("role", "radiogroup"); st.setAttribute("aria-label", "reading or editing");
+      st.innerHTML = `<button type="button" role="radio" data-czmode="preview" aria-checked="false" tabindex="-1">READ</button>`
+        + `<span aria-hidden="true">·</span>`
+        + `<button type="button" role="radio" data-czmode="studio" aria-checked="false" tabindex="-1">EDIT</button>`
+        + `<span class="bs-stamp-say"></span>`;
       st.addEventListener("click", e => {
         const b = e.target.closest && e.target.closest("[data-czmode]");
-        if (b && st.contains(b)) setMode(b.dataset.czmode);
+        if (b && st.contains(b)) { BS_STAMP_ORIGIN = true; setMode(b.dataset.czmode); }
       });
       // arrow keys move the choice, as on the footprint control
       st.addEventListener("keydown", e => {
         const b = e.target.closest && e.target.closest("[data-czmode]"); if (!b) return;
-        if (["ArrowLeft", "ArrowUp"].includes(e.key)) { e.preventDefault(); setMode("preview"); }
-        else if (["ArrowRight", "ArrowDown"].includes(e.key)) { e.preventDefault(); setMode("studio"); }
+        if (["ArrowLeft", "ArrowUp"].includes(e.key)) { e.preventDefault(); BS_STAMP_ORIGIN = true; setMode("preview"); }
+        else if (["ArrowRight", "ArrowDown"].includes(e.key)) { e.preventDefault(); BS_STAMP_ORIGIN = true; setMode("studio"); }
       });
     }
-    st.innerHTML = `<button type="button" role="radio" data-czmode="preview" aria-checked="${edit ? "false" : "true"}" tabindex="${edit ? -1 : 0}">READ</button>`
-      + `<span aria-hidden="true">·</span>`
-      + `<button type="button" role="radio" data-czmode="studio" aria-checked="${edit ? "true" : "false"}" tabindex="${edit ? 0 : -1}">EDIT</button>`
-      + `<span class="bs-stamp-say">${edit ? "your front page · nothing here changes the record" : "the record"}</span>`;
+    st.dataset.mode = edit ? "edit" : "read";
+    const had = st.contains(document.activeElement);
+    $$("[data-czmode]", st).forEach(b => {
+      const on = (b.dataset.czmode === "studio") === edit;
+      b.setAttribute("aria-checked", on ? "true" : "false"); b.tabIndex = on ? 0 : -1;
+    });
+    const say = $(".bs-stamp-say", st);
+    if (say) say.textContent = edit ? "your front page · nothing here changes the record" : "the record";
+    if (had) { const on = $('[aria-checked="true"]', st); if (on) on.focus(); }
   }
   /* ---- the front page's two stories (specs/24) — one shows at a time.
      The page presses both; this turns the two tab links into a toggle,
@@ -618,7 +637,8 @@
     if (m === "studio") schedulePaperRender(); else renderPaperNow();
     // keyboard focus must not fall to <body> when the control the reader was on
     // is display:none'd by the switch — land it on a control the new mode shows.
-    focusModeControl(m);
+    // A change made on the stamp keeps the keyboard on the stamp (paintModeBar).
+    if (BS_STAMP_ORIGIN) BS_STAMP_ORIGIN = false; else focusModeControl(m);
     // moving into paper is the reader's exit from the studio; moving out restores
     // it. Nothing here touches the paper's own DOM — the shift is a class on
     // <html>, and paper mode carries none of it.
@@ -4750,7 +4770,7 @@
         ? paperGone(`a meeting (${b.pid})`)
         : paperBudget("a meeting");
       return `<a class="mcard pb-story" href="${BASE}/m/${esc(b.pid)}">`
-        + (m.thumb ? `<img loading="lazy" src="${esc(m.thumb)}" alt="" width="96" height="54">` : "")
+        + ((m.still || m.thumb) ? `<img loading="lazy" src="${esc(m.still || m.thumb)}" alt="" width="96" height="54">` : "")
         + `<div class="mc-body"><span class="chip">${esc(m.body || "meeting")}</span>`
         + `<b>${esc(m.title || b.pid)}</b>`
         + `<span class="mc-meta">${esc([m.date, m.town].filter(Boolean).join(" · "))}</span>`
@@ -6243,7 +6263,7 @@
      them equal): the search page's live story downloads its pictures the
      way the pressed story does, a white page with its title and source */
   const TP_PIC = { GREEN: "#052e16", INK: "#0f172a", SLATE: "#475569", HAIR: "#e2e8f0",
-    FONT: "JetBrains Mono, ui-monospace, Menlo, Consolas, monospace" };
+    FONT: "IBM Plex Mono, Menlo, Consolas, monospace" };
   const TP_NUM = /^[ \t\n\r]*[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?[ \t\n\r]*$/;
   const tpPicN = v => {
     if (typeof v === "string") { if (!TP_NUM.test(v)) return 0; } else if (typeof v !== "number") return 0;
@@ -7135,19 +7155,20 @@
         if (lab) { lab.setAttribute("x", st.x); lab.textContent = st.mmss; }
         decs.forEach((a, i) => a.classList.toggle("on", i === st.near));
         ticks.forEach(a => a.classList.toggle("near", Math.abs(+a.dataset.t - t) < 240));
-        frames.forEach(f => f.classList.toggle("on", +f.dataset.i === st.third));
-        money.forEach(r => r.classList.toggle("on", Math.abs(+r.dataset.t - t) < 1));
+        const cur = (el, on) => { el.classList.toggle("on", on); if (on) el.setAttribute("aria-current", "true"); else el.removeAttribute("aria-current"); };
+        frames.forEach(f => cur(f, +f.dataset.i === st.third));
+        money.forEach(r => cur(r, Math.abs(+r.dataset.t - t) < 1));
         if (play) { play.href = `${BASE}/m/${encodeURIComponent(D.pid)}#t${Math.floor(t)}`; if (playT) playT.textContent = st.mmss; }
         const d = st.near !== null ? D.decisions[st.near] : null;
         if (now && d) {
           $(".bs-now-t", now).textContent = st.mmss;
           $(".bs-now-kind", now).textContent = d.kind === "tension" ? "tension" : d.kind === "vote" ? "a roll call" : "a decision";
-          $(".bs-now-q", now).textContent = `“${d.quote}”`;
+          $(".bs-now-q", now).textContent = `“${d.quote || ""}”`;
           $(".bs-now-why", now).textContent = d.kind === "vote" ? "the record read a roll call here"
             : d.kind === "tension" ? "the record heard the room push back here"
             : d.reason === "passes" ? "the record heard a motion carry here" : "the record heard a decision here";
         }
-        if (heroQ) heroQ.textContent = said ? `“${said}”` : d ? `“${d.quote}”` : "";
+        if (heroQ) heroQ.textContent = said ? `“${said}”` : d ? `“${d.quote || ""}”` : "";
         if (heroImg) { const f = frames.find(x => +x.dataset.i === st.third), im = f && $("img", f);
           if (im && im.getAttribute("src")) heroImg.src = im.getAttribute("src"); }
       };
@@ -7183,9 +7204,11 @@
     const t = pick ? (D.tapes || []).find(x => x.pid === pick) : null;
     return {
       dim: ch ? (D.tapes || []).filter(x => !months.has(x.month)).map(x => x.pid) : [],
-      line: t ? t.title : ch ? ch.blurb : "",
-      meta: t ? `${tpDay(t.date)} · ${t.town} · ${t.body} · ${t.hours} hours of tape · press Play on its page`
-              : ch ? `chapter ${chapter + 1} of ${chs.length} · ${tpN(ch.months.length, "month")}` : "",
+      line: t ? String(t.title || t.pid) : ch ? String(ch.blurb || "") : "",
+      // the pressed paragraph, with its receipts, when the press shipped one
+      html: t ? "" : ch ? String(ch.html || "") : "",
+      meta: t ? `${tpDay(t.date)} · ${[t.town, t.body].filter(Boolean).join(" · ")} · ${+t.hours || 0} hours of tape · press again to open its page`
+              : ch ? `chapter ${chapter + 1} of ${chs.length} · ${tpN((ch.months || []).length, "month")}` : "",
       href: t ? `${BASE}/m/${encodeURIComponent(t.pid)}` : "",
     };
   }
@@ -7199,9 +7222,12 @@
     let chapter = Math.max(0, (D.chapters || []).length - 1), pick = null;
     const paint = () => {
       const st = bsYearState(D, chapter, pick), dim = new Set(st.dim);
-      tapes.forEach(a => { a.classList.toggle("bs-dim", dim.has(a.dataset.pid)); a.classList.toggle("on", a.dataset.pid === pick); });
-      pills.forEach(p => { const on = +p.dataset.chapter === chapter; p.classList.toggle("on", on); p.setAttribute("aria-current", on ? "true" : "false"); });
-      if (line) { if (st.href) { line.innerHTML = `<a href="${esc(st.href)}">${esc(st.line)}</a>`; } else line.textContent = st.line; }
+      tapes.forEach(a => { a.classList.toggle("bs-dim", dim.has(a.dataset.pid)); const on = a.dataset.pid === pick;
+        a.classList.toggle("on", on); if (on) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current"); });
+      pills.forEach(p => { const on = +p.dataset.chapter === chapter; p.classList.toggle("on", on); if (on) p.setAttribute("aria-current", "true"); else p.removeAttribute("aria-current"); });
+      if (line) { if (st.href) line.innerHTML = `<a href="${esc(st.href)}">${esc(st.line)}</a>`;
+        else if (st.html) line.innerHTML = st.html;      // press-made and already escaped — the page's own bytes
+        else line.textContent = st.line; }
       if (meta) meta.textContent = st.meta;
     };
     pills.forEach(p => p.addEventListener("click", e => { e.preventDefault(); chapter = +p.dataset.chapter; pick = null; paint(); }));
@@ -7246,17 +7272,16 @@
     const months = tpMonthRange(rows.filter(r => tpIsMonth(r.date)).map(r => r.date.slice(0, 7)));
     if (!said.length || !months.length) return "";
     const x = bsMonthX(months, width), colw = width / months.length, base = 110;
-    let out = months.map((mo, i) => `<text x="${r1(i * colw + 4)}" y="${height - 8}" font-size="11" fill="#6F6A5B">${TP_MON[+mo.slice(5, 7)]}</text><line x1="${r1(i * colw)}" y1="${base - 6}" x2="${r1(i * colw)}" y2="${base + 6}" stroke="#D9D1BF"/>`).join("");
+    let out = months.map((mo, i) => `<text x="${r1(i * colw + 4)}" y="${height - 8}" font-size="11" fill="#6F6A5B" style="font-family:var(--font-mono)">${TP_MON[+mo.slice(5, 7)]}</text><line x1="${r1(i * colw)}" y1="${base - 6}" x2="${r1(i * colw)}" y2="${base + 6}" stroke="#D9D1BF"/>`).join("");
     out += `<line x1="0" y1="${base}" x2="${width}" y2="${base}" stroke="#D9D1BF" stroke-width="2"/>`;
-    for (const r of said.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.pid < b.pid ? -1 : 1))) {
+    for (const r of said.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.pid < b.pid ? -1 : a.pid > b.pid ? 1 : 0))) {
       const cx = x(r.date);
-      out += `<a href="${BASE}/m/${encodeURIComponent(r.pid)}#t${Math.floor(r.first_t || 0)}" class="bs-tdot"><circle cx="${r1(cx)}" cy="${base}" r="9" fill="${bsTown(r.town)}"><title>${esc(r.title)} — ${tpN(r.n, "line")}</title></circle>`
-        + `<text x="${r1(cx)}" y="${base - 22}" font-size="12" fill="#4B473E" text-anchor="middle">${esc(tpCutWords(r.body, 24))}</text>`
+      out += `<a href="${BASE}/m/${esc(r.pid)}#t${Math.floor(r.first_t || 0)}" class="bs-tdot" data-pid="${esc(r.pid)}"><circle cx="${r1(cx)}" cy="${base}" r="9" fill="${bsTown(r.town)}"><title>${esc(r.title || r.pid)} — ${tpN(+r.n || 0, "line")}</title></circle>`
+        + `<text x="${r1(cx)}" y="${base - 22}" font-size="12" fill="#4B473E" text-anchor="middle" style="font-family:var(--font-sans)">${esc(tpCutWords(r.body, 24))}</text>`
         + `<text x="${r1(cx)}" y="${base - 38}" font-size="11" fill="#6F6A5B" text-anchor="middle" style="font-family:var(--font-mono)">${esc(bsDayShort(r.date))}</text></a>`;
     }
     const label = q ? `when “${q}” came up` : "when it came up";
-    return `<div class="bs-timeline"><span class="kicker">${esc(label)} — each dot is a meeting; click one to jump</span>
-      <div class="fp-chartwrap"><svg class="bs-timeline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(label)}">${out}</svg></div></div>`;
+    return `<div class="bs-timeline"><span class="kicker">${esc(label)} — each dot is a meeting; click one to jump</span><div class="fp-chartwrap"><svg class="bs-timeline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(label)}">${out}</svg></div></div>`;
   }
   function bsSearchExtras(d, q, idx) {
     const stills = Object.create(null);
@@ -7271,7 +7296,9 @@
         <span class="bs-reelrow-m">first said at ${hms(c.t || 0)} · ${tpN(c.n, "line")} that night · play the moment, or read the captions around it</span></span>
         <span class="bs-reelrow-go">▶ ${hms(c.t || 0)}</span></a>`;
     }).join("");
-    return `<section class="fp-part">${bsTimeline(d.meetings || [], q)}</section>`
+    // the story's rows carry no town of their own — the story's town is theirs
+    const tl = bsTimeline((d.meetings || []).map(r => ({ ...r, town: r.town || d.town })), q);
+    return (tl ? `<section class="fp-part">${tl}</section>` : "")
       + (rows ? `<section class="fp-part"><div class="sectionhead"><span class="kicker">the reel — ${tpN((d.chapters || []).length, "meeting")}, in order</span></div><div class="bs-reelrows">${rows}</div></section>` : "");
   }
   /* ---- the spine's type-ahead (board 2): moments · meetings · threads ·
@@ -7288,7 +7315,7 @@
     const perPid = Object.create(null);
     for (const h of hits) (perPid[h.pid] ||= []).push(h);
     const meetings = Object.keys(perPid).map(pid => { const m = by[pid] || {}; const hs = perPid[pid].slice().sort((a, b) => a.t - b.t);
-      return { pid, title: m.title || pid, date: m.date || "", town: m.town || "", body: m.body || "", still: !!m.still, n: hs.length, first_t: hs[0].t }; })
+      return { pid, title: String(m.title || pid), date: String(m.date || ""), town: String(m.town || ""), body: String(m.body || ""), still: !!m.still, n: hs.length, first_t: hs[0].t }; })
       .sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0) || (a.pid < b.pid ? -1 : 1));
     const ql = q.trim().toLowerCase();
     const threads = (Array.isArray(issues) ? issues : []).filter(i => i && typeof i === "object" && PAPER_REF.test(i.slug || "")
@@ -7296,7 +7323,7 @@
       .sort((a, b) => (+b.n_meetings || 0) - (+a.n_meetings || 0) || (String(a.name) < String(b.name) ? -1 : 1))
       .map(i => ({ slug: i.slug, name: i.name || i.slug, n_meetings: +i.n_meetings || 0 }));
     const months = tpMonthRange(meta.filter(m => m && tpIsMonth(m.date)).map(m => m.date.slice(0, 7)));
-    const counts = months.map(mo => meetings.filter(m => m.date.slice(0, 7) === mo).length);
+    const counts = months.map(mo => meetings.filter(m => String(m.date).slice(0, 7) === mo).length);
     let clips = [];
     for (const pid of Object.keys(perPid).sort()) clips = clips.concat(tpMerge(perPid[pid], +(by[pid] || {}).duration || 0));
     return { total: hits.length, moments, meetings, threads, months, counts, clips: clips.slice(0, BS_TA_CLIPS) };
@@ -7319,15 +7346,16 @@
     input.setAttribute("role", "combobox"); input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-expanded", "false"); input.setAttribute("aria-controls", "bs-ta");
     panel.setAttribute("role", "listbox"); panel.setAttribute("aria-label", "suggestions");
-    let deb, items = [], sel = -1, open = false, seq = 0;
-    const close = () => { panel.hidden = true; panel.innerHTML = ""; items = []; sel = -1; open = false;
+    let deb, items = [], sel = -1, open = false, seq = 0, dismissed = "";
+    const close = () => { clearTimeout(deb); seq++; panel.hidden = true; panel.innerHTML = ""; items = []; sel = -1; open = false;
       input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-activedescendant"); };
     const mark = () => { items.forEach((el, i) => el.setAttribute("aria-selected", i === sel ? "true" : "false"));
       if (sel >= 0 && items[sel]) { input.setAttribute("aria-activedescendant", items[sel].id); items[sel].scrollIntoView({ block: "nearest" }); }
       else input.removeAttribute("aria-activedescendant"); };
     const move = d => { if (!items.length) return; sel = (sel + d + items.length) % items.length; mark(); };
-    const nextGroup = () => { if (!items.length) return; const g = sel >= 0 ? items[sel].dataset.g : "";
-      const i = items.findIndex((el, k) => k > sel && el.dataset.g !== g); sel = i >= 0 ? i : items.findIndex(el => el.dataset.g !== g); if (sel < 0) sel = 0; mark(); };
+    // the next group's first suggestion, or -1 past the last group (Tab then leaves the spine)
+    const nextGroup = () => { if (!items.length) return -1; const g = sel >= 0 ? items[sel].dataset.g : "";
+      const i = items.findIndex((el, k) => k > sel && el.dataset.g !== g); if (i < 0) return -1; sel = i; mark(); return i; };
     const paint = (g, q) => {
       const townOf = m => [m.town, m.body].filter(Boolean).join(" · ");
       const mom = g.moments.slice(0, BS_TA_MOMENTS).map((h, i) => `<a class="bs-ta-hit" role="option" id="bs-ta-m${i}" data-g="m" href="${BASE}/m/${encodeURIComponent(h.pid)}#t${Math.floor(h.t)}">
@@ -7341,10 +7369,10 @@
       const start = g.threads.length ? `${BASE}/p#edit&tpl=issue&ref=${encodeURIComponent(g.threads[0].slug)}` : `${BASE}/p#edit`;
       const color = g.meetings.length && g.meetings.every(m => m.town === g.meetings[0].town) ? bsTown(g.meetings[0].town) : "#191712";
       panel.innerHTML = g.total ? `
-        <div class="bs-ta-col bs-ta-moments"><div class="bs-ta-head"><span class="kicker">moments that say it · ${g.total}</span><span class="bs-ta-keys">↑↓ move · ↵ play · ⇥ next group</span></div>${mom}${all}</div>
-        <div class="bs-ta-col bs-ta-meet"><div class="bs-ta-head"><span class="kicker">meetings that took it up · ${g.meetings.length}</span></div>${meet}
+        <div class="bs-ta-col bs-ta-moments" role="group" aria-label="moments that say it"><div class="bs-ta-head"><span class="kicker">moments that say it · ${g.total}</span><span class="bs-ta-keys">↑↓ move · ↵ play · ⇥ next group</span></div>${mom}${all}</div>
+        <div class="bs-ta-col bs-ta-meet" role="group" aria-label="meetings that took it up, and threads"><div class="bs-ta-head"><span class="kicker">meetings that took it up · ${g.meetings.length}</span></div>${meet}
           <div class="bs-ta-head"><span class="kicker">threads</span></div>${thr || `<span class="bs-ta-empty">no thread the record tracks by that name</span>`}</div>
-        <div class="bs-ta-col bs-ta-time"><span class="kicker">over time</span>${bsSpark(g.months, g.counts, color)}
+        <div class="bs-ta-col bs-ta-time" role="group" aria-label="over time"><span class="kicker">over time</span>${bsSpark(g.months, g.counts, color)}
           <span class="bs-ta-note" style="margin-top:0">${g.months.length ? `${TP_MON[+g.months[0].slice(5, 7)]} → ${TP_MON[+g.months[g.months.length - 1].slice(5, 7)]} · meetings that took it up` : ""}</span>
           <a class="bs-ta-btn" role="option" id="bs-ta-tell" data-g="o" href="${sq}">Tell “${esc(q)}” as a story →</a>
           <a class="bs-ta-btn rust" role="option" id="bs-ta-start" data-g="o" href="${esc(start)}">Start a front page from it</a>
@@ -7362,15 +7390,19 @@
       if (my !== seq || input.value.trim() !== q) return;
       paint(bsGroup(idx, ids, q, issues), q);
     }
-    input.addEventListener("input", () => { clearTimeout(deb); const v = input.value.trim();
+    input.addEventListener("input", () => { clearTimeout(deb); dismissed = ""; const v = input.value.trim();
       if (v.length < 3) { close(); return; } deb = setTimeout(() => run(v), 220); });
-    input.addEventListener("focus", () => { const v = input.value.trim(); if (v.length >= 3 && !open) run(v); });
+    // a dismissed word stays dismissed until it changes — a returning focus does not reopen it
+    input.addEventListener("focus", () => { const v = input.value.trim(); if (v.length >= 3 && !open && dismissed !== v) run(v); });
     input.addEventListener("keydown", e => {
-      if (e.key === "Escape") { if (open) { e.preventDefault(); close(); } return; }
+      if (e.key === "Escape") { dismissed = input.value.trim(); if (open) e.preventDefault(); close(); return; }
       if (!open) return;
       if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
       else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
-      else if (e.key === "Tab" && !e.shiftKey && items.length) { e.preventDefault(); nextGroup(); }
+      else if (e.key === "Tab" && !e.shiftKey && items.length) {
+        // the next group; past the last, Tab leaves the spine for the page (no trap)
+        if (nextGroup() >= 0) e.preventDefault(); else close();
+      }
       else if (e.key === "Enter") {
         if (e.metaKey || e.ctrlKey) { const a = $("#bs-ta-all", panel); if (a) { e.preventDefault(); location.href = a.href; } return; }
         const el = items[sel]; if (el) { e.preventDefault(); location.href = el.href; }

@@ -852,7 +852,7 @@ def _score_pic(m) -> str:
     from . import charts as _charts
     from . import pictures as _pictures
     pic = _charts.score(m, base="/app", questions=True)
-    return pic + _pictures.take(f'm-{_pictures.key(m["pid"])}-score', pic, f'The shape of the tape — {m["title"]}',
+    return pic + _pictures.take(f'm-{_pictures.key(m["pid"])}-shape', pic, f'The shape of the tape — {m["title"]}',
                                 f'/app/m/{m["pid"]}',
                                 legend="a dot is a decision, sized by its weight; rust, pushback · a tick above, a question · $ a dollar figure · the eight lanes: where each lens’s words fell")
 
@@ -1231,7 +1231,7 @@ def page_paper(manifest, base, featured=None):
 def _kit_card(k):
     """A kit in the index — a meeting's still + deck, linking to its kit."""
     meta = k.get("meta") or {}
-    thumb = meta.get("thumb") or ""
+    thumb = (meta.get("still") or meta.get("thumb")) or ""
     n = len(k.get("clips") or [])
     return (f'<a class="mcard" href="/app/k/{esc(k.get("slug", ""))}" '
             f'data-town="{esc(meta.get("town", ""))}" '
@@ -1814,14 +1814,14 @@ def page_ai(manifest, base):
         <path d="M364 118 h48 m-10 -6 10 6 -10 6"/>
         <path d="M570 118 h48 m-10 -6 10 6 -10 6"/>
       </g>
-      <g font-family="'JetBrains Mono',monospace" font-size="14" fill="#0f172a"
+      <g font-family="'IBM Plex Mono',monospace" font-size="14" fill="#191712"
          text-anchor="middle">
         <text x="83"  y="123">the tape</text>
         <text x="289" y="123">the transcript</text>
         <text x="495" y="123">the record</text>
         <text x="668" y="123" fill="#052e16" font-weight="700">you</text>
       </g>
-      <g font-family="'JetBrains Mono',monospace" font-size="11" fill="#475569">
+      <g font-family="'IBM Plex Mono',monospace" font-size="11" fill="#4B473E">
         <g stroke="#059669" stroke-dasharray="4 3" fill="none">
           <path d="M186 60 v26"/><path d="M392 60 v26"/><path d="M598 60 v26"/>
         </g>
@@ -2218,7 +2218,7 @@ def _brand_tokens() -> str:
         f"--border-hairline:{b['rule']};--border-strong:{b['ink-muted']};"
         # measurement and controls are ink; rust is the one action colour and
         # the state light (the focus ring keeps its --state fallback)
-        f"--accent:{b['ink-record']};--state:{b['rust']};--write:{b['rust']};--write-light:{b['rust-light']};"
+        f"--accent:{b['ink-record']};--state:{b['rust']};--write:{b['rust']};--write-light:{b['rust-light']};--live:{b['ink-2']};"
         f"--paper:{b['paper']};--card:{b['paper-card']};--rule:{b['rule']};--rust:{b['rust']};"
         f"--ink:{b['ink-record']};--ink-2:{b['ink-2']};--muted:{b['ink-muted']};"
         f"--boston:{b['boston']};--boston-light:{b['boston-light']};"

@@ -180,7 +180,7 @@ def tonight_section(m: dict, stills: Optional[dict], base: str = "/app") -> str:
     quote = f'“{esc(near["quote"])}”' if near else ""
     now_card = ""
     if near:
-        now_card = (f'<div class="bs-now" id="bs-now"><span class="bs-now-k">now at <span class="bs-now-t">{st["mmss"]}</span> · <span class="bs-now-kind">'
+        now_card = (f'<div class="bs-now" id="bs-now" aria-live="polite"><span class="bs-now-k">now at <span class="bs-now-t">{st["mmss"]}</span> · <span class="bs-now-kind">'
                     f'{"a decision" if near["kind"] != "tension" else "tension"}</span></span>'
                     f'<span class="bs-now-q">“{esc(near["quote"])}”</span><span class="bs-now-why">{esc(story.now_words(near))}</span></div>')
     money = "".join(
@@ -191,7 +191,7 @@ def tonight_section(m: dict, stills: Optional[dict], base: str = "/app") -> str:
                  if money else "")
     labels = "".join(f'<span class="bs-label">{esc(x)}</span>' for x in w["labels"])
     score_pic = charts.score(m, base=base, data=d)
-    score_pic += pictures.take(f"m-{pictures.key(pid)}-score", score_pic, f"The score of the night — {w['title']}", href,
+    score_pic += pictures.take("tonight-score", score_pic, f"The score of the night — {w['title']}", href,
                                legend="a dot is a decision, sized by its weight; rust, pushback · $ a dollar figure the room named · the eight lanes: where each lens’s words fell")
     return f'''<section class="bs-tonight" id="tonight" aria-labelledby="bs-tonight-hl" data-town="{esc(w["town"])}" data-body="{esc(w["body"])}">
   <div class="bs-tonight-l">
@@ -223,11 +223,13 @@ def year_section(meetings: Sequence[dict], votes: Sequence[dict], analytics: dic
     if not chs:
         return ""
     last = chs[-1]
-    pills = "".join(f'<a class="bs-chap{" on" if c["i"] == last["i"] else ""}" href="#year" data-chapter="{c["i"]}">{esc(c["title"])}</a>' for c in chs)
+    current = ' aria-current="true"'     # built first: an f-string expression holds no backslash (3.11)
+    pills = "".join(f'<a class="bs-chap{" on" if c["i"] == last["i"] else ""}" href="#year" data-chapter="{c["i"]}"'
+                    f'{current if c["i"] == last["i"] else ""}>{esc(c["title"])}</a>' for c in chs)
     n = len([m for m in meetings if charts.is_month(m.get("date"))])
     months = charts.month_range([str(m.get("date"))[:7] for m in meetings if charts.is_month(m.get("date"))])
     span = story.month_span_words([months[0], months[-1]]).replace(" and ", " to ") if len(months) > 1 else story.month_span_words(months)
-    sub = f'{story.number_words(min(59, n))} meetings, {esc(span)} — each tape sized by its length; click one, or a chapter'
+    sub = f'{story.number_words(n)} meeting{"" if n == 1 else "s"}, {esc(span)} — each tape sized by its length; click one, or a chapter'
     year_pic = charts.year_tapes(meetings, chs, stills, base=base)
     year_pic += pictures.take("year-in-tapes", year_pic, "The year in tapes", f"{base}/",
                               legend="every meeting as its own still on the year, sized by its length; the top edge is the town’s colour")
@@ -235,7 +237,7 @@ def year_section(meetings: Sequence[dict], votes: Sequence[dict], analytics: dic
   {section_head("The year in tapes", sub, "every meeting →", f"{base}/s")}
   {year_pic}
   <div class="bs-yearwords">
-    <div class="bs-yearline"><p class="bs-tapeline" id="bs-tapeline">{last["html"]}</p>
+    <div class="bs-yearline" aria-live="polite"><p class="bs-tapeline" id="bs-tapeline">{last["html"]}</p>
       <span class="bs-tapemeta" id="bs-tapemeta">chapter {last["i"] + 1} of {len(chs)} · {n_of(len(last["months"]), "month")}</span></div>
     <div class="bs-chapters" role="group" aria-label="the year’s chapters">{pills}</div>
   </div>
@@ -361,14 +363,23 @@ def frontpages_section(featured: Sequence[dict], meetings: Sequence[dict], still
 </section>'''
 
 
+def _day_of(d) -> Optional[story._dt.datetime]:
+    """A real calendar day, or None — a stored '2026-02-30' is undated, not a crash."""
+    try:
+        return story._dt.datetime.strptime(str(d or "")[:10], "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
 def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: str, base: str = "/app") -> str:
     ms = sorted((m for m in meetings if m.get("date")), key=lambda m: (str(m["date"]), str(m.get("pid"))), reverse=True)
     if not ms:
         return ""
-    latest = str(ms[0]["date"])
-    since = story._dt.datetime.strptime(latest[:10], "%Y-%m-%d") - story._dt.timedelta(days=WEEK_DAYS) if charts.DAY_RE.match(latest) else None
-    week = [m for m in ms if since is None or (charts.DAY_RE.match(str(m["date"])) and story._dt.datetime.strptime(str(m["date"])[:10], "%Y-%m-%d") > since)]
-    if len(week) < 3:
+    latest_day = _day_of(ms[0]["date"])
+    since = latest_day - story._dt.timedelta(days=WEEK_DAYS) if latest_day else None
+    week = [m for m in ms if since is None or ((d := _day_of(m["date"])) is not None and d > since)]
+    fell_back = len(week) < 3
+    if fell_back:
         week = ms[:5]
     cards = []
     for m in week[:8]:
@@ -380,7 +391,7 @@ def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: 
                      f'style="--town:{town_color(m.get("town"))}">{pic}<span class="bs-wkbody">'
                      f'<span class="bs-wkkick">{esc(" · ".join(x for x in (m.get("town"), m.get("body")) if x))}</span>'
                      f'<b>{esc(m.get("title") or pid)}</b><span class="bs-wkmeta">{esc(story.day_name(m.get("date") or ""))} · {esc(story.hours_words(m.get("duration") or 0))}</span></span></a>')
-    title = "This week on the record" if since is not None and len(week) >= 3 and week is not ms[:5] else "The latest on the record"
+    title = "The latest on the record" if (fell_back or since is None) else "This week on the record"
     return f'''<section class="bs-week" id="week">
   {section_head(title, "", "every meeting, by town and body →", f"{base}/s")}
   {bodies_html}
@@ -443,7 +454,7 @@ def tell_section(lead: Optional[dict], stats: dict, base: str = "/app") -> str:
     loud = (stats or {}).get("loud") or []
     one = f'{base}/p#edit&amp;tpl=meeting&amp;ref={esc(lead["pid"])}' if lead else f"{base}/p#edit&amp;tpl=meeting"
     issue = f'{base}/p#edit&amp;tpl=issue&amp;ref={esc(loud[0]["slug"])}' if loud else f"{base}/p#edit&amp;tpl=issue"
-    return f'''<section class="bs-tell" id="yourpaper" aria-labelledby="bs-tell-hl">
+    return f'''<section class="bs-yours" id="yourpaper" aria-labelledby="bs-tell-hl">
   <div class="bs-sechead"><div class="bs-sechead-l"><h2 id="bs-tell-hl">Now tell yours.</h2></div><span class="bs-right bs-rustline">everything past this line is writing — the record itself never changes</span></div>
   <div class="bs-doors">
     <a class="bs-door bs-door-ink" href="{one}"><span class="bs-fpkick">One meeting</span><b>What happened on the night, in your words</b><span>Start from the summary, the roll calls and the moments; add the clip, the chart and the caption you want.</span><span class="bs-fpgo">Start with tonight’s tape →</span></a>
@@ -466,8 +477,12 @@ def page_body(meetings: Sequence[dict], issues: Sequence[dict], stats: dict, bas
     ms = sorted(meetings, key=lambda m: (str(m.get("date") or ""), str(m.get("pid"))), reverse=True)
     lead = ms[0] if ms else None
     parts: List[str] = []
-    if lead:
+    if lead and float(lead.get("duration") or 0) > 0:
         parts.append(tonight_section(lead, stills, base))
+    elif lead:
+        parts.append(f'<section class="bs-tonight" id="tonight"><p class="hint">The latest meeting on the record, '
+                     f'<a href="{base}/m/{esc(lead["pid"])}">{esc(lead.get("title") or lead["pid"])}</a>, has no tape length yet — '
+                     'the score needs one.</p></section>')
     else:
         parts.append('<section class="bs-tonight"><p class="hint">The record is empty — no meetings pressed yet.</p></section>')
     votes = _votes_of(meetings)

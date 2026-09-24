@@ -206,7 +206,7 @@ class TestThePressWritesThePictures(unittest.TestCase):
     def test_the_record_and_the_meeting_pictures_are_files_too(self):
         pics = sorted(p.name for p in (self.out / "pictures").iterdir())
         # the broadsheet's own pictures download too (specs/29 + specs/28 §3.3)
-        for name in ("year-in-tapes.svg", "how-the-talk-flowed.svg", "m-t3-score.svg"):
+        for name in ("year-in-tapes.svg", "how-the-talk-flowed.svg", "tonight-score.svg", "m-t3-shape.svg"):
             self.assertIn(name, pics, name)
         home = (self.out / "index.html").read_text()
         self.assertIn('href="/app/pictures/year-in-tapes.svg" download="the-year-in-tapes.svg"', home)

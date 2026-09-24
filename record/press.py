@@ -102,6 +102,13 @@ _DOC_LIMIT = 2000
 # it, so a missing directory is a clean "no tracks here" rather than an error.
 _NO_SIDECARS = Path("/var/empty/record-has-no-sidecars")
 
+# Prefixes the delete pass never touches (specs/29 §P0.2): the stills are a
+# cache that outlives a pressing — a night whose seed failed and whose fetch
+# was walled would otherwise press no stills and then delete every still the
+# bucket held, and the Pages repo would follow. A forgotten meeting's stills
+# linger as orphans instead, which is cheap and harmless.
+KEEP_PREFIXES = ("stills/",)
+
 # The object metadata key carrying the digest of the *plain* bytes. Comparing
 # GCS's own md5 would compare the gzipped object against the local file and
 # re-upload the whole edition every night; comparing what we put there
@@ -480,7 +487,8 @@ def _should_gzip(rel: str, size: int) -> bool:
     return Path(rel).suffix.lower() in _GZIP_SUFFIXES and size >= _GZIP_FLOOR
 
 
-def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "") -> dict:
+def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "",
+                keep_prefixes=KEEP_PREFIXES) -> dict:
     """Make a bucket hold exactly this directory — additions, changes, and
     the removals a re-press legitimately makes.
 
@@ -571,8 +579,13 @@ def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "") -> dict:
         except Exception as exc:
             errors.append(f"upload {name}: {exc}")
 
+    keep = tuple(f"{prefix}/{k}" if prefix else k for k in (keep_prefixes or ()))
+    kept = 0
     if not errors:
         for name in sorted(set(remote) - set(local)):
+            if name.startswith(keep):
+                kept += 1          # a still the press did not re-press stays (the cache lives here)
+                continue
             try:
                 bkt.blob(name).delete()
                 deleted += 1
@@ -586,7 +599,7 @@ def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "") -> dict:
                       "place: deletes are skipped when an upload failed")
 
     out = {"ok": not errors, "bucket": bucket, "prefix": prefix,
-           "uploaded": uploaded, "deleted": deleted, "skipped": skipped,
+           "uploaded": uploaded, "deleted": deleted, "skipped": skipped, "kept": kept,
            "gzipped": gzipped, "bytes": sent_bytes, "errors": errors}
     if errors:
         out["reason"] = errors[0]
@@ -632,17 +645,6 @@ def main(argv=None):
     out_dir = args.out or settings.edition_dir
     bucket = args.bucket or settings.edition_bucket
 
-    stills = None
-    if not args.no_stills:
-        # the picture desk: the cache is seeded from what the bucket already
-        # holds (a job's disk is new every night), so YouTube is asked only
-        # for the tapes that landed since the last pressing
-        stills = Stills(cache=Path(settings.stills_dir), fetch=True)
-        if bucket:
-            seeded = stills.seed_from_bucket(bucket, f"{args.prefix.strip('/')}/stills")
-            if seeded:
-                print(f"  stills: {seeded} seeded from gs://{bucket}")
-
     corpus = PgCorpus()
     try:
         manifest_path = str(Path(out_dir) / PRESSING)
@@ -650,6 +652,17 @@ def main(argv=None):
             print(f"the record has not moved since the last pressing "
                   f"({corpus_fingerprint(corpus)}) — nothing to press")
             return 0
+        stills = None
+        if not args.no_stills:
+            # the picture desk: the cache is seeded from what the bucket already
+            # holds (a job's disk is new every night), so YouTube is asked only
+            # for the tapes that landed since the last pressing — after the
+            # gate, so a night with nothing to press downloads nothing
+            stills = Stills(cache=Path(settings.stills_dir), fetch=True)
+            if bucket:
+                seed = stills.seed_from_bucket(bucket, f"{args.prefix.strip('/')}/stills")
+                print(f"  stills: seeded {seed['copied']} of {seed['listed']} from gs://{bucket}"
+                      + (f" — the seed failed: {seed['error']}" if seed["error"] else ""))
         report = press(corpus, out_dir, args.version, args.base, api=args.api,
                        stills=stills)
     finally:
@@ -687,7 +700,7 @@ def main(argv=None):
     print(f"synced → gs://{bucket}/{sync['prefix']}: "
           f"{sync['uploaded']} uploaded ({sync['gzipped']} gzipped, "
           f"{sync['bytes']/1024:.0f} KB), {sync['skipped']} unchanged, "
-          f"{sync['deleted']} removed")
+          f"{sync['deleted']} removed, {sync.get('kept', 0)} stills kept")
     # A budget bust is loud (the bake already printed it) but it is not a
     # failed job. At the desk a nonzero exit blocks a human's push, which is
     # the right lever; here it tells a scheduler to retry, and retrying a

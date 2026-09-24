@@ -425,8 +425,8 @@ class TestBakeEdition(unittest.TestCase):
         class, no studio hue, no button, no script; the byte-clean guard
         below sweeps the same page for cz- markers."""
         home = (self.out / "index.html").read_text()
-        self.assertIn('class="bs-tell"', home)
-        door = home[home.index('class="bs-tell"'):home.index("</section>", home.index('class="bs-tell"'))]
+        self.assertIn('class="bs-yours"', home)
+        door = home[home.index('class="bs-yours"'):home.index("</section>", home.index('class="bs-yours"'))]
         self.assertIn("Now tell yours.", door)
         self.assertIn("everything past this line is writing — the record itself never changes", door)
         self.assertIn('href="/app/p#edit"', door)
@@ -435,7 +435,7 @@ class TestBakeEdition(unittest.TestCase):
         self.assertIn('href="/app/p#edit&amp;tpl=issue&amp;ref=issue_testville_budget-override"', door)
         # the doors close the page: after tonight's tape, the year, the columns and the week
         for earlier in ('id="tonight"', 'id="year"', 'id="columns"', 'id="week"'):
-            self.assertLess(home.index(earlier), home.index('class="bs-tell"'), earlier)
+            self.assertLess(home.index(earlier), home.index('class="bs-yours"'), earlier)
         # content, not chrome: nothing studio-namespaced, nothing scripted
         for bad in ("cz-", "<button", "onclick"):
             self.assertNotIn(bad, door, f"{bad!r} in the baked doors")

@@ -881,7 +881,7 @@ def day_short(d: str) -> str:
 
 def money_label(name: str) -> str:
     """'$97 MILLION' → '$97 million' — the room's figure, in the paper's case."""
-    s = " ".join(str(name or "").split())
+    s = " ".join(str(name or "").split()).rstrip(".,;:")
     if not s:
         return ""
     head, _, tail = s.partition(" ")
@@ -916,7 +916,13 @@ def loudest_t(m: dict) -> float:
 
 def _third_label(i: int, span: float) -> str:
     mins = int(round(span / 60))
-    what = "hour" if 50 <= mins <= 70 else n_of(mins, "minute")
+    if 50 <= mins <= 70:
+        what = "hour"
+    elif mins >= 90:
+        h, m = divmod(mins, 60)
+        what = f"{h} h {m} min" if m else n_of(h, "hour")
+    else:
+        what = n_of(mins, "minute")
     return ("The first", "The second", "The last")[i] + " " + what
 
 
@@ -998,7 +1004,8 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
     for i, lens in enumerate(LENS_ORDER):
         y = lanes_y0 + i * lane_gap
         color = LENS_COLOR[lens]
-        out.append(f'<text x="-6" y="{y + 8}" font-size="9" fill="{color}" text-anchor="end" style="{MONO}">{lens}</text>')
+        out.append(f'<rect x="-6" y="{y + 1}" width="4" height="{lane_h - 2}" fill="{color}"/>'
+                   f'<text x="-12" y="{y + 8}" font-size="9" fill="{INK2}" text-anchor="end" style="{MONO}">{lens}</text>')
         track = list((rows.get(lens) or {}).get("track") or [])
         bins_n = max(bins_n, len(track))
         mx = max(track) if track else 0
@@ -1045,8 +1052,8 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
         out.append(f'<text x="{_r(x(t))}" y="166" font-size="10" fill="{MUTED}" text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}">{hms(t)}</text>')
         t += step
     svg = (f'<svg class="bs-score-svg" width="{W}" height="168" viewBox="-70 0 {W + 80} 168" xmlns="http://www.w3.org/2000/svg" role="img" '
-           f'aria-label="the shape of the meeting along the tape: {n_of(len(d["decisions"]), "scored moment")}, '
-           f'{n_of(len(d["money"]), "dollar figure")}, eight lanes of lens words">' + "".join(out) + "</svg>")
+           f'aria-label="the shape of the meeting along the tape: its loudest moments as dots, '
+           f'the dollar figures the room named, eight lanes of lens words">' + "".join(out) + "</svg>")
     trows = "".join(f'<tr><td><a href="{at(dc["t"])}">{hms(dc["t"])}</a></td><td>{esc(SHAPE_KINDS.get(dc["kind"], dc["kind"]))}</td>'
                     f'<td>{esc(dc["quote"])}</td></tr>' for dc in d["decisions"])
     trows += "".join(f'<tr><td><a href="{at(mo["t"])}">{hms(mo["t"])}</a></td><td>money</td>'
@@ -1087,13 +1094,20 @@ def tape_width(hours: float) -> int:
     return int(max(56, min(140, round(60 + 10.3 * float(hours or 0)))))
 
 
+YEAR_MONTHS = 12      # the year in tapes is the last twelve months the record holds
+YEAR_STILLS = 60      # the most recent tapes carry their still; older ones are the town's colour
+
+
 def year_layout(meetings: Sequence[dict], width: int = 1328, height: int = 300) -> Tuple[List[str], List[dict]]:
-    """Every dated meeting as a still on the year's month axis, sized by its
-    length, packed upward so no two overlap — a pure layout, so the JS and
-    the press agree on where each tape sits."""
+    """Every dated meeting of the last twelve months as a still on the month
+    axis, sized by its length, packed upward so no two overlap — a pure
+    layout, so the JS and the press agree on where each tape sits."""
     dated = sorted((m for m in meetings if is_month(m.get("date"))),
                    key=lambda m: (str(m.get("date")), str(m.get("pid"))))
     months = month_range([str(m["date"])[:7] for m in dated]) if dated else []
+    if len(months) > YEAR_MONTHS:
+        months = months[-YEAR_MONTHS:]
+        dated = [m for m in dated if str(m["date"])[:7] in set(months)]
     x_of = month_axis(months, width)
     colw = width / max(1, len(months))
     floor_y, gap = height - 34, 6
@@ -1203,9 +1217,12 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
         x0 = i * colw
         out.append(f'<line x1="{_r(x0)}" y1="0" x2="{_r(x0)}" y2="{height - 24}" stroke="{RULE}" stroke-dasharray="2 4"/>'
                    f'<text x="{_r(x0 + 6)}" y="{height - 8}" font-size="12" fill="{MUTED}" style="{MONO}">{month_short(mo)}</text>')
+    # the sixty most recent tapes carry their still (an SVG <image> cannot
+    # load lazily); older ones are the town's colour, still the meeting's link
+    with_still = {t["pid"] for t in sorted(tapes, key=lambda t: (t["date"], t["pid"]), reverse=True)[:YEAR_STILLS]}
     for t in tapes:
         dim = "" if (not lit or t["month"] in lit) else " bs-dim"
-        src = still_src(stills, t["pid"], 0, base)
+        src = still_src(stills, t["pid"], 0, base) if t["pid"] in with_still else ""
         pic = (f'<image href="{esc(src)}" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" preserveAspectRatio="xMidYMid slice"/>'
                if src else
                f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="{town_light(t["town"])}" rx="2"/>'
@@ -1219,7 +1236,9 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
            f'aria-label="every meeting on the record as its own still, placed on the year — {n_of(len(tapes), "tape")}">' + "".join(out) + "</svg>")
     trows = "".join(f'<tr><td><a href="{base}/m/{esc(t["pid"])}">{esc(t["date"])}</a></td><td>{esc(t["town"])}</td>'
                     f'<td>{esc(t["body"])}</td><td>{esc(t["title"])}</td><td>{t["hours"]}</td></tr>' for t in tapes)
-    payload = {"tapes": tapes, "chapters": [{k: v for k, v in c.items() if k != "html"} for c in chapters], "months": months}
+    # the chapters ride whole — the pressed paragraph (with its receipts) as
+    # well as the plain blurb, so a re-lit chapter keeps its links
+    payload = {"tapes": tapes, "chapters": list(chapters), "months": months}
     return (f'<div class="bs-year" {data_attr("year", payload)}><div class="fp-chartwrap">{svg}</div>'
             + twin(trows, "<th>date</th><th>town</th><th>body</th><th>meeting</th><th>hours</th>") + "</div>")
 
@@ -1337,13 +1356,14 @@ def who_when(names: Sequence[dict], months: Sequence[str], towns_by_pid: Dict[st
     return f'<div class="fp-chartwrap">{svg}</div>' + twin("".join(trows), "<th>name</th><th>kind</th><th>meetings</th><th>mentions</th>")
 
 
-def ayes_of(v: dict) -> int:
-    """The ayes in a roll call: the roll's yes votes, else the tally's first number."""
+def ayes_of(v: dict) -> Optional[int]:
+    """The ayes in a roll call: the roll's yes votes, else the tally's first
+    number, else None (nothing countable — the square shows a dot, not a zero)."""
     roll = v.get("roll") or []
     if roll:
         return sum(1 for r in roll if str(r.get("vote") or "").lower() in ("yes", "aye", "y"))
     m = re.match(r"\s*(\d+)", str(v.get("tally") or ""))
-    return int(m.group(1)) if m else 0
+    return int(m.group(1)) if m else None
 
 
 def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
@@ -1374,7 +1394,7 @@ def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
             fill, op = (RUST, ".95") if out_ == "fails" else (INK, ".8") if out_ == "passes" else (INK, ".45")
             tip = f'{v.get("date")} · {out_}' + (f' {v["tally"]}' if v.get("tally") else "") + f' — {cut_words(v.get("motion"), 100)}'
             out.append(f'<a href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}"><rect x="{_r(x)}" y="{y}" width="{sq}" height="{sq}" rx="3" fill="{fill}" opacity="{op}"/>'
-                       f'<text x="{_r(x + sq / 2)}" y="{y + 12}" font-size="8" fill="{PAPER}" text-anchor="middle" style="{MONO}">{ayes_of(v)}</text><title>{esc(tip)}</title></a>')
+                       f'<text x="{_r(x + sq / 2)}" y="{y + 12}" font-size="8" fill="{PAPER}" text-anchor="middle" style="{MONO}">{"·" if ayes_of(v) is None else ayes_of(v)}</text><title>{esc(tip)}</title></a>')
             trows.append(f'<tr><td><a href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}">{esc(v.get("date"))}</a></td>'
                          f'<td>{esc(cut_words(v.get("motion"), 90))}</td><td>{esc(out_)}</td><td>{esc(v.get("tally") or "")}</td></tr>')
         x0 += ncols * (sq + gap) + 14
@@ -1472,7 +1492,7 @@ def lens_river(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str], base:
         widest = max(range(n), key=lambda i: (base_y[i] - tops[i], -i))
         if base_y[widest] - tops[widest] >= 9:
             labels.append(f'<text class="bs-rlabel" data-lens="{lens}" x="{_r(xs[widest])}" y="{_r((base_y[widest] + tops[widest]) / 2 + 4)}" '
-                          f'font-size="11" fill="{PAPER}" text-anchor="middle" style="{MONO};paint-order:stroke" stroke="{LENS_COLOR[lens]}" stroke-width="3">{lens}</text>')
+                          f'font-size="11" fill="{INK}" text-anchor="middle" style="{MONO};paint-order:stroke" stroke="{CARD}" stroke-width="3">{lens}</text>')
         base_y = tops
     if d["joins"] is not None:
         j = d["joins"]
@@ -1521,7 +1541,7 @@ def timeline_dots(rows: Sequence[dict], base: str = "/app", width: int = 1160, h
         col = town_color(r.get("town"))
         out.append(f'<a href="{base}/m/{esc(r["pid"])}#t{int(float(r.get("first_t") or 0))}" class="bs-tdot" data-pid="{esc(r["pid"])}">'
                    f'<circle cx="{_r(x)}" cy="{base_y}" r="9" fill="{col}"><title>{esc(r.get("title") or r["pid"])} — {n_of(int(r["n"]), "line")}</title></circle>'
-                   f'<text x="{_r(x)}" y="{base_y - 22}" font-size="12" fill="{INK2}" text-anchor="middle">{esc(cut_words(r.get("body"), 24))}</text>'
+                   f'<text x="{_r(x)}" y="{base_y - 22}" font-size="12" fill="{INK2}" text-anchor="middle" style="font-family:var(--font-sans)">{esc(cut_words(r.get("body"), 24))}</text>'
                    f'<text x="{_r(x)}" y="{base_y - 38}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{esc(day_short(r["date"]))}</text></a>')
     label = f'when “{q}” came up' if q else "when it came up"
     return (f'<div class="bs-timeline"><span class="kicker">{esc(label)} — each dot is a meeting; click one to jump</span>'

@@ -25,12 +25,20 @@ its meeting lands and never again. Nothing here calls a model.
 
 from __future__ import annotations
 
+import os
+import re
 import shutil
+import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Tuple
 
 YT = "https://i.ytimg.com/vi/{vid}/{name}.jpg"
+_VID = re.compile(r"^[A-Za-z0-9_-]{11}$")   # a YouTube id, and nothing else goes in a URL
+BUDGET_S = 180.0        # the whole fetch pass, wall clock — a walled CDN must not eat the press
+BREAKER = 12            # straight misses before the press stops asking and presses what it has
+MISS_DAYS = 7           # a frame YouTube lacks is remembered, not re-asked nightly
 # (the file's suffix in the edition, YouTube's name for it)
 FRAMES: Tuple[Tuple[str, str], ...] = (("", "hqdefault"), ("-1", "hq1"),
                                         ("-2", "hq2"), ("-3", "hq3"))
@@ -69,11 +77,18 @@ class Stills:
     presses what the cache holds and nothing else (the desk's default)."""
 
     def __init__(self, cache: Optional[Path] = None, fetch: bool = True,
-                 fetcher: Callable[[str], Optional[bytes]] = fetch):
+                 fetcher: Callable[[str], Optional[bytes]] = fetch,
+                 budget_s: float = BUDGET_S, breaker: int = BREAKER,
+                 clock: Callable[[], float] = time.monotonic):
         self.cache = Path(cache) if cache else None
         self.fetch = bool(fetch)
         self.fetcher = fetcher
-        self.fetched = self.copied = self.missed = 0
+        self.budget_s = float(budget_s)
+        self.breaker = int(breaker)
+        self.clock = clock
+        self.fetched = self.copied = self.missed = self.remembered = 0
+        self.stopped = ""          # why the fetching stopped early, if it did
+        self.seed = {"listed": 0, "copied": 0, "error": ""}
 
     # -- the cache -------------------------------------------------------
     def _cached(self, fn: str) -> Optional[bytes]:
@@ -87,36 +102,65 @@ class Stills:
         return data if is_still(data) else None
 
     def _keep(self, fn: str, data: bytes) -> None:
+        """Written whole or not at all: a reader of a shared desk cache never
+        sees a truncated JPEG that still passes is_still."""
         if not self.cache:
             return
         try:
             self.cache.mkdir(parents=True, exist_ok=True)
-            (self.cache / fn).write_bytes(data)
+            part = self.cache / (fn + ".part")
+            part.write_bytes(data)
+            os.replace(part, self.cache / fn)
         except OSError:
             pass   # a cache that cannot be written is a slower press, not a broken one
 
-    def seed_from_bucket(self, bucket: str, prefix: str = "app/stills") -> int:
+    def _missed_recently(self, fn: str) -> bool:
+        """A frame YouTube said it lacks, within MISS_DAYS — not asked again."""
+        if not self.cache:
+            return False
+        p = self.cache / (fn + ".miss")
+        try:
+            return p.is_file() and (time.time() - p.stat().st_mtime) < MISS_DAYS * 86400
+        except OSError:
+            return False
+
+    def _remember_miss(self, fn: str) -> None:
+        if not self.cache:
+            return
+        try:
+            self.cache.mkdir(parents=True, exist_ok=True)
+            (self.cache / (fn + ".miss")).write_bytes(b"")
+        except OSError:
+            pass
+
+    def seed_from_bucket(self, bucket: str, prefix: str = "app/stills") -> dict:
         """Copy the stills a previous pressing already put in the bucket into
         the cache, so tonight's press asks YouTube only for tonight's tapes.
-        Best effort: no client, no credentials, no bucket → 0, and the press
-        goes on (it will fetch instead)."""
+        Best effort, but never silent: the report says what was listed, what
+        was copied and what went wrong, and `note()` repeats it. The sync
+        never deletes under the bucket's stills prefix (record/press.py
+        `KEEP_PREFIXES`), so a night whose seed fails cannot empty the bucket."""
+        rep = {"listed": 0, "copied": 0, "error": ""}
+        self.seed = rep
         if not self.cache or not bucket:
-            return 0
+            return rep
         try:
             from google.cloud import storage
             client = storage.Client()
-            n = 0
             for b in client.list_blobs(bucket, prefix=prefix.strip("/") + "/"):
                 fn = b.name.rsplit("/", 1)[-1]
-                if not fn.endswith(".jpg") or (self.cache / fn).is_file():
+                if not fn.endswith(".jpg"):
+                    continue
+                rep["listed"] += 1
+                if (self.cache / fn).is_file():
                     continue
                 data = b.download_as_bytes()
                 if is_still(data):
                     self._keep(fn, data)
-                    n += 1
-            return n
-        except Exception:
-            return 0
+                    rep["copied"] += 1
+        except Exception as exc:
+            rep["error"] = f"{type(exc).__name__}: {exc}"[:200]
+        return rep
 
     # -- the press ---------------------------------------------------------
     def press(self, rows: Iterable[Tuple[str, str]], out_dir: Path) -> Dict[str, dict]:
@@ -125,6 +169,8 @@ class Stills:
         "frames": [1, 2, 3]}} — only meetings with at least one picture."""
         out = Path(out_dir)
         have: Dict[str, dict] = {}
+        started = self.clock()
+        straight = 0
         for pid, vid in sorted((str(p or ""), str(v or "")) for p, v in rows):
             if not pid or not vid:
                 continue
@@ -134,12 +180,26 @@ class Stills:
                 data = self._cached(fn)
                 if data is not None:
                     self.copied += 1
-                elif self.fetch:
-                    got = self.fetcher(YT.format(vid=vid, name=name))
-                    if is_still(got):
-                        data = got
-                        self.fetched += 1
-                        self._keep(fn, data)
+                elif self.fetch and not self.stopped:
+                    if self._missed_recently(fn):
+                        self.remembered += 1
+                    elif not _VID.match(vid):
+                        self.missed += 1
+                    elif self.clock() - started > self.budget_s:
+                        self.stopped = f"the {int(self.budget_s)} s budget ran out"
+                    elif straight >= self.breaker:
+                        self.stopped = f"{straight} misses in a row — the picture host is not answering"
+                    else:
+                        got = self.fetcher(YT.format(vid=urllib.parse.quote(vid, safe="-_"), name=name))
+                        if is_still(got):
+                            data = got
+                            self.fetched += 1
+                            straight = 0
+                            self._keep(fn, data)
+                        else:
+                            straight += 1
+                            if got is not None:            # answered, but no picture: remember it
+                                self._remember_miss(fn)
                 if data is None:
                     self.missed += 1
                     continue
@@ -154,8 +214,12 @@ class Stills:
         return have
 
     def note(self) -> str:
+        s = self.seed
+        seed = (f" · seeded {s['copied']} of {s['listed']} from the bucket" if s.get("listed") else "") \
+            + (f" · the seed failed: {s['error']}" if s.get("error") else "")
+        stop = f" · stopped early: {self.stopped}" if self.stopped else ""
         return (f"{self.fetched} fetched · {self.copied} from the cache · "
-                f"{self.missed} not available")
+                f"{self.missed} not available · {self.remembered} remembered as missing{seed}{stop}")
 
 
 def copy_tree(src: Path, dst: Path) -> int:

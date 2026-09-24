@@ -119,24 +119,77 @@ class TestThePressPressesPictures(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cache, out = Path(d) / "cache", Path(d) / "out"
             st = Stills(cache=cache, fetch=True, fetcher=fetcher)
-            have = st.press([("abc", "abc"), ("", "x"), ("nov", "")], out)
+            have = st.press([("abc", "abcdefghijk"), ("", "xxxxxxxxxxx"), ("nov", "")], out)
             self.assertEqual(have, {"abc": {"poster": True, "frames": [1]}})
             self.assertTrue((out / "abc.jpg").is_file() and (out / "abc-1.jpg").is_file())
             self.assertFalse((out / "abc-2.jpg").exists() or (out / "abc-3.jpg").exists())
             self.assertEqual(len(calls), 4)
             # the second pressing asks YouTube only for what the cache lacks
             st2 = Stills(cache=cache, fetch=True, fetcher=fetcher)
-            have2 = st2.press([("abc", "abc")], Path(d) / "out2")
+            have2 = st2.press([("abc", "abcdefghijk")], Path(d) / "out2")
             self.assertEqual(have2, have)
             self.assertEqual(st2.copied, 2)
-            self.assertEqual(len(calls), 6)     # only the two missing frames were asked for again
+            # the network miss is asked again; the placeholder was remembered and is not
+            self.assertEqual(len(calls), 5)
+            self.assertEqual(st2.remembered, 1)
             # a press told not to fetch presses what the cache holds and nothing else
             st3 = Stills(cache=cache, fetch=False, fetcher=fetcher)
-            self.assertEqual(st3.press([("abc", "abc"), ("zzz", "zzz")], Path(d) / "out3"), have)
-            self.assertEqual(len(calls), 6)
+            self.assertEqual(st3.press([("abc", "abcdefghijk"), ("zzz", "zzzzzzzzzzz")], Path(d) / "out3"), have)
+            self.assertEqual(len(calls), 5)
         self.assertFalse(is_still(None) or is_still(b"GIF89a" + b"x" * 5000) or is_still(placeholder))
         self.assertEqual(still_path("p"), "/app/stills/p.jpg")
         self.assertEqual(still_path("p", 2), "/app/stills/p-2.jpg")
+
+    def test_the_desk_stops_asking_a_host_that_does_not_answer(self):
+        """A walled picture host must not eat the press: after a run of
+        misses the desk stops fetching and presses what the cache holds; a
+        budget of wall-clock does the same; a frame YouTube said it lacks is
+        remembered and not asked again; an id that is not a YouTube id is
+        never put in a URL."""
+        from record.stills import Stills
+        calls = []
+        none = lambda url: (calls.append(url), None)[1]
+        with tempfile.TemporaryDirectory() as d:
+            st = Stills(cache=Path(d) / "c", fetch=True, fetcher=none, breaker=5)
+            have = st.press([(f"p{i:02d}", f"v{i:02d}xxxxxxxx"[:11]) for i in range(10)], Path(d) / "o")
+            self.assertEqual(have, {})
+            self.assertEqual(len(calls), 5)
+            self.assertIn("misses in a row", st.stopped)
+            self.assertIn("stopped early", st.note())
+            # the wall clock: a fetcher that "takes" a minute each trips a 100 s budget
+            now = [0.0]
+            slow = lambda url: (calls.append(url), now.__setitem__(0, now[0] + 60.0), None)[2]
+            st2 = Stills(cache=Path(d) / "c2", fetch=True, fetcher=slow, breaker=99, budget_s=100, clock=lambda: now[0])
+            st2.press([(f"q{i}", f"w{i}xxxxxxxxx"[:11]) for i in range(10)], Path(d) / "o2")
+            self.assertIn("budget ran out", st2.stopped)
+            # a placeholder answer is remembered; the next press does not ask again
+            placeholder = b"\xff\xd8" + b"x" * 500
+            asked = []
+            card = lambda url: (asked.append(url), placeholder)[1]
+            st3 = Stills(cache=Path(d) / "c3", fetch=True, fetcher=card)
+            st3.press([("abc", "abcdefghijk")], Path(d) / "o3")
+            n = len(asked)
+            st4 = Stills(cache=Path(d) / "c3", fetch=True, fetcher=card)
+            st4.press([("abc", "abcdefghijk")], Path(d) / "o4")
+            self.assertEqual(len(asked), n)
+            self.assertEqual(st4.remembered, 4)
+            # an id that is not YouTube's shape never reaches the fetcher
+            bad = []
+            st5 = Stills(cache=None, fetch=True, fetcher=lambda u: (bad.append(u), None)[1])
+            st5.press([("x", "not a video id"), ("y", "../../etc/passwd"), ("z", "abcdefghijk")], Path(d) / "o5")
+            self.assertEqual(len(bad), 4)
+            self.assertTrue(all("abcdefghijk" in u for u in bad))
+
+    def test_the_sync_never_deletes_the_stills(self):
+        """The keep rule (a fold): the delete pass leaves the bucket's stills
+        alone, so a night whose seed failed cannot empty the cache the
+        edition depends on."""
+        from record import press
+        self.assertIn("stills/", press.KEEP_PREFIXES)
+        import inspect
+        src = inspect.getsource(press.sync_to_gcs)
+        self.assertIn("if name.startswith(keep):", src)
+        self.assertIn("kept", src)
 
     def test_a_bake_without_a_picture_desk_touches_no_network_and_says_so(self):
         """The test corpus presses no stills: every place a still would stand
@@ -338,6 +391,33 @@ class TestBroadsheetTwins(unittest.TestCase):
             "D.forEach((d, i) => { const g = Math.round(x(d) * 1000) / 1000; if (Math.abs(g - W[i]) > 0.001) fail(d + ': ' + g + ' vs ' + W[i]); });",
             "console.log('ok');"])))
 
+    def test_bs_timeline_agrees_with_the_press(self):
+        """The search page's timeline and the pressed topic page's are one
+        picture: the same rows draw the same bytes on both sides."""
+        from web import charts
+        rows = [{"pid": "vid1", "date": "2026-03-10", "n": 2, "first_t": 12.97, "town": "Testville", "body": "Board", "title": "Select Board — March"},
+                {"pid": "vid2", "date": "2026-06-18", "n": 1, "first_t": 40.0, "town": "Boston", "body": "School Committee of the City", "title": "School Committee — June"},
+                {"pid": "vid3", "date": "2026-05-02", "n": 0, "first_t": None, "town": "Testville", "body": "Board", "title": "silent"},
+                {"pid": "vid4", "date": "", "n": 3, "first_t": 1.0, "town": "Testville", "body": "Board", "title": "undated"}]
+        want = charts.timeline_dots(rows, q="budget")
+        self.ok(node("\n".join([
+            PRELUDE,
+            "const TP_MON = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];",
+            'const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;" }[c]));',
+            "const tpIsMonth = d => /^\\d{4}-(0[1-9]|1[0-2])/.test(String(d || ''));",
+            lift(r"  const tpMonthRange = months => \{.+?\n  \};"),
+            lift(r"  const tpCutWords = \(s, n\) => \{.+?\n  \};"),
+            lift(r"  const BS_TOWNS = [^\n]+"),
+            lift(r"  const bsTown = [^\n]+"),
+            lift(r"  const BS_MDAYS = [^\n]+"),
+            lift(r"  function bsMonthX\(months, width\) \{.+?\n  \}"),
+            lift(r"  const bsDayShort = [^\n]+"),
+            lift(r"  function bsTimeline\(rows, q, width, height\) \{.+?\n  \}"),
+            f"const got = bsTimeline({json.dumps(rows)}, 'budget'); const want = {json.dumps(want)};",
+            "if (got !== want) { let i = 0; while (i < got.length && got[i] === want[i]) i++; fail('drift at ' + i + ': ' + got.slice(i, i + 160) + ' vs ' + want.slice(i, i + 160)); }",
+            "if (bsTimeline([], 'x') !== '') fail('no rows, no picture');",
+            "console.log('ok');"])))
+
     def test_the_score_survives_a_malformed_plane(self):
         """decodeReel's law for the score's JSON: a broken attribute paints
         nothing and throws nothing — the still stays a still."""
@@ -436,8 +516,12 @@ class TestTheBroadsheetPage(unittest.TestCase):
         self.assertIn('href="#score">the shape of the tape</a>', page)
         self.assertIn('data-bs-score="', page)
         self.assertRegex(page, r'<a href="/app/m/vid1#t\d+" class="bs-dec"')
-        self.assertIn('href="/app/pictures/m-vid1-score.svg"', page)
-        self.assertTrue((OUT / "pictures" / "m-vid1-score.svg").is_file())
+        self.assertIn('href="/app/pictures/m-vid1-shape.svg"', page)
+        self.assertTrue((OUT / "pictures" / "m-vid1-shape.svg").is_file())
+        # the front page's score is its own picture, under its own name (a fold: two pictures shared one file)
+        self.assertTrue((OUT / "pictures" / "tonight-score.svg").is_file())
+        self.assertIn("The score of the night", (OUT / "pictures" / "tonight-score.svg").read_text())
+        self.assertIn("The shape of the tape", (OUT / "pictures" / "m-vid1-shape.svg").read_text())
         # the town's colour rides the header's rule; the facade shows the still or the town's colour
         self.assertIn('class="mhead bs-mhead" style="--town:', page)
 

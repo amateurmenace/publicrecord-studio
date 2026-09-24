@@ -88,6 +88,7 @@ def kit_from_meeting(m: dict) -> Optional[dict]:
         "body": m.get("body") or "",
         "duration": m.get("duration") or 0,
         "thumb": m.get("thumb") or "",
+        "still": m.get("still") or "",
     }
 
     kit = kit_from_parts(meta, cands, insight)

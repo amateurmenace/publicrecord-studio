@@ -19,6 +19,7 @@ story as a draft in the studio, block for block.
 from __future__ import annotations
 
 import datetime as _dt
+import html as _html
 import re
 from typing import Dict, List, Optional, Sequence
 
@@ -602,7 +603,7 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
     parts: List[str] = []
     parts.append(f'<section class="fp-part">{kicker(f"“{esc(q)}”, by the numbers")}{charts.numbers_strip(cells)}</section>')
     # when it came up (specs/29 board 5): each meeting a town-coloured dot on the year
-    tl = charts.timeline_dots(d["meetings"], base=base, q=q)
+    tl = charts.timeline_dots([{**r, "town": r.get("town") or town} for r in d["meetings"]], base=base, q=q)
     if tl:
         parts.append(f'<section class="fp-part">{tl}</section>')
     busiest = max(d["months"], key=lambda x: (int(x.get("mentions") or 0), x["month"])) if d["months"] else None
@@ -728,6 +729,12 @@ def number_words(n: int) -> str:
     return str(n)
 
 
+def hours_prose_short(hours: float) -> str:
+    """'16.8 hours', '1 hour', '0.6 hours' — a chapter's tape, counted."""
+    h = float(hours or 0)
+    return "1 hour" if h == 1 else f"{h:g} hours"
+
+
 def hours_prose(seconds: float) -> str:
     """'two hours and forty-six minutes' — the tape's length, said."""
     s = int(seconds or 0)
@@ -805,7 +812,7 @@ def tonight(m: dict, base: str = "/app") -> dict:
               "counted by the record"]
     kicker = " · ".join(x for x in ("Tonight’s tape", town, body, day) if x)
     n_caps = int(m.get("n_segments") or 0)
-    meta = f'{hms(dur)} · {n_caps:,} captions' if n_caps else hms(dur)
+    meta = f'{hms(dur)} · {n_caps:,} caption{"" if n_caps == 1 else "s"}' if n_caps else hms(dur)
     return {"pid": pid, "headline": headline, "lede": " ".join(lede), "kicker": kicker,
             "meta": meta, "money": money, "labels": labels, "town": town, "body": body,
             "title": str(m.get("title") or pid), "date": str(m.get("date") or "")}
@@ -867,6 +874,8 @@ def chapters(meetings: Sequence[dict], votes: Sequence[dict], framing_rows: Sequ
     for m in dated:
         cov[str(m["date"])[:7]] = cov.get(str(m["date"])[:7], 0) + 1
     busiest = max(cov, key=lambda mo: (cov[mo], mo)) if cov else ""
+    if busiest and sum(1 for v in cov.values() if v == cov[busiest]) > 1:
+        busiest = ""          # a tie is not a busiest month
     longest = max(dated, key=lambda m: (float(m.get("duration") or 0), str(m["date"]))) if dated else None
     budget = max((m for m in dated if fshare.get(str(m.get("pid")))), key=lambda m: (fshare[str(m.get("pid"))], str(m["date"])), default=None)
     vs = [v for v in votes if v.get("pid") in by_pid]
@@ -909,7 +918,7 @@ def chapters(meetings: Sequence[dict], votes: Sequence[dict], framing_rows: Sequ
                           f'{esc(month_name(busiest + "-01"))} is the busiest month on the record: {n_of(cov[busiest], "tape")}.'))
         towns = sorted({str(m.get("town") or "") for m in ms if m.get("town")})
         bodies = sorted({str(m.get("body") or "") for m in ms if m.get("body")})
-        opener = (f'{n_of(len(ms), "tape")}, {ch["hours"]} hours'
+        opener = (f'{n_of(len(ms), "tape")}, {hours_prose_short(ch["hours"])}'
                   + (f' — {esc(the_list(towns))}' if len(towns) > 1 else "")
                   + (f': {esc(the_list(["the " + b for b in bodies[:4]]))}' if bodies else "") + ".")
         chosen = facts[0] if facts else ("tapes", n_of(len(ms), "tape"), "")
@@ -917,7 +926,7 @@ def chapters(meetings: Sequence[dict], votes: Sequence[dict], framing_rows: Sequ
         title = f'{month_span_words(span)} — {chosen[1]}'
         sentences = [opener] + [f[2] for f in facts[:2] if f[2]]
         html = " ".join(sentences)
-        plain = re.sub(r"<[^>]+>", "", html).replace("&amp;", "&")
+        plain = _html.unescape(re.sub(r"<[^>]+>", "", html))
         result.append({"i": ch["i"], "months": span, "title": title, "blurb": plain, "html": html,
                        "n": len(ms), "hours": ch["hours"]})
     return result
@@ -962,13 +971,15 @@ def vocab_words(shares: Sequence[dict]) -> Tuple[str, str, str]:
     la2 = sorted((l for l in charts.LENS_ORDER if l != la), key=lambda l: -a["shares"].get(l, 0))[0]
     head = f'{esc(b["town"])} talks {esc(noun(lb))}; {esc(a["town"])} talks {esc(noun(la))} and {esc(noun(la2))}'
     ratio = _ratio_words(b["shares"].get(lb, 0), a["shares"].get(lb, 0))
+    tb = top(b)
     say = (f'Each bar is a lens’s share of everything a town’s meetings say under a lens. {esc(a["town"])} gives '
            f'{esc(noun(la))} {round(100 * a["shares"][la])}% of its words and {esc(noun(la2))} {round(100 * a["shares"][la2])}%; '
            f'{esc(b["town"])} gives {esc(noun(lb))} {round(100 * b["shares"][lb])}%'
            + (f', {ratio} {esc(a["town"])}’s share' if ratio else "")
-           + f', and {esc(noun(top(b)))} {round(100 * b["shares"][top(b)])}%.' if top(b) != lb else ".")
-    count = f'{number_words(min(59, b["n"])).capitalize()} {esc(b["town"])} tapes against {number_words(min(59, a["n"]))} from {esc(a["town"])} — early, and already a different accent.' \
-        if a["n"] + b["n"] < 60 else f'{b["n"]} {esc(b["town"])} tapes against {a["n"]} from {esc(a["town"])}.'
+           + (f', and {esc(noun(tb))} {round(100 * b["shares"][tb])}%.' if tb != lb else "."))
+    tapes = lambda n, town: f'{number_words(n) if n < 60 else n} {esc(town)} tape{"" if n == 1 else "s"}'
+    count = f'{tapes(b["n"], b["town"]).capitalize()} against {number_words(a["n"]) if a["n"] < 60 else a["n"]} from {esc(a["town"])}' \
+        + (" — early, and already a different accent." if a["n"] + b["n"] < 60 else ".")
     return head, say, count
 
 
@@ -1006,7 +1017,8 @@ def rolls_words(votes: Sequence[dict], meetings_by_pid: Dict[str, dict]) -> Tupl
     dated = sorted(str(meetings_by_pid[v["pid"]].get("date") or "") for v in vs if charts.is_month(meetings_by_pid[v["pid"]].get("date")))
     span = (f', {esc(month_name(dated[0]).split()[0])} to {esc(month_name(dated[-1]).split()[0])}' if dated and month_name(dated[0]) != month_name(dated[-1])
             else f', in {esc(month_name(dated[0]))}' if dated else "")
-    unanimous = all(not any(str(r.get("vote") or "").lower() in ("no", "nay", "n") for r in (v.get("roll") or [])) for v in vs if v.get("outcome") == "passes")
+    rolled = [v for v in vs if v.get("outcome") == "passes" and v.get("roll")]
+    unanimous = bool(rolled) and all(not any(str(r.get("vote") or "").lower() in ("no", "nay", "n") for r in v["roll"]) for v in rolled)
     say = (f'Every roll call on the record so far is {esc(the_list([w + "’s" for w in who]))}{span}'
            + ("; each unanimous among those voting" if unanimous and passed else "")
            + "; the number in each square is the ayes.")
@@ -1037,10 +1049,10 @@ def thread_words(t: dict) -> Tuple[str, str]:
     first, last = ms[0], ms[-1]
     n = len(t.get("meetings") or [])
     mf, ml = month_name(first["date"]).split()[0], month_name(last["date"]).split()[0]
-    head = f'“{esc(name)}” — {n_of(int(t.get("count") or 0), "time")}, {number_words(min(59, n))} night{"" if n == 1 else "s"}, {esc(mf)} to {esc(ml)}' \
-        if mf != ml else f'“{esc(name)}” — {n_of(int(t.get("count") or 0), "time")}, {number_words(min(59, n))} night{"" if n == 1 else "s"} in {esc(mf)}'
+    head = f'“{esc(name)}” — {n_of(int(t.get("count") or 0), "time")}, {number_words(n)} night{"" if n == 1 else "s"}, {esc(mf)} to {esc(ml)}' \
+        if mf != ml else f'“{esc(name)}” — {n_of(int(t.get("count") or 0), "time")}, {number_words(n)} night{"" if n == 1 else "s"} in {esc(mf)}'
     say = (f'The phrase first lands on {esc(day_name(first["date"]))}'
-           + (f' and returns {number_words(min(59, n - 1))} time{"" if n - 1 == 1 else "s"}, last on {esc(day_name(last["date"]))}.' if n > 1 else "."))
+           + (f' and returns {number_words(n - 1)} time{"" if n - 1 == 1 else "s"}, last on {esc(day_name(last["date"]))}.' if n > 1 else "."))
     return head, say
 
 
@@ -1057,7 +1069,7 @@ def river_words(d: dict) -> str:
         widest[l] = widest.get(l, 0) + 1
     la = max(widest, key=lambda l: (widest[l], -order.index(l)))
     noun = lambda l: LENS_NOUN.get(l, l)
-    bits = [f'{esc(noun(la)).capitalize()} is the widest band on {number_words(min(59, widest[la]))} of the {number_words(min(59, len(ms)))} nights']
+    bits = [f'{esc(noun(la)).capitalize()} is the widest band on {number_words(widest[la])} of the {number_words(len(ms))} nights']
     j = d.get("joins")
     if j is not None and 0 < j < len(ms):
         before, after = ms[:j], ms[j:]
