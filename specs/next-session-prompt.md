@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, ⟦TIME⟧ — v2.2.4 / r51 IS LIVE: said alongside it (specs/29 board 6 — the spec is whole)
+## 2026-09-24, 15:54Z — v2.2.4 / r51 IS LIVE: said alongside it (specs/29 board 6 — the spec is whole)
 
 Stephen said go on the first of the list below; this is it. The CHANGELOG
 entry says what; the shape:
@@ -144,7 +144,7 @@ entry says what; the shape:
   stacks the section under the framing in the right column; the paper's
   grammar pairs halves side by side, so the block stands full width under
   the reel and the framing instead.
-- **Tests**: 999 (110 PG-backed skip without a DSN). New
+- **Tests**: 1000 (110 PG-backed skip without a DSN). New
   `tests/test_web_beside.py`: the count (each line once, a bead between
   two lines, a cough beside the phrase, junk nodes — fewer phrases, never a
   throw), the ranking, the cap, determinism and the per-press cache, the
@@ -152,10 +152,10 @@ entry says what; the shape:
   and the issue page; in `tests/test_web_bake.py`: the chips twin byte for
   byte, the `e.<slug>` round trip and a bad slug, `paperV` → 6, the press's
   link builder, the template shapes lit and dark.
-- **Deploy**: r51 (image `sha256:c40958a6…`, built from e8ddfda) on the service
-  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.4`
-  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.4` at e8ddfda.
+- **Deploy**: r51 (image `sha256:97a5030d…`, built from 5e2f62b) on the service
+  (revision record-api-00043-9kg) and all six jobs; the press at `--version 2.2.4`
+  (execution record-press-dpmcm, 15:52Z); Pages e934b62 (the workflow carried it, run 36023250343); `sw.js` key `cz-record-2.2.4-9eb9be490f17df4c`;
+  tag `v2.2.4` at 5e2f62b.
 - **Reviewed**: one two-lens pass (twelve findings, twelve folded: the
   search page telling a chip's reader they were inside "a front page"; an
   own-words bag that cut the strongest collocations, which are what the

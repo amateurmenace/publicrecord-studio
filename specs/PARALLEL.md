@@ -157,8 +157,8 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
-- 2026-09-24, ⟦TIME⟧ — **v2.2.4 / r51 is LIVE: said alongside it** (specs/29
-  board 6, the spec's last unbuilt line; tag `v2.2.4` at e8ddfda, the commit
+- 2026-09-24, 15:54Z — **v2.2.4 / r51 is LIVE: said alongside it** (specs/29
+  board 6, the spec's last unbuilt line; tag `v2.2.4` at 5e2f62b, the commit
   the image was built from; the service and all six jobs on r51; the press
   at `--version 2.2.4`). The press counts the phrases said in the same
   breath as each issue (`web/beside.py`) onto the issue plane; the issue
