@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.1.20, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.1.22, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -94,7 +94,35 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## Stephen's decisions (never unprompted) — the switches that make the night run
+## 2026-09-24, 02:30Z — v2.1.22 / r45 IS LIVE: the steward's desk; the database resized
+
+- **The desk** (specs/27): `/steward` opens on Tonight (what is running with its
+  own log lines, the record counted, the chain step by step with *Run now* on
+  poll/pipeline/embed), a municipality bar scoping every screen, Meetings,
+  Log (audit filters + any execution's own sentences), Settings (read-only,
+  with where each thing is set), a link back to the record. `record/ops.py`
+  reads Cloud Run and Cloud Logging with the service's identity; the
+  service carries `RECORD_CLOUD_PROJECT` / `RECORD_CLOUD_REGION`. Proven
+  from the cloud: executions listed, a log tail read, the edition manifest
+  fetched. **Not yet seen through a signed-in browser** — Stephen should
+  open it; anything wrong on screen is the first thing to fix.
+- **Cloud SQL `record-pg` is `db-g1-small`** (from `db-f1-micro`, 02:09–02:14Z,
+  Stephen's call; ~+$18/mo). Measured on it, same probe as before: the
+  100-row SELECT 1.3 s (was 9.5), the embed call 0.95 s, the 100 UPDATEs
+  **16.7 s** (was 341 s; median 73 ms a row, max 1.3 s), the behind-count
+  0.37 s with the new partial index `002_neural_todo`. Twenty times faster,
+  not free: **103,779 segments still have no vector** (the night's 11 new
+  tapes added ~35K), which is ~5 hours of `record-embed` at this pace —
+  a few nights at 05:45 ET, or run it from the desk. If that is too slow,
+  `db-custom-1-3840` (~$49/mo) is the next step; measure a batch first.
+- **The first full night landed 11 tapes** (15 → 26 live). The two the
+  hour-kills interrupted sit `queued`/mid-flight until the 03:30 ET drain
+  reclaims them (by design, v2.1.20).
+- Another session ("Community Highlighter features into record") ships
+  v2.1.23 / r46 next from branch `desk-in-the-paper` (a fix for Gemini's
+  cut-off summaries, plus renderer features; its spec is 28). The main
+  checkout on this machine is on `main` but was left behind the remote —
+  `git pull` there before anything.
 
 0. **`PAGES_TOKEN` cannot write.** The 2026-09-23 dispatch cloned the Pages
    repo with it and the push was refused (`Permission to

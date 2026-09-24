@@ -157,6 +157,9 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24 02:30Z — **v2.1.22 / r45 is LIVE**; `record-pg` resized to
+  `db-g1-small` (100 vector updates: 341 s → 16.7 s); migration 002 applied;
+  103,779 segments still without a vector. Next number: v2.1.23 / r46.
 - 2026-09-24 — **v2.1.22 / r45: the steward's desk** (specs/27): Tonight,
   the municipality bar, Meetings, Log, Settings, a way back to the record;
   `record/ops.py` reads Cloud Run and Cloud Logging. The service carries
