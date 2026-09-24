@@ -68,6 +68,22 @@ class TestCounting(unittest.TestCase):
                                    {"start": 5, "text": "free. cash again; the select board voted again"}]}}
         got = beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0}]}], cut, set())
         self.assertEqual(got, [])                                                    # no "free cash", no "select board"
+        dash = {"m1": {"segments": [{"start": 0, "text": "free cash - housing trust fund -- well-known water main"},
+                                    {"start": 5, "text": "free cash - housing trust fund -- well-known water main"}]}}
+        got = [g["phrase"] for g in beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0}]}], dash, set())]
+        self.assertNotIn("cash housing", got); self.assertNotIn("fund well", got)          # a dash between words is a clause break
+        self.assertIn("free cash", got); self.assertIn("water main", got)                  # a hyphen inside a word is not
+        # a pair inside one of the issue's longer names is the issue said beside itself
+        longer = {"m1": {"segments": [{"start": 0, "text": "the affordable housing trust fund voted"},
+                                      {"start": 5, "text": "the affordable housing trust fund voted"}]}}
+        own = beside.own_words({"name": "Housing Trust Fund", "aliases": ["Affordable Housing Trust Fund"]})
+        self.assertEqual(beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0}]}], longer, own), [])   # no "fund voted" either: the name's edge
+        # …while the same pair said apart from the name still counts
+        apart = {"m1": {"segments": [{"start": 0, "text": "affordable housing needs money; the housing trust fund voted"},
+                                     {"start": 5, "text": "affordable housing needs money; the housing trust fund voted"}]}}
+        got = [g["phrase"] for g in beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0}]}], apart, own)]
+        self.assertIn("affordable housing", got); self.assertIn("needs money", got)
+        self.assertNotIn("fund voted", got); self.assertNotIn("trust fund", got)
 
     def test_ranking_is_by_count_then_alphabet_and_the_cap_holds(self):
         segs = [{"start": i * 5, "text": f"zoning bylaw and water main and zoning bylaw"} for i in range(3)]

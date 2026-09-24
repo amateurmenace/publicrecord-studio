@@ -840,6 +840,8 @@
     : b.kind === "doc" ? `📄 ${b.dkind ? b.dkind + " — " : ""}${b.title || b.doc}`
     : b.kind === "digest" ? `⟳ what changed — ${b.name || b.slug} (${b.n})`
     : b.story === "issue" ? `◈ ${b.name || b.slug}`
+    : b.kind === "beside" ? `◇ said alongside — ${b.name || b.slug}`
+    : b.kind === "reading" && b.slug ? `✎ the record’s reading — ${b.name || b.slug}`
     : `§ ${b.title || b.pid}`;
   const blockLabelL = b => blockLabel(b) + (b.layout ? ` · ${LAYOUT_LABEL[b.layout]}` : "");
   function refreshPaperSummary(focus) {
@@ -1574,7 +1576,7 @@
     (!SCOPE.body || (body || "") === SCOPE.body);
   const inPids = pid => !(SCOPE.pids && SCOPE.pids.length) || SCOPE.pids.includes(String(pid || ""));
   /* the scope, said: "the 3 meetings of a front page · Brookline · Select Board" */
-  const scopeWords = () => [(SCOPE.pids && SCOPE.pids.length) ? `the ${tpN(SCOPE.pids.length, "meeting")} this link names` : "",
+  const scopeWords = () => [(SCOPE.pids && SCOPE.pids.length) ? `the ${tpN(SCOPE.pids.length, "meeting")} this search is kept to` : "",
     SCOPE.town, SCOPE.body].filter(Boolean).join(" · ");
 
   /* ================= HOME (scope + body filter) ================= */
@@ -4507,6 +4509,10 @@
         : b.kind === "digest"
         ? { kind: "digest", slug: b.slug, n: b.n, name: b.name || "",
             computed: "from the issue's own timeline at render",
+            url: `${location.origin}${BASE}/i/${b.slug}` }
+        : b.kind === "beside"
+        ? { kind: "beside", slug: b.slug, name: b.name || "",
+            computed: "the phrases the press counted beside the issue, from its own plane at render",
             url: `${location.origin}${BASE}/i/${b.slug}` }
         : b.kind === "reel"
         ? { kind: "reel", runtime: reelRuntime(b.clips),
@@ -7704,7 +7710,7 @@
     if (SCOPE.pids.length && form && !$("#sq-scoped")) {
       const wide = new URL(location.href); wide.searchParams.delete("m");
       const line = document.createElement("p"); line.className = "hint sq-scoped"; line.id = "sq-scoped";
-      line.innerHTML = `searching inside the ${esc(tpN(SCOPE.pids.length, "meeting"))} this link names · <a href="${esc(wide.pathname + wide.search)}">search the whole record</a>`;
+      line.innerHTML = `searching inside the ${esc(tpN(SCOPE.pids.length, "meeting"))} this search is kept to · <a href="${esc(wide.pathname + wide.search)}">search the whole record</a>`;
       form.insertAdjacentElement("afterend", line);
     }
     // instant search: debounced, and never under three characters — a two-letter
@@ -7768,7 +7774,7 @@
     // filtered after, could say "nothing" over lines it never returned. Said
     // as a choice, never as a Studio that failed to answer (a skeptic's catch).
     if (SCOPE.pids.length) {
-      saySearchIsStatic("This search reads inside a few named meetings, so it is counted from "
+      saySearchIsStatic("This search reads inside the meetings it was given, so it is counted from "
         + "the edition’s index in your browser — every line, exactly. Nothing was sent anywhere.");
       return staticSearch(q, terms, box);
     }

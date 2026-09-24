@@ -7,10 +7,13 @@ either side of it is the issue's breath; the two-word phrases in those lines
 whose every token carries signal (memory.issues.phrases: no filler, no
 procedural grams) are counted — each line once, however many beads touch
 it, and a line cut at its punctuation first, so a pair no one said across
-a full stop is not a phrase — with the issue's own names kept out (its
-name, its other names, and any pair made only of the name's words: a thing
-is not said beside itself, while a phrase that merely shares a word with
-it stays), civic stopwords out, and transcript artifacts out (an issue was
+a full stop is not a phrase — with the issue's own names kept out (any
+pair that overlaps its name, its other names or its keywords where they
+are said, and any pair that is one of them or is made only of the name's
+words: a thing is not said beside itself, while a phrase that merely
+shares a word with it, said elsewhere, stays; the record's tokeniser reads
+a hyphenated word as two, as the search index does), civic stopwords out,
+and transcript artifacts out (an issue was
 never said alongside a cough). Ranked by count, then alphabet; only what
 came up more than once. Pure over the corpus's meetings as the press reads
 them, so two presses of one corpus say the same; nothing here calls a
@@ -25,13 +28,13 @@ import re
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from highlighter.insight import _stopish
-from memory.issues import phrases as _phrases
+from memory.issues import FILLER, PROCEDURAL
 
 from .charts import ARTIFACTS
 
 TOP = 8                                 # the plane carries this many (board 6 shows seven)
 _WORD = re.compile(r"[a-z0-9']+")       # memory.issues' own token rule
-_CLAUSE = re.compile(r"[.,;:!?…—–()\[\]\"]+")   # a phrase never crosses one of these
+_CLAUSE = re.compile(r"[.,;:!?…—–()\[\]\"]+|\s-+\s|-{2,}")   # a phrase never crosses one of these (a hyphen inside a word is not one)
 
 
 def own_words(issue: dict) -> dict:
@@ -67,6 +70,37 @@ def _at(starts: Sequence[float], t) -> Optional[int]:
     return max(0, i)
 
 
+def _pairs(clause: str, own_phrases: set) -> List[str]:
+    """The two-word phrases of one clause, memory.issues.phrases' own rules
+    (no filler token, no token under three letters or all digits, no
+    procedural gram) — minus every pair that overlaps an occurrence of one
+    of the issue's own names where it is said ("fund voted" at the edge of
+    "housing trust fund", "affordable housing" inside "affordable housing
+    trust fund"): the issue is not said beside itself, and a pair that
+    merely shares a word with the name, said elsewhere, stays."""
+    ws = _WORD.findall(clause.lower())
+    masked = set()
+    for q in own_phrases:
+        qs = q.split()
+        k = len(qs)
+        if not k:
+            continue
+        for i in range(len(ws) - k + 1):
+            if ws[i:i + k] == qs:
+                masked.update(range(i, i + k))
+    out = []
+    for i in range(len(ws) - 1):
+        g = ws[i:i + 2]
+        if i in masked or i + 1 in masked:
+            continue
+        if any(w in FILLER or len(w) < 3 or w.isdigit() for w in g):
+            continue
+        p = " ".join(g)
+        if p not in PROCEDURAL:
+            out.append(p)
+    return out
+
+
 def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
            top: int = TOP, prepared: Optional[dict] = None) -> List[dict]:
     """[{phrase, n, meetings}] — the phrases said beside the issue, over every
@@ -98,11 +132,11 @@ def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
             covered.update(j for j in (i - 1, i, i + 1) if 0 <= j < len(lines))
         for j in sorted(covered):
             for clause in _CLAUSE.split(lines[j]):            # a phrase never crosses a full stop
-                for p in _phrases(clause):
+                for p in _pairs(clause, own_phrases):           # …nor overlaps the issue's own name where it is said
                     ws = p.split()
-                    if len(ws) != 2:
-                        continue
-                    if p in own_phrases or all(w in own_tokens for w in ws):   # the issue's own name, said beside itself
+                    # the issue's own name said apart from itself: a pair that is one of
+                    # its names, or made only of the name's words ("trust fund" alone)
+                    if p in own_phrases or all(w in own_tokens for w in ws):
                         continue
                     if any(_stopish(w) or w in ARTIFACTS for w in ws) or p in ARTIFACTS:
                         continue

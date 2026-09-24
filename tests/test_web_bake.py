@@ -3328,7 +3328,8 @@ class TestPaper(unittest.TestCase):
         count, the search within the issue's meetings — for plain phrases and
         for one wearing an apostrophe and an ampersand."""
         from web import charts
-        words = [{"phrase": "free cash", "n": 3, "meetings": 2}, {"phrase": "town's & budget", "n": 2, "meetings": 1}, {"phrase": "", "n": 9}]
+        words = [{"phrase": "free cash", "n": 3, "meetings": 2}, {"phrase": "town's & budget", "n": 2, "meetings": 1},
+                 {"phrase": "no count", "n": 2}, {"phrase": "", "n": 9}]
         pids = ["vid1", "vid2"] + [f"p{i}" for i in range(70)]
         body = "\n".join([
             self.PRELUDE, self.helpers(),
@@ -3345,8 +3346,27 @@ class TestPaper(unittest.TestCase):
         self.assertEqual(js[1], charts.beside_chips(words, []))
         self.assertEqual(js[2], charts.beside_chips([], pids))
         self.assertIn('href="/app/s?q=free%20cash&amp;m=vid1,vid2,p0,', js[0])
-        self.assertNotIn("p62,p63,p64", js[0])                                    # capped at 64, as the search page caps its scope
+        self.assertEqual(js[0].split("&amp;m=")[1].split('"')[0].count(",") + 1, 64)   # capped at 64 pids, as the search page caps its scope
+        self.assertIn('title="“no count” in 0 meetings — search them"', js[0])            # a count the plane lacks reads as none, both sides
         self.assertIn('title="“free cash” in 2 meetings — search them"', js[0])
+
+    def test_the_studio_labels_the_words_beside_an_issue(self):
+        """The studio's block label (the panel's rows, the editor pill's
+        tooltip) names a beside block and an issue's reading — a skeptic
+        found both falling through to "§ undefined"."""
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "const esc = s => String(s == null ? '' : s); const nOf = (n, a, b) => `${n} ${n === 1 ? a : (b || a + 's')}`;",
+            "const chartRowLabel = b => '▤ ' + b.chart; const tpN = nOf;",
+            "const bsTownName = s => s; const bsWhoName = s => s;",
+            self.lift(r"const blockLabel = [\s\S]*?`§ \$\{b\.title \|\| b\.pid\}`;"),
+            "console.log(JSON.stringify([blockLabel({kind:'beside',slug:'issue_x',name:'Housing'}), blockLabel({kind:'beside',slug:'issue_x'}),",
+            "  blockLabel({kind:'reading',slug:'issue_x',name:'Housing'}), blockLabel({kind:'story',story:'meeting',pid:'v',title:'T'})]));"])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = json.loads(r.stdout)
+        self.assertEqual(got[:3], ["◇ said alongside — Housing", "◇ said alongside — issue_x", "✎ the record’s reading — Housing"])
+        self.assertNotIn("undefined", json.dumps(got))
 
     def test_the_press_side_link_builder_speaks_the_broadsheet_kinds(self):
         """specs/29 P1: `_paper_qs` (the press's twin of encodePaperQS) mints

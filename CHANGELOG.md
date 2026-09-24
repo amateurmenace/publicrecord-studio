@@ -12,9 +12,11 @@ filed under an issue, and the line either side of it, is the issue's
 breath; the two-word phrases in those lines whose every word carries
 signal are counted — a line cut at its punctuation first, so no pair is
 minted across a full stop; each line once however many of the issue's
-moments touch it — with the issue's own names kept out (its name, its
-other names, and any pair made only of the name's own words: a thing is not
-said beside itself; a phrase that merely shares a word with it stays),
+moments touch it — with the issue's own names kept out (any pair that
+overlaps its name, its other names or its keywords where they are said,
+and any pair that is one of them or is made only of the name's own words:
+a thing is not said beside itself; a phrase that merely shares a word with
+it, said elsewhere, stays),
 civic stopwords out (the record's own list, so a board, a committee, a town
 meeting or public comment is never a phrase beside anything) and transcript
 artifacts out (an issue was never said alongside a cough — a peer's note);
@@ -27,8 +29,9 @@ alongside* on the shelf, a pick of which issue; the issue template draws it
 under the reel and the framing of the night that said it most; the block
 travels as `e.<slug>` and a page carrying one is `v=6`. And each chip opens
 the record's search for the phrase within the issue's own meetings, in the
-search page's scope grammar — which now says *the meetings this link names*
-rather than *a front page cites*, since a chip is not a front page. The chips on the page and on
+search page's scope grammar — which now says *the meetings this search is
+kept to* rather than *a front page cites*, since a chip is not a front page
+and neither is every search box. The chips on the page and on
 a paper are one fragment, the press's and the reader's, held equal byte for
 byte by a node twin.
 

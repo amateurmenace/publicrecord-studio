@@ -158,13 +158,13 @@ section below, updated on main.
 ## State of main (lane A updates this)
 
 - 2026-09-24, ⟦TIME⟧ — **v2.2.4 / r51 is LIVE: said alongside it** (specs/29
-  board 6, the spec's last unbuilt line; tag `v2.2.4` at ⟦TAGAT⟧, the commit
+  board 6, the spec's last unbuilt line; tag `v2.2.4` at e8ddfda, the commit
   the image was built from; the service and all six jobs on r51; the press
   at `--version 2.2.4`). The press counts the phrases said in the same
   breath as each issue (`web/beside.py`) onto the issue plane; the issue
   page and a paper's new `beside` block (`e.<slug>`, v=6) show them as
   chips into the search page, scoped to the issue's meetings. Reviewed
-  ⟦REVIEW⟧. r51 / 2.2.4 are spent; next numbers r52 / 2.2.5.
+  through one two-lens pass (twelve, folded) and a skeptic (seven, folded). r51 / 2.2.4 are spent; next numbers r52 / 2.2.5.
 - 2026-09-24, 14:04Z — **v2.2.3 / r50 is LIVE: the decisions made** (specs/29,
   after P2; tag `v2.2.3` at 8ed3cfc, the commit the image was built from; the
   service and all six jobs on r50; the press at `--version 2.2.3`). Stephen

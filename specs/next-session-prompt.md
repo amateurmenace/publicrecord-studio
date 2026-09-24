@@ -99,13 +99,18 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 Stephen said go on the first of the list below; this is it. The CHANGELOG
 entry says what; the shape:
 
-- **The count** (`web/beside.py`): `beside(timeline, meetings_by_id, skip,
+- **The count** (`web/beside.py`): `beside(timeline, meetings_by_id, own,
   top=8, prepared=)` — over every bead's line and its neighbours (each
   line once), two-word phrases from `memory.issues.phrases` (no filler, no
   procedural grams), a line cut at `_CLAUSE` punctuation first; skipping
-  a phrase that is one of the issue's own names (`own_words(issue)` →
-  `phrases`: name + aliases + keywords, whole) or is made only of the
-  name's own tokens, any stopish token (`highlighter.insight._stopish`)
+  a pair that overlaps one of the issue's own names where it is said
+  (`_pairs` masks every occurrence of `own_words(issue)["phrases"]`: name
+  + aliases + keywords — so "fund voted" at the name's edge and
+  "affordable housing" inside "affordable housing trust fund" are out,
+  while the same pair said apart stays), a pair that is one of those names
+  or is made only of the name's tokens (`tokens`); a dash between words is
+  a clause break too, and a hyphenated word reads as two, as the record's
+  tokeniser reads it; any stopish token (`highlighter.insight._stopish`)
   or artifact (`charts.ARTIFACTS`); a bead without a numeric `t` counts
   nothing;
   ranked by count then alphabet; `n > 1` only. `prepared` caches a
@@ -119,8 +124,8 @@ entry says what; the shape:
   encodeURIComponent does (emit's `_js_euc` now delegates to it). The
   search page's scope words say *the meetings this link names*, not *a
   front page cites*. The issue page presses a `.card.pb-beside-card`; the paper's block
-  is `bsBesideBlock` (a kicker naming the issue, the chips, a `pb-say`; or
-  a hint when nothing counted twice).
+  is `bsBesideBlock` (a kicker naming the issue, the chips, a `pb-say` —
+  the same `pb-say` when nothing counted twice).
 - **The kind** `beside` — `record/papers.py` (a slug, exact keys), the
   codec `e.<slug>` (decodePart, encodePaperQS, portablePaper,
   normalizeKind), `paperV` → "6", `PAPER_VS` gains "6", `emit._paper_qs`
@@ -139,7 +144,7 @@ entry says what; the shape:
   stacks the section under the framing in the right column; the paper's
   grammar pairs halves side by side, so the block stands full width under
   the reel and the framing instead.
-- **Tests**: 998 (110 PG-backed skip without a DSN). New
+- **Tests**: 999 (110 PG-backed skip without a DSN). New
   `tests/test_web_beside.py`: the count (each line once, a bead between
   two lines, a cough beside the phrase, junk nodes — fewer phrases, never a
   throw), the ranking, the cap, determinism and the per-press cache, the
@@ -147,11 +152,26 @@ entry says what; the shape:
   and the issue page; in `tests/test_web_bake.py`: the chips twin byte for
   byte, the `e.<slug>` round trip and a bad slug, `paperV` → 6, the press's
   link builder, the template shapes lit and dark.
-- **Deploy**: r51 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+- **Deploy**: r51 (image `sha256:c40958a6…`, built from e8ddfda) on the service
   (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.4`
   (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.4` at ⟦TAGAT⟧.
-- **Reviewed**: ⟦REVIEW⟧.
+  tag `v2.2.4` at e8ddfda.
+- **Reviewed**: one two-lens pass (twelve findings, twelve folded: the
+  search page telling a chip's reader they were inside "a front page"; an
+  own-words bag that cut the strongest collocations, which are what the
+  aliases are made of — names now, whole; bigrams minted across a full
+  stop; a bead without a time counting the tape's opening lines; a plane
+  test vacuous on the seed; the layout claimed beside the framing when it
+  stood under; the scope cap the search page keeps; a `meetings` count
+  pressed but unread — the chip's title now; the block changing typeface
+  with its data; the kicker's link looking like text; the pick's count line
+  naming meetings it never lists; docstrings and the store's unknown-kind
+  message) — then a skeptic on those folds (seven, folded: the
+  downloaded paper file calling the block a meeting story; the studio's
+  label reading "§ undefined"; scope words true only for a link, now
+  neutral to the way in; a pair inside a longer own name still counted; a
+  dash between words not a clause break; three stale sentences here; a cap
+  pinned loosely).
 - **Next, in order**: the front page read on a phone and fixed; a second
   featured word; one real page shared to prove the listing path on
   production; then the older list below.
