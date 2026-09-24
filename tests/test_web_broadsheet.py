@@ -273,6 +273,9 @@ class TestTheChartsArePure(unittest.TestCase):
         self.assertTrue(all(m in months for c in chs for m in c["months"]))
         html_ = broadsheet.year_section(ms, [], {}, None)
         self.assertIn("the last twelve months", html_)
+        # both pictures name the window they draw, for a screen reader too (a review catch)
+        self.assertIn('aria-label="every meeting of the last twelve months', html_)
+        self.assertIn('aria-label="meetings of the last twelve months, by month', html_)
         self.assertIn("twelve meetings", html_)
         self.assertEqual(len(re.findall(r'class="bs-tape( bs-dim)?"', html_)), 12)
 
@@ -313,15 +316,39 @@ class TestTheChartsArePure(unittest.TestCase):
         big = charts.year_phone(months, laid, [])
         self.assertEqual(big.count("<circle"), 12); self.assertIn(">14</text>", big)
         self.assertEqual(charts.year_phone([], [], []), "")
-        # the sheet: the phone picture hidden at desktop, swapped in under 720px; the river's text hidden there
+        # the sheet: the phone picture hidden at desktop, swapped in on a phone's
+        # SCREEN only — an A4 page is 718px wide and must print the wide forms
+        # (a review catch), so each rule lives in the screen block and nowhere else
         css = (REPO / "web" / "static" / "app.web.css").read_text()
         self.assertIn(".bs-yearphone{display:none", css)
-        phone = css[css.rindex("@media (max-width:720px)"):]
+        self.assertIn(".bs-onphone{display:none}", css)
+        phone = css[css.index("@media screen and (max-width:720px){"):]
         phone = phone[:phone.index("\n}\n")]
-        for rule in (".bs-year .fp-chartwrap{display:none}", ".bs-yearphone{display:block}", ".bs-river-svg text{display:none}"):
+        for rule in (".bs-year .fp-chartwrap{display:none}", ".bs-yearphone{display:block}",
+                     ".bs-river-svg text,.bs-river-svg .bs-rjoinline{display:none}", ".bs-scorecard{display:none}",
+                     ".bs-onwide{display:none}", ".bs-onphone{display:revert}",
+                     ".bs-river-svg.bs-iso .bs-band,.bs-river-svg.bs-iso .bs-band.on{opacity:.86}"):
             self.assertIn(rule, phone)
+            self.assertEqual(css.count(rule), 1, rule)                                   # never in a block print can match
         self.assertIn('dots = $$(".bs-ydot", box)', JS)
         self.assertIn('dots.forEach(c => { c.classList.toggle("bs-dim", dim.has(c.dataset.pid));', JS)
+        self.assertIn('narrow.addEventListener("change", letGo)', JS)                      # a pick lets go across 720px
+        # the words and the download describe the picture on screen
+        self.assertIn('<span class="bs-onwide"> — each tape sized by its length; click one, or a chapter</span>', html_)
+        self.assertIn('<span class="bs-onphone"> — a dot per meeting, its month’s count above; press a chapter</span>', html_)
+        from web import pictures
+        self.assertIn("bs-ydot", pictures._PENDING.get("year-by-month", ""))
+        self.assertNotIn("bs-ydot", pictures._PENDING.get("year-in-tapes", ""))
+        self.assertIn('<div class="bs-onphone"><', html_)
+        for k in ("year-by-month", "year-in-tapes"):
+            pictures._PENDING.pop(k, None)
+        self.assertIn('<h2 id="bs-year-hl">', html_)                                       # the section's aria-labelledby resolves
+        # the river's dashed line where a second town joins carries the class the
+        # phone hides with the labels (a review catch: it stood unlabelled)
+        rows = [{"pid": f"r{i}", "date": f"2026-0{1 + i}-01", "total": 10, "lenses": {"financial": 6, "process": 4}} for i in range(4)]
+        river = charts.lens_river(rows, {"r0": "Boston", "r1": "Boston", "r2": "Brookline", "r3": "Brookline"})
+        self.assertIn('<line class="bs-rjoinline"', river)
+        self.assertIn("Brookline joins the record", river)
 
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
@@ -591,6 +618,11 @@ class TestTheBroadsheetPage(unittest.TestCase):
             self.assertIn('class="navlink bs-write" href="/app/p#edit"', page, rel)
         home = (OUT / "index.html").read_text()
         self.assertIn('class="bs-nameplate"', home)
+        # the wordmark, the spine, the switch — in that order in the page (board 3: the spine second)
+        plate = home[home.index('class="bs-nameplate"'):]
+        self.assertLess(plate.index('class="bs-wordmark"'), plate.index('id="bs-spine"'))
+        self.assertLess(plate.index('id="bs-spine"'), plate.index('id="scope"'))
+        self.assertEqual(home.count('id="bs-spine"'), 1)
         self.assertNotIn('class="bs-nameplate"', (OUT / "s" / "index.html").read_text())
 
     def test_the_meeting_page_carries_the_score_as_its_jump_bar(self):

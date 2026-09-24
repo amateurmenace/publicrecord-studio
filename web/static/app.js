@@ -8327,6 +8327,12 @@
       if (meta) meta.textContent = st.meta;
     };
     pills.forEach(p => p.addEventListener("click", e => { e.preventDefault(); chapter = +p.dataset.chapter; pick = null; paint(); }));
+    // a tape picked wide is not shown on a phone: turning the screen across
+    // 720px lets the pick go, so the words never promise a tape that is gone
+    // (a review catch)
+    const narrow = window.matchMedia ? window.matchMedia("screen and (max-width:720px)") : null;
+    const letGo = () => { if (pick !== null) { pick = null; paint(); } };
+    if (narrow) { if (narrow.addEventListener) narrow.addEventListener("change", letGo); else if (narrow.addListener) narrow.addListener(letGo); }
     // the first press on a still names the meeting; a second opens it (the link)
     tapes.forEach(a => a.addEventListener("click", e => { if (pick === a.dataset.pid) return; e.preventDefault(); pick = a.dataset.pid; paint(); }));
   }

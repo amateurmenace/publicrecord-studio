@@ -1244,7 +1244,7 @@ def _refan(dated, months, width, height, fanning):
 
 
 def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optional[dict] = None,
-               base: str = "/app", width: int = 1328, height: int = 300) -> str:
+               base: str = "/app", width: int = 1328, height: int = 300, windowed: Optional[bool] = None) -> str:
     """The year in tapes: every meeting as its own still on the month axis,
     sized by its hours, town-coloured on its top edge, rows to avoid overlap;
     the last chapter lit and the rest dimmed (the pressed state; the chapter
@@ -1279,7 +1279,10 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
                    f'<title>{esc(tip)}</title>{pic}'
                    f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="4" fill="{town_color(t["town"])}"/>'
                    f'<rect class="bs-tape-ring" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="none" stroke="none" stroke-width="2.5" rx="2"/></a>')
-    _m, _d, windowed = year_window(meetings)
+    # the caller's window when it windowed the meetings first (year_section
+    # does, so these meetings never span more than a year here — a review catch)
+    _m, _d, own = year_window(meetings)
+    windowed = own if windowed is None else windowed
     what = "the last twelve months" if windowed else "the record"
     svg = (f'<svg class="bs-year-svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="every meeting of {what} as its own still, placed on the year — {n_of(len(tapes), "tape")}">' + "".join(out) + "</svg>")
@@ -1289,7 +1292,7 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
     # well as the plain blurb, so a re-lit chapter keeps its links
     payload = {"tapes": tapes, "chapters": list(chapters), "months": months}
     return (f'<div class="bs-year" {data_attr("year", payload)}><div class="fp-chartwrap">{svg}</div>'
-            + year_phone(months, tapes, lit)
+            + year_phone(months, tapes, lit, windowed)
             + twin(trows, "<th>date</th><th>town</th><th>body</th><th>meeting</th><th>hours</th>") + "</div>")
 
 
@@ -1297,7 +1300,7 @@ PHONE_W = 340                 # board 3's picture of the year, at a phone's widt
 PHONE_ROWS, PHONE_COLS = 6, 2  # a month's dots stack six high, two wide; the count says the rest
 
 
-def year_phone(months: Sequence[str], tapes: Sequence[dict], lit: Iterable[str] = ()) -> str:
+def year_phone(months: Sequence[str], tapes: Sequence[dict], lit: Iterable[str] = (), windowed: bool = False) -> str:
     """The year at a phone's width (specs/29 board 3, "the record, over
     time"): a column per month, one dot per meeting in its town's colour,
     the month's count above its dots and the month beneath. It stands in
@@ -1334,9 +1337,9 @@ def year_phone(months: Sequence[str], tapes: Sequence[dict], lit: Iterable[str] 
             dim = "" if (not lit or mo in lit) else " bs-dim"
             out.append(f'<circle class="bs-ydot{dim}" data-pid="{esc(t["pid"])}" data-month="{esc(mo)}" cx="{_r(x)}" cy="{_r(y)}" r="{r}" '
                        f'fill="{town_color(t["town"])}"><title>{esc(t["date"])} · {esc(t["town"])} · {esc(t["body"])}</title></circle>')
-        out.append(f'<text x="{_r(cx)}" y="{_r(base_y - rows * step - 4)}" font-size="11" fill="{INK}" text-anchor="middle" style="{MONO}">{len(ts)}</text>')
+        out.append(f'<text x="{_r(cx)}" y="{_r(base_y - rows * step - 4)}" font-size="11" fill="{INK2}" text-anchor="middle" style="{MONO}">{len(ts)}</text>')
     return (f'<div class="bs-yearphone"><svg class="bs-yearphone-svg" width="{PHONE_W}" height="{height}" viewBox="0 0 {PHONE_W} {height}" '
-            f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="meetings on the record, by month — {n_of(len(tapes), "meeting")}">'
+            f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="meetings {"of the last twelve months" if windowed else "on the record"}, by month — {n_of(len(tapes), "meeting")}">'
             + "".join(out) + "</svg></div>")
 
 
@@ -1593,7 +1596,7 @@ def lens_river(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str], base:
         base_y = tops
     if d["joins"] is not None:
         j = d["joins"]
-        out.append(f'<line x1="{_r(xs[j])}" y1="4" x2="{_r(xs[j])}" y2="{_r(bottom - 4)}" stroke="{INK}" stroke-dasharray="3 4"/>'
+        out.append(f'<line class="bs-rjoinline" x1="{_r(xs[j])}" y1="4" x2="{_r(xs[j])}" y2="{_r(bottom - 4)}" stroke="{INK}" stroke-dasharray="3 4"/>'
                    f'<text x="{_r(xs[j] + 6)}" y="16" font-size="13" fill="{INK}" class="bs-rjoin">{esc(ms[j]["town"])} joins the record</text>')
     every = max(1, n // 6)
     for i, m in enumerate(ms):

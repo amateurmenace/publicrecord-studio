@@ -97,11 +97,15 @@ def municipality(towns: Sequence[dict]) -> str:
             f'<span class="bs-scopenow" id="scopenow">the whole record</span></div>')
 
 
-def nameplate(manifest: dict, towns: Sequence[dict]) -> str:
+def nameplate(manifest: dict, towns: Sequence[dict], spine_html: str = "") -> str:
+    """The wordmark, then the search spine, then the municipality switch —
+    in that order in the page, so a phone (board 3: "the spine second") and
+    a screen reader meet them as the spec orders them; the desktop grid
+    still sets the switch at the wordmark's right (app.web.css)."""
     return (f'<div class="bs-nameplate"><div class="bs-wordmark-box">'
             f'<a class="bs-wordmark" href="/app/">The Public Record</a>'
             f'<p class="bs-promise">What {esc(story.the_list([t["town"] for t in (towns or [])]) or "the town")} said in their own public meetings — searchable, quotable, and yours to retell.</p>'
-            f'</div>{municipality(towns)}</div>')
+            f'</div>{spine_html}{municipality(towns)}</div>')
 
 
 def spine(tries: Sequence[str], base: str = "/app") -> str:
@@ -150,9 +154,10 @@ def primary_nav(current: str, towns: Sequence[dict] = ()) -> str:
 # the page's sections
 # --------------------------------------------------------------------------
 
-def section_head(title: str, sub: str = "", right: str = "", right_href: str = "") -> str:
+def section_head(title: str, sub: str = "", right: str = "", right_href: str = "", hid: str = "") -> str:
     r = f'<a class="bs-right" href="{esc(right_href)}">{right}</a>' if right and right_href else (f'<span class="bs-right">{right}</span>' if right else "")
-    return (f'<div class="bs-sechead"><div class="bs-sechead-l"><h2>{title}</h2>'
+    idattr = f' id="{esc(hid)}"' if hid else ""      # the section's aria-labelledby names it (a review catch: the year's named no element)
+    return (f'<div class="bs-sechead"><div class="bs-sechead-l"><h2{idattr}>{title}</h2>'
             + (f'<span class="bs-sub">{sub}</span>' if sub else "") + f'</div>{r}</div>')
 
 
@@ -232,14 +237,23 @@ def year_section(meetings: Sequence[dict], votes: Sequence[dict], analytics: dic
                     f'{current if c["i"] == last["i"] else ""}>{esc(c["title"])}</a>' for c in chs)
     n = len(dated)
     span = story.month_span_words([months[0], months[-1]]).replace(" and ", " to ") if len(months) > 1 else story.month_span_words(months)
+    # the words and the download describe the picture on screen: the tapes
+    # wide, board 3's dots on a phone (a review catch — the phone read "click
+    # one" beneath dots that do nothing, and saved a picture it never showed)
     sub = (f'{story.number_words(n)} meeting{"" if n == 1 else "s"}, {esc(span)}'
            + (" — the last twelve months" if windowed else "")
-           + ' — each tape sized by its length; click one, or a chapter')
-    year_pic = charts.year_tapes(dated, chs, stills, base=base)
-    year_pic += pictures.take("year-in-tapes", year_pic, "The year in tapes", f"{base}/",
+           + '<span class="bs-onwide"> — each tape sized by its length; click one, or a chapter</span>'
+           + '<span class="bs-onphone"> — a dot per meeting, its month’s count above; press a chapter</span>')
+    year_pic = charts.year_tapes(dated, chs, stills, base=base, windowed=windowed)
+    wide_take = pictures.take("year-in-tapes", year_pic, "The year in tapes", f"{base}/",
                               legend="every meeting as its own still on the year, sized by its length; the top edge is the town’s colour")
+    at = year_pic.find('<div class="bs-yearphone">')
+    phone_take = pictures.take("year-by-month", year_pic[at:] if at >= 0 else "", "The year, month by month", f"{base}/",
+                               legend="a dot per meeting in its town’s colour, month by month; the count above each month")
+    year_pic += ((f'<div class="bs-onwide">{wide_take}</div>' if wide_take else "")
+                 + (f'<div class="bs-onphone">{phone_take}</div>' if phone_take else ""))
     return f'''<section class="bs-year-sec" id="year" aria-labelledby="bs-year-hl">
-  {section_head("The year in tapes", sub, "every meeting →", f"{base}/s")}
+  {section_head("The year in tapes", sub, "every meeting →", f"{base}/s", hid="bs-year-hl")}
   {year_pic}
   <div class="bs-yearwords">
     <div class="bs-yearline" aria-live="polite"><p class="bs-tapeline" id="bs-tapeline">{last["html"]}</p>
@@ -339,7 +353,7 @@ def river_section(meetings: Sequence[dict], analytics: dict, base: str = "/app")
     return f'''<section class="bs-river-sec" id="river">
   {section_head("How the talk flowed, meeting by meeting", "each band is one lens’s share of a night’s words; the record reads eight", "the lenses, explained →", f"{base}/analytics")}
   {river_pic}
-  <p class="bs-reading">{story.river_words(d)}</p>
+  <p class="bs-reading">{story.river_words(d)}<span class="bs-onphone"> Tap a band for the full page, where each lens is named.</span></p>
 </section>'''
 
 

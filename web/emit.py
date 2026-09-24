@@ -247,7 +247,7 @@ def masthead(current, manifest):
     from . import broadsheet as _bs
     top = _bs.topbar(manifest, current, _brand_mark())
     if current == "home":
-        plate = _bs.nameplate(manifest, _EDITION.get("towns") or []) + _bs.spine(_SPINE["tries"])
+        plate = _bs.nameplate(manifest, _EDITION.get("towns") or [], _bs.spine(_SPINE["tries"]))
     else:
         plate = ""
     return f"""<header class="masthead bs-masthead">
