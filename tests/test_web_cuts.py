@@ -167,7 +167,10 @@ class TestMeetingCutAndFound(unittest.TestCase):
         for bad in ("cz-", "onclick", "#a855f7", "#7c3aed"):
             self.assertNotIn(bad, body)
         # the find box is the script's, never pressed (a pressed box that did nothing would lie)
-        self.assertNotIn("mp-find", page)
+        # the find box is pressed under the score now (specs/29 board 4): a
+        # real form that searches the record without the script
+        self.assertIn('<form class="mp-find bs-find" id="find" role="search" action="/app/s" method="get">', page)
+        self.assertIn('id="score"', page)
 
     def test_a_taped_meeting_the_analyzer_scored_nothing_on_offers_no_kit(self):
         """The kit link stands only where a kit was pressed (video AND a
@@ -193,13 +196,16 @@ class TestMeetingCutAndFound(unittest.TestCase):
         self.assertNotIn('href="#cut"', page)
 
     def test_the_front_page_closes_the_latest_story_with_the_night(self):
+        # the night's cut is the meeting page's (specs/26); the broadsheet's
+        # front page opens on the tape itself, with Play from its loudest moment
+        page = (self.out / "m" / "vid1" / "index.html").read_text()
+        self.assertIn("▶ the night in ", page)
+        self.assertIn('href="/app/r?v=1&amp;m=vid1&amp;c=', page)
         home = (self.out / "index.html").read_text()
-        latest = home[home.index('id="latest"'):home.index('class="sp-paths"')]
-        self.assertIn("▶ the night in ", latest)
-        self.assertIn('href="/app/r?v=1&amp;m=vid1&amp;c=', latest)
-        # the bodies filter sits under the stories, beside the list it filters
-        self.assertLess(home.index('id="latest"'), home.index('id="bodyfilter"'))
-        self.assertLess(home.index('id="bodyfilter"'), home.index("also on the record"))
+        self.assertIn('class="bs-playfrom"', home)
+        # the bodies filter sits in the week, beside the cards it filters
+        self.assertLess(home.index('id="week"'), home.index('id="bodyfilter"'))
+        self.assertLess(home.index('id="bodyfilter"'), home.index("bs-weekrow"))
 
     def test_the_reader_finds_in_the_meeting_and_names_the_keys(self):
         js = (REPO / "web" / "static" / "app.js").read_text()

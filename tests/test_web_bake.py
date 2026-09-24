@@ -361,16 +361,14 @@ class TestBakeEdition(unittest.TestCase):
         self.assertIn("the reading, drafted by a model — ai:gemini-2.0-flash, labeled", page)
         self.assertIn('<a class="ts" href="#t12">[0:12]</a>', page)
         self.assertNotIn('class="card summary draft"', (self.out / "m" / "vid1" / "index.html").read_text())
+        # the broadsheet's front page names the summary's model on its label
+        # (specs/29 board 1); the reading itself is read on the meeting page
         home = (self.out / "index.html").read_text()
-        latest = home[home.index('id="latest"'):home.index('class="sp-paths"')]
-        self.assertIn('class="fp-draft"', latest)
-        self.assertIn('<a class="ts" href="/app/m/vid2#t12">[0:12]</a>', latest)
-        self.assertIn("the reading, drafted by a model — ai:gemini-2.0-flash, labeled", latest)
+        self.assertIn("summary drawn from the tape", home)      # the test corpus has no model summary
         ai = (self.out / "ai" / "index.html").read_text()
         self.assertIn("the reading, drafted", ai)
         self.assertIn("before that lane existed names the desk model", ai)
         self.assertIn("ai:gpt-4o-mini", ai)
-
     def test_the_constitution_names_the_standing_rule(self):
         """When the use of the gate changes, /app/ai changes in the same
         commit (CLAUDE.md): a standing rule may now approve a channel's
@@ -406,103 +404,91 @@ class TestBakeEdition(unittest.TestCase):
         # & rides HTML-escaped in an attribute)
         self.assertIn("/app/p?v=2&amp;t=the%20roll%20calls%2C%20watched", stub)
         self.assertIn("b=c.votes,c.framing", stub)
-        # on the front page they are CARDS now, inside the front door
-        # (specs/23 A1 grew the one quiet line into the section)
+        # on the front page they are the front-pages strip (specs/29 board 1):
+        # a card per paper the press built, and the ink door into writing
         home = (self.out / "index.html").read_text()
         self.assertNotIn('class="featline"', home)
-        door = home[home.index('class="sp-paths"'):home.index("</section>", home.index('class="sp-paths"'))]
-        self.assertIn('class="pf-card"', door)
-        self.assertIn("/app/p?v=2&amp;t=the%20roll%20calls%2C%20watched", door)
-        self.assertIn("the press built from the record", door)
+        strip = home[home.index('class="bs-frontpages"'):home.index("</section>", home.index('class="bs-frontpages"'))]
+        self.assertIn('class="bs-fpcard"', strip)
+        self.assertIn("/app/p?v=2&amp;t=the%20roll%20calls%2C%20watched", strip)
+        self.assertIn("pressed nightly", strip)
+        self.assertIn('class="bs-fpdoor" href="/app/p#edit"', strip)
         # the latest-meeting paper names the latest meeting (vid2, June)
         # …as the shape of path one: its numbers, its shape, its framing,
         # the record's reading, and what keeps coming back (a v=4 link)
         self.assertIn("b=m.vid2,c.numbers.m%3Avid2,c.shape.vid2,c.framing.vid2,a.m%3Avid2,c.topics", stub)
-
-    def test_the_two_paths_are_baked_content_in_the_paper_palette(self):
-        """specs/24 (after specs/23 A1): the front page carries the two paths
-        into a story of your own — path one from the latest meetings, path
-        two from the issues with the longest reach — as the record's own
-        prose: real links (JS-off follows them to the stub's honest hint),
-        no studio class, no studio hue, no button, no script; the byte-clean
-        guard below sweeps the same page for cz- markers."""
+    def test_the_three_doors_are_baked_content_in_the_paper_palette(self):
+        """specs/29 (after specs/24's two paths): the front page ends where
+        writing begins — three doors (one meeting, an issue over time, five
+        more templates) under the rust line, as the record's own prose: real
+        links (JS-off follows them to the stub's honest hint), no studio
+        class, no studio hue, no button, no script; the byte-clean guard
+        below sweeps the same page for cz- markers."""
         home = (self.out / "index.html").read_text()
-        self.assertIn('class="sp-paths"', home)
-        door = home[home.index('class="sp-paths"'):home.index("</section>", home.index('class="sp-paths"'))]
-        self.assertIn("your paper — be the editor", door)
-        self.assertIn("Two ways in.", door)
-        self.assertIn("No account. Nothing uploaded.", door)
+        self.assertIn('class="bs-tell"', home)
+        door = home[home.index('class="bs-tell"'):home.index("</section>", home.index('class="bs-tell"'))]
+        self.assertIn("Now tell yours.", door)
+        self.assertIn("everything past this line is writing — the record itself never changes", door)
         self.assertIn('href="/app/p#edit"', door)
-        self.assertIn("What happened", door)
-        self.assertIn("How it moved", door)
-        # the starts are the record's own refs: the latest meetings, the
-        # widest issues, the roll calls
+        # the doors are the record's own refs: the latest meeting, the widest issue
         self.assertIn('href="/app/p#edit&amp;tpl=meeting&amp;ref=vid2"', door)
         self.assertIn('href="/app/p#edit&amp;tpl=issue&amp;ref=issue_testville_budget-override"', door)
-        self.assertIn('href="/app/p#edit&amp;tpl=rolls"', door)
-        self.assertIn("Testville Board · 2026-06-18", door)
-        # the paths sit after the two stories and before the briefs: home
-        # stays the record's front page, and the stories lead it
-        self.assertLess(home.index('id="over-time"'), home.index('id="latest"'))
-        self.assertLess(home.index('id="latest"'), home.index('class="sp-paths"'))
-        self.assertLess(home.index('class="sp-paths"'), home.index("also on the record"))
+        # the doors close the page: after tonight's tape, the year, the columns and the week
+        for earlier in ('id="tonight"', 'id="year"', 'id="columns"', 'id="week"'):
+            self.assertLess(home.index(earlier), home.index('class="bs-tell"'), earlier)
         # content, not chrome: nothing studio-namespaced, nothing scripted
         for bad in ("cz-", "<button", "onclick"):
-            self.assertNotIn(bad, door, f"{bad!r} in the baked paths")
+            self.assertNotIn(bad, door, f"{bad!r} in the baked doors")
         css = (self.out / "app.css").read_text()
-        self.assertIn(".sp-paths{", css)
-        block = css[css.index(".sp-paths{"):css.index(".sp-pressed .kicker")]
-        for pop in ("#a855f7", "#7c3aed", "studio"):
-            self.assertNotIn(pop, block, f"{pop!r} reached the two paths")
-
-    def test_the_front_page_is_two_stories_with_a_toggle(self):
-        """specs/24 §2.4: the front page IS the story — the record over time
-        and the latest meeting, both pressed whole (JS-off complete), a tab
-        strip of two links between the record's controls and the stories,
-        and every picture computed at press time in the paper palette."""
+        self.assertIn(".bs-doors{", css)
+        block = css[css.index("THE CIVIC BROADSHEET"):]
+        for pop in ("#a855f7", "#7c3aed", "#22c55e", "studio"):
+            self.assertNotIn(pop, block, f"{pop!r} reached the broadsheet's rules")
+    def test_the_front_page_is_the_broadsheet(self):
+        """specs/29 board 1: the front page is a paper on the grid — the
+        masthead with the municipality switch and the READ stamp, the search
+        spine (a real form), tonight's tape (the frame, the score with its
+        numbers beside it, the counted headline and lede, the filmstrip), the
+        year in tapes with its chapters, four columns, the river, the front
+        pages, the week, the threads, the doors — in that order, every
+        picture pressed SVG, every control an anchor, and the pressed bytes
+        clean of the studio."""
         home = (self.out / "index.html").read_text()
-        self.assertIn('<nav class="stab" aria-label="the front page’s two stories">', home)
-        self.assertIn('href="#over-time" data-story="over-time" aria-current="true"', home)
-        self.assertIn('href="#latest" data-story="latest"', home)
-        over = home[home.index('id="over-time"'):home.index('id="latest"')]
-        latest = home[home.index('id="latest"'):home.index('class="sp-paths"')]
-        # the record over time: counted headline and lede, every picture
-        self.assertIn("2 meetings, 0.0 hours, 1 roll call — the record since March 2026", over)
-        self.assertIn("the record holds <a href=\"/app/s\">2 meetings</a> of the Board in Testville", over)
-        self.assertIn("1 roll call</a> were read from the tapes: 1 passed, 0 failed", over)
-        for kicker in ("the record, by the numbers", "votes over time", "the long view",
-                       "how the talk was framed", "what keeps coming back", "the record in words",
-                       "what changed, last time", "the latest roll calls"):
-            self.assertIn(kicker, over, f"the over-time story lost '{kicker}'")
-        self.assertIn('<svg width="', over)                       # the votes dots
-        self.assertIn('href="/app/m/vid1#t12"', over)             # the vote's receipt
-        self.assertIn('class="fp-cloud"', over)                   # the record in words
-        self.assertIn('class="fp-heat"', over)                    # the framing strip
-        self.assertIn('class="fp-multiples"', over)               # the threads by month
-        self.assertIn('href="/app/p#edit&amp;tpl=rolls">make this story yours', over)
-        # the latest meeting: the labeled lede, the counted commentary, the shape
-        self.assertIn("the latest meeting on the record — what happened", latest)
-        self.assertIn("a summary drawn from the tape", latest)      # the test corpus has no model
-        self.assertIn('The night ran <a href="/app/m/vid2">1 min</a>.', latest)
-        for kicker in ("the meeting in numbers", "the shape of the meeting", "the moments that decided it",
-                       "the roll calls", "the meeting in words"):
-            self.assertIn(kicker, latest, f"the latest story lost '{kicker}'")
-        self.assertIn('href="/app/p#edit&amp;tpl=meeting&amp;ref=vid2">make this story yours', latest)
+        # the chrome: the stamp, the switch, the spine, the section line
+        self.assertIn('id="bs-stamp" data-mode="read"', home)
+        self.assertIn('class="bs-wordmark" href="/app/">The Public Record</a>', home)
+        self.assertIn('<form class="bs-spineform" action="/app/s" method="get" role="search">', home)
+        self.assertRegex(home, r'<input id="spine" name="q" type="search"')
+        self.assertIn('<div class="bs-ta" id="bs-ta" hidden></div>', home)   # the type-ahead's host, empty when pressed
+        self.assertIn("everything you see is a search", home)
+        self.assertIn('class="navlink bs-write" href="/app/p#edit"', home)
+        # the sections, in the board's order
+        order = ['id="tonight"', 'id="year"', 'id="columns"', 'id="river"', 'id="frontpages"', 'id="week"', 'id="yourpaper"']
+        at = [home.index(k) for k in order]
+        self.assertEqual(at, sorted(at), "the broadsheet's sections are out of order")
+        # tonight's tape: the score carries its numbers, the counted headline and lede
+        tonight = home[home.index('id="tonight"'):home.index('id="year"')]
+        self.assertIn('class="bs-score" data-bs-score="', tonight)
+        self.assertIn('class="bs-dec"', tonight)                       # a decision, sized by weight
+        self.assertRegex(tonight, r'class="bs-playfrom" id="bs-playfrom" href="/app/m/vid2#t\d+"')
+        self.assertIn("and money was the frame", tonight)            # the budget talk, counted
+        self.assertIn("words the record files under a lens", tonight)
+        self.assertIn('class="bs-filmstrip"', tonight)
+        self.assertIn('class="bs-frame on"', tonight)                 # the third the frame shows, at press time
+        # the year: the strip with its numbers, the chapters as anchors
+        year = home[home.index('id="year"'):home.index('id="columns"')]
+        self.assertIn('class="bs-year" data-bs-year="', year)
+        self.assertIn('class="bs-chap on" href="#year"', year)
         # the pictures are content in the paper palette — no studio hue, no chrome
-        for bad in ("cz-", "#a855f7", "#7c3aed", "#d946ef", "<button", "onclick"):
-            self.assertNotIn(bad, over + latest, f"{bad!r} in a pressed story")
+        main = home[home.index('<main'):home.index("</main>")]
+        for bad in ("cz-", "#a855f7", "#7c3aed", "#d946ef", "onclick", "<script"):
+            self.assertNotIn(bad, main, f"{bad!r} in the pressed front page")
+        # the one button on the page is the spine's submit — a form control, not a script's
+        body = home[home.index("<body>"):home.rindex("<script")]
+        self.assertEqual(body.count("<button"), 1)
+        self.assertIn('<button class="bs-spinego" type="submit">Search</button>', body)
         # the commentary is counted, never modeled — and says so
-        self.assertIn("no model wrote a line of it", over)
-        self.assertIn("no model wrote a line of it", latest)
-        # the toggle hides by its own class on the story's wrapper, never by
-        # `hidden` — the town scope paints hidden on every card with a
-        # data-town and would show the latest story again (a live catch)
-        js = (REPO / "web" / "static" / "app.js").read_text()
-        self.assertIn('box(stories[k]).classList.toggle("fp-off", k !== which)', js)
-        self.assertNotIn("stories[k].hidden = k !== which", js)
-        css = (REPO / "web" / "static" / "app.web.css").read_text()
-        self.assertIn("html.js .fp-off{display:none !important}", css)
-
+        self.assertIn("counted by the record", home)
     def test_issues_index_plane_names_every_issue(self):
         """specs/23 A3: the editor's add-search reads the record's own
         static index — every meeting is already in search/meta.json; every
@@ -741,8 +727,8 @@ class TestBakeEdition(unittest.TestCase):
         root = css[css.index(":root{"):css.index("}", css.index(":root{"))]
         for pop in ("#a855f7", "#7c3aed", "#d946ef", "fuchsia", "purple"):
             self.assertNotIn(pop, root, f"{pop!r} leaked into the shared :root")
-        # and the record's own accents ARE there
-        for good in ("#052e16", "#059669", "#f8fafc"):
+        # and the broadsheet's own colours ARE there: paper, ink, rust
+        for good in ("#f3eee3", "#191712", "#b23a1d"):
             self.assertIn(good, css, f"{good} (brand) missing from the pressed CSS")
 
     def test_the_studio_is_script_built_never_baked(self):
@@ -836,9 +822,10 @@ class TestBakeEdition(unittest.TestCase):
         self.assertIn("<details>", page)
         self.assertIn("aria-label", page)      # the diagram speaks to AT
         home = (self.out / "index.html").read_text()
-        for frag in ("weird machine", "brookline interactive group",
-                     "Our AI Constitution", 'href="/app/ai"',
-                     'class="scopeai"'):
+        # the credit line (CLAUDE.md): designed and developed by Stephen
+        # Walter with Brookline Interactive Group & Neighborhood AI
+        for frag in ("Stephen Walter", "Brookline Interactive Group", "Neighborhood AI",
+                     "Our AI Constitution", 'href="/app/ai"'):
             self.assertIn(frag, home, f"{frag!r} missing from the front page")
         self.assertNotIn("a Community AI Project tool", home,
                          "the old footer credit survived the recredit")
@@ -848,48 +835,58 @@ class TestBakeEdition(unittest.TestCase):
                       "the constitution should read offline too")
 
     def test_pressed_css_draws_its_tokens_from_brand(self):
-        """The drift-guard, repointed at brand/ (specs/20 §8): the pressed
-        :root carries the brand's own values, byte-faithful — the accent is
-        green-deep, the state light is green-emerald, the page is off-white."""
-        brand = (REPO / "brand" / "tokens" / "colors.css").read_text()
+        """The drift-guard, repointed at brand/tokens/broadsheet.css
+        (specs/29): the pressed :root carries the broadsheet's own values,
+        byte-faithful — the page is paper, the text is ink, the accent is
+        ink, rust is the state light and the one action colour."""
+        brand = (REPO / "brand" / "tokens" / "broadsheet.css").read_text()
         val = lambda n: re.search(rf"--{n}:\s*(#[0-9A-Fa-f]{{6}})", brand).group(1)
         css = (self.out / "app.css").read_text()
         root = css[css.index(":root{"):css.index("}", css.index(":root{"))]
-        for token, source in [("--accent", "green-deep"),
-                              ("--state", "green-emerald"),
-                              ("--surface-page", "offwhite"),
-                              ("--text-primary", "ink"),
-                              ("--text-secondary", "slate")]:
+        for token, source in [("--surface-page", "paper"),
+                              ("--surface-card", "paper-card"),
+                              ("--text-primary", "ink-record"),
+                              ("--text-secondary", "ink-2"),
+                              ("--accent", "ink-record"),
+                              ("--state", "rust"),
+                              ("--write", "rust"),
+                              ("--boston", "boston"),
+                              ("--brookline", "brookline")]:
             self.assertIn(f"{token}:{val(source)}", root,
                           f"{token} drifted from brand --{source}")
-
+        # the three faces are the broadsheet's, declared last so they win
+        self.assertIn("--font-display:'Fraunces'", root)
+        self.assertIn("--font-sans:'IBM Plex Sans'", root)
+        self.assertIn("--font-mono:'IBM Plex Mono'", root)
     def test_fonts_are_vendored_and_within_budget(self):
-        """Real Inter + JetBrains Mono, self-hosted (specs/20 §4): six subset
-        woff2 with their OFL texts ship in the edition, the @font-face block is
-        pressed, the CSP stays font-src 'self', and the whole face set is under
-        its ~250 KB budget — thumbnails are remote, fonts are the only new
-        bytes."""
+        """Fraunces, IBM Plex Sans and IBM Plex Mono, self-hosted (specs/29):
+        five latin woff2 (two of them variable) with their OFL texts ship in
+        the edition, the @font-face block is pressed with the variable
+        ranges, the CSP stays font-src 'self', and the whole face set is
+        under its ~250 KB budget."""
         fonts = self.out / "fonts"
-        faces = ["inter-400", "inter-500", "inter-700",
-                 "jetbrains-mono-400", "jetbrains-mono-700", "jetbrains-mono-800"]
+        faces = ["fraunces-300-700", "fraunces-italic-300-700", "plex-sans-400-600",
+                 "plex-mono-400", "plex-mono-500"]
         total = 0
         for f in faces:
             p = fonts / f"{f}.woff2"
             self.assertTrue(p.is_file(), f"{f}.woff2 not vendored")
             total += p.stat().st_size
-        self.assertTrue((fonts / "OFL-Inter.txt").is_file())
-        self.assertTrue((fonts / "OFL-JetBrainsMono.txt").is_file())
+        self.assertTrue((fonts / "OFL-Fraunces.txt").is_file())
+        self.assertTrue((fonts / "OFL-IBMPlex.txt").is_file())
+        self.assertFalse((fonts / "inter-400.woff2").exists(), "the old faces should be gone")
         self.assertLess(total, 260_000, f"font set is {total//1024} KB (budget ~250)")
         css = (self.out / "app.css").read_text()
         self.assertIn("@font-face", css)
         self.assertIn("font-display:swap", css.replace(" ", ""))
-        self.assertIn("/app/fonts/inter-400.woff2", css)
+        self.assertIn("font-family:'Fraunces';font-style:italic;font-weight:300 700", css)
+        self.assertIn("/app/fonts/plex-sans-400-600.woff2", css)
         home = (self.out / "index.html").read_text()
         self.assertIn("font-src 'self'", home)           # CSP unwidened
         self.assertIn('rel="preload"', home)             # critical faces preloaded
+        self.assertIn("/app/fonts/fraunces-300-700.woff2", home)
         self.assertNotIn("fonts.googleapis.com", home)   # nothing third-party
         self.assertNotIn("fonts.gstatic.com", css)
-
     def test_masthead_carries_the_brand_mark_byte_equal(self):
         """The keycap is read from brand/logos and never redrawn (specs/20 §4).
         Its three deep-green minute-lines, at their exact coordinates, appear in
@@ -902,32 +899,27 @@ class TestBakeEdition(unittest.TestCase):
         self.assertEqual((self.out / "favicon.svg").read_text().strip(), mark)
 
     def test_front_page_is_a_newspaper(self):
-        """The front page reads like a paper, not a dashboard: a lead story, a
-        briefs column, by-the-numbers, the long view, the access ledger and the
-        latest roll calls — all real HTML, so it reads linearly with JS off
-        (specs/20 §5)."""
+        """The front page reads like a paper, not a dashboard: tonight's tape
+        with a counted headline, the year, four columns, the river, the front
+        pages, this week — all real HTML, so it reads linearly with JS off
+        (specs/29)."""
         home = (self.out / "index.html").read_text()
-        for kicker in ("the latest meeting on the record", "also on the record",
-                       "by the numbers", "the long view", "the access ledger",
-                       "the latest roll calls"):
+        for kicker in ("Tonight’s tape", "The year in tapes", "Four columns", "How the talk flowed",
+                       "Front pages", "Threads", "Now tell yours."):
             self.assertIn(kicker, home, f"front page missing '{kicker}'")
-        # the latest meeting (vid2, June) is told as a real article — the
-        # second of the front page's two stories (specs/24 §2.4)
-        self.assertIn('<article class="lead fp-story fp-latest" id="latest"', home)
+        # the latest meeting (vid2, June) is tonight's tape
+        self.assertIn('data-town="Testville" data-body="Board">', home)
         self.assertIn("School Committee — June", home)
-        # briefs are the scope-filterable meeting cards
-        self.assertIn('class="mcard"', home)
-        # by-the-numbers, and every figure is a link (roll calls → the votes)
-        self.assertIn('class="lead-nums"', home)
-        self.assertIn('<a class="ln" href="/app/officials">', home)
-
+        # the week's cards are the scope-filterable meeting cards
+        self.assertIn('class="mcard bs-week-card"', home)
+        # the headline is a link into the meeting
+        self.assertRegex(home, r'<h1 class="bs-hl" id="bs-tonight-hl"><a href="/app/m/vid2">')
     def test_front_page_pull_moments_link_into_the_tape(self):
-        """The lead's pull-moments come from the moments plane and deep-link
-        into the tape — nothing hand-typed."""
+        """The score's decisions and the filmstrip's frames come from the
+        moments plane and deep-link into the tape — nothing hand-typed."""
         home = (self.out / "index.html").read_text()
-        self.assertIn('class="pull"', home)
-        self.assertRegex(home, r'class="pull" href="/app/m/vid2#t\d+"')
-
+        self.assertRegex(home, r'<a href="/app/m/vid2#t\d+" class="bs-dec"')
+        self.assertRegex(home, r'class="bs-frame( on)?" href="/app/m/vid2#t\d+"')
     def test_meeting_carries_the_moments_plane(self):
         """Each meeting.json carries the pressed moments (specs/20 §6): a ranked,
         chronological list of {t, end, kind, score, reason, quote}. vid1 has a
@@ -1224,7 +1216,7 @@ class TestBakeEdition(unittest.TestCase):
         """One town is not a question. The bar states it; there is no picker,
         no prompt, and nothing that blocks the page."""
         home = (self.out / "index.html").read_text()
-        self.assertIn('class="scope one"', home)
+        self.assertIn('class="scope one bs-muni"', home)
         self.assertIn("the only town on this edition", home)
         self.assertNotIn('class="scopetown"', home)
         self.assertNotIn("scopelink", home)      # no footer re-chooser either

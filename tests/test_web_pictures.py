@@ -177,7 +177,9 @@ class TestThePressWritesThePictures(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_the_topic_pictures_are_files_the_story_links(self):
-        home = (self.out / "index.html").read_text()
+        # the topic story lives on its own page now (specs/29): its three
+        # pictures are linked from there
+        home = (self.out / "topic" / "ai" / "index.html").read_text()
         titles = {"months": "mentions, month by month", "tapes": "where it fell, night by night", "words": "the words beside it"}
         names = []
         for kind, what in (("months", "mentions-month-by-month"), ("tapes", "where-it-fell"), ("words", "the-words-beside-it")):
@@ -203,7 +205,12 @@ class TestThePressWritesThePictures(unittest.TestCase):
 
     def test_the_record_and_the_meeting_pictures_are_files_too(self):
         pics = sorted(p.name for p in (self.out / "pictures").iterdir())
-        self.assertIn("record-words.svg", pics)
+        # the broadsheet's own pictures download too (specs/29 + specs/28 §3.3)
+        for name in ("year-in-tapes.svg", "how-the-talk-flowed.svg", "m-t3-score.svg"):
+            self.assertIn(name, pics, name)
+        home = (self.out / "index.html").read_text()
+        self.assertIn('href="/app/pictures/year-in-tapes.svg" download="the-year-in-tapes.svg"', home)
+        self.assertIn('href="/app/pictures/how-the-talk-flowed.svg"', home)
         mt = (self.out / "m" / "t3" / "index.html").read_text()
         self.assertIn('href="/app/pictures/m-t3-words.svg"', mt)
         svg = (self.out / "pictures" / "m-t3-words.svg").read_text()

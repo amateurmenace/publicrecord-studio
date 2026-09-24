@@ -28,6 +28,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Sequence
 
 from . import charts, story
+from . import pictures
 from .charts import esc, hms, n_of, cut_words, town_color, still_src, data_attr
 
 WEEK_DAYS = 7
@@ -83,14 +84,14 @@ def municipality(towns: Sequence[dict]) -> str:
         return ""
     if len(ts) == 1:
         t = ts[0]
-        return (f'<div class="bs-muni scope one" id="scope"><span class="kicker">Municipality</span>'
+        return (f'<div class="scope one bs-muni" id="scope"><span class="kicker">Municipality</span>'
                 f'<span class="bs-muni-row"><span class="bs-town scopenow" id="scopenow" data-town="{esc(t["town"])}">{esc(t["town"])}'
                 f' <span class="bs-n">{t["meetings"]}</span></span>'
                 f'<span class="hint">the only town on this edition</span></span></div>')
     links = "".join(
         f'<a class="bs-town scopetown" href="/app/?town={esc(t["town"])}" data-town="{esc(t["town"])}" '
         f'style="--town:{town_color(t["town"])}">{esc(t["town"])} <span class="bs-n">{t["meetings"]}</span></a>' for t in ts)
-    return (f'<div class="bs-muni scope" id="scope"><span class="kicker">Municipality</span>'
+    return (f'<div class="scope bs-muni" id="scope"><span class="kicker">Municipality</span>'
             f'<span class="bs-muni-row">{links}'
             f'<a class="bs-town bs-town-all scopetown" href="/app/" data-town="">The whole record</a></span>'
             f'<span class="bs-scopenow" id="scopenow">the whole record</span></div>')
@@ -125,20 +126,24 @@ NAV = [("home", "Read the record", "/app/"),
        ("search", "A word over time", "/app/s"),
        ("officials", "The votes", "/app/officials"),
        ("graph", "Threads", "/app/graph"),
-       ("paper", "Front pages", "/app/p")]
+       ("paper", "Front pages", "/app/p"),
+       ("glossary", "The glossary", "/app/glossary/")]
 WRITE = ("write", "Write your own", "/app/p#edit")
 
 
-def primary_nav(current: str) -> str:
+def primary_nav(current: str, towns: Sequence[dict] = ()) -> str:
     """Five words on the reading side and one rust word on the writing side,
-    a mono hint between them (specs/29 — the stamps)."""
+    a mono hint between them (specs/29 — the stamps). Off the front page the
+    municipality switch rides the line's right slot, compact — the switch is
+    on every page (specs/17 §8), the nameplate only on the front page."""
     items = "".join(f'<a class="navlink{" active" if k == current else ""}" href="{href}">{esc(label)}</a>'
                     for k, label, href in NAV)
     pen = ('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
            '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>')
+    right = (f'<span class="bs-navhint">↑ reading · writing ↑</span>' if current == "home"
+             else f'<div class="bs-navmuni">{municipality(towns)}</div>')
     return (f'<div class="bs-navrow"><nav class="sectionnav" aria-label="Sections">{items}'
-            f'<a class="navlink bs-write" href="{WRITE[2]}">{pen}{WRITE[1]}</a></nav>'
-            f'<span class="bs-navhint">↑ reading · writing ↑</span></div>')
+            f'<a class="navlink bs-write" href="{WRITE[2]}">{pen}{WRITE[1]}</a></nav>{right}</div>')
 
 
 # --------------------------------------------------------------------------
@@ -185,6 +190,9 @@ def tonight_section(m: dict, stills: Optional[dict], base: str = "/app") -> str:
     money_box = (f'<div class="bs-moneybox"><span class="kicker bs-money-k">money named on the tape · click to go there</span>{money}</div>'
                  if money else "")
     labels = "".join(f'<span class="bs-label">{esc(x)}</span>' for x in w["labels"])
+    score_pic = charts.score(m, base=base, data=d)
+    score_pic += pictures.take(f"m-{pictures.key(pid)}-score", score_pic, f"The score of the night — {w['title']}", href,
+                               legend="a dot is a decision, sized by its weight; rust, pushback · $ a dollar figure the room named · the eight lanes: where each lens’s words fell")
     return f'''<section class="bs-tonight" id="tonight" aria-labelledby="bs-tonight-hl" data-town="{esc(w["town"])}" data-body="{esc(w["body"])}">
   <div class="bs-tonight-l">
     <div class="bs-kickrow"><span class="kicker bs-kick" style="color:{town_color(w["town"])}">{esc(w["kicker"])}</span><span class="bs-meta">{esc(w["meta"])}</span></div>
@@ -195,7 +203,7 @@ def tonight_section(m: dict, stills: Optional[dict], base: str = "/app") -> str:
     <div class="bs-scorecard">
       <div class="bs-scorehead"><span class="kicker">the score of the night — click anything to go there</span>
         <span class="bs-legend">● a decision, sized by weight · ▮ tension · $ money named · the eight lanes: where each lens’s words fell</span></div>
-      {charts.score(m, base=base, data=d)}
+      {score_pic}
     </div>
   </div>
   <div class="bs-tonight-r">
@@ -220,9 +228,12 @@ def year_section(meetings: Sequence[dict], votes: Sequence[dict], analytics: dic
     months = charts.month_range([str(m.get("date"))[:7] for m in meetings if charts.is_month(m.get("date"))])
     span = story.month_span_words([months[0], months[-1]]).replace(" and ", " to ") if len(months) > 1 else story.month_span_words(months)
     sub = f'{story.number_words(min(59, n))} meetings, {esc(span)} — each tape sized by its length; click one, or a chapter'
+    year_pic = charts.year_tapes(meetings, chs, stills, base=base)
+    year_pic += pictures.take("year-in-tapes", year_pic, "The year in tapes", f"{base}/",
+                              legend="every meeting as its own still on the year, sized by its length; the top edge is the town’s colour")
     return f'''<section class="bs-year-sec" id="year" aria-labelledby="bs-year-hl">
   {section_head("The year in tapes", sub, "every meeting →", f"{base}/s")}
-  {charts.year_tapes(meetings, chs, stills, base=base)}
+  {year_pic}
   <div class="bs-yearwords">
     <div class="bs-yearline"><p class="bs-tapeline" id="bs-tapeline">{last["html"]}</p>
       <span class="bs-tapemeta" id="bs-tapemeta">chapter {last["i"] + 1} of {len(chs)} · {n_of(len(last["months"]), "month")}</span></div>
@@ -258,18 +269,27 @@ def columns_section(meetings: Sequence[dict], analytics: dict, issues: Sequence[
     # 1 — two towns, two vocabularies
     shares = charts.town_shares(an.get("framing") or [], tb)
     head, say, count = story.vocab_words(shares)
+    bpic = charts.butterfly(shares)
+    bpic += pictures.take("two-towns-two-vocabularies", bpic, "Two towns, two vocabularies", f"{base}/",
+                          legend="each bar is a lens’s share of everything a town’s meetings say under a lens")
     cols.append(_column("Two towns, two vocabularies" if len(shares) > 1 else "One town’s vocabulary", head or "The lenses",
-                        charts.butterfly(shares), [say, count], "delve: the lenses, meeting by meeting →", f"{base}/analytics", charts.INK))
+                        bpic, [say, count], "delve: the lenses, meeting by meeting →", f"{base}/analytics", charts.INK))
     # 2 — who, and when
     nh, ns = story.names_words(an.get("names") or [], months)
     first_town = next((t for t in tb.values() if t), "")
-    cols.append(_column("Who, and when", nh, charts.who_when(an.get("names") or [], months, tb, base=base),
+    wpic = charts.who_when(an.get("names") or [], months, tb, base=base)
+    wpic += pictures.take("who-and-when", wpic, "Who, and when", f"{base}/",
+                          legend="a dot is a month the name was said; bigger, said in more meetings; the colour is the town that says it most")
+    cols.append(_column("Who, and when", nh, wpic,
                         [ns, "Every name and every street is a search — click one and the record cuts a reel."],
                         "delve: names and places, as a reel →", f"{base}/s", town_color(first_town) if first_town else charts.INK))
     # 3 — the roll calls
     votes = _votes_of(meetings)
     rh, rs, rl = story.rolls_words(votes, by_pid)
-    cols.append(_column("The roll calls", rh, charts.vote_grid(votes, base=base), [rs, rl],
+    vpic = charts.vote_grid(votes, base=base)
+    vpic += pictures.take("the-roll-calls", vpic, "The roll calls", f"{base}/",
+                          legend="a square is a roll call, by month; the number is the ayes; rust, the one that failed")
+    cols.append(_column("The roll calls", rh, vpic, [rs, rl],
                         "delve: every roll call, dot by dot →", f"{base}/officials", charts.RUST))
     # 4 — the widest thread's season
     topics = _real_topics(an)
@@ -306,9 +326,12 @@ def river_section(meetings: Sequence[dict], analytics: dict, base: str = "/app")
     d = charts.river_data(rows, tb)
     if len(d["meetings"]) < 2:
         return ""
+    river_pic = charts.lens_river(rows, tb, base=base)
+    river_pic += pictures.take("how-the-talk-flowed", river_pic, "How the talk flowed, meeting by meeting", f"{base}/",
+                               legend="each band is one lens’s share of a night’s framed words, meeting by meeting; the dashed line is where the second town joins")
     return f'''<section class="bs-river-sec" id="river">
   {section_head("How the talk flowed, meeting by meeting", "each band is one lens’s share of a night’s words; the record reads eight", "the lenses, explained →", f"{base}/analytics")}
-  {charts.lens_river(rows, tb, base=base)}
+  {river_pic}
   <p class="bs-reading">{story.river_words(d)}</p>
 </section>'''
 
@@ -367,7 +390,7 @@ def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: 
 
 
 def threads_section(analytics: dict, issues: Sequence[dict], topics: Sequence[dict], meetings: Sequence[dict],
-                    base: str = "/app") -> str:
+                    base: str = "/app", stats: Optional[dict] = None) -> str:
     """Threads: six small multiples — the featured words first (each with its
     own story page), then the recurring topics — each with what it keeps
     coming back as, and *tell its story →*."""
@@ -394,11 +417,18 @@ def threads_section(analytics: dict, issues: Sequence[dict], topics: Sequence[di
         cards.append(_thread_card(name, int(t.get("count") or 0), len(ms),
                                   charts.thread_spark([x.get("date") for x in ms], months, label=f"meetings that took up {name}, month by month"),
                                   months, charts.search_url(name, "", base).replace("&", "&amp;"), tell, "tell its story →"))
-    if not cards:
+    resurf = (stats or {}).get("resurfacings") or []
+    rrows = "".join(
+        f'<a class="rsrow" href="{base}/i/{esc(r["slug"])}"><b>{esc(r["name"])}</b>'
+        f'<span class="rsdelta">{esc(cut_words(str(r.get("delta") or ""), 220))}</span></a>' for r in resurf[:6])
+    changed = (f'<div class="bs-changed"><span class="kicker">what changed, last time — threads that resurfaced</span>'
+               f'<div class="rsrows">{rrows}</div></div>' if rrows else "")
+    if not cards and not changed:
         return ""
     return f'''<section class="bs-threads" id="threads">
   {section_head("Threads", "what keeps coming back", "search any word over time →", f"{base}/s")}
   <div class="bs-threadgrid">{"".join(cards)}</div>
+  {changed}
 </section>'''
 
 
@@ -446,6 +476,6 @@ def page_body(meetings: Sequence[dict], issues: Sequence[dict], stats: dict, bas
     parts.append(river_section(meetings, analytics or {}, base))
     parts.append(frontpages_section(featured or [], meetings, stills, base))
     parts.append(week_section(meetings, stills, bodies_html, base))
-    parts.append(threads_section(analytics or {}, issues, topics or [], meetings, base))
+    parts.append(threads_section(analytics or {}, issues, topics or [], meetings, base, stats=stats))
     parts.append(tell_section(lead, stats, base))
     return "\n".join(p for p in parts if p)

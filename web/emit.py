@@ -306,7 +306,7 @@ def masthead(current, manifest):
     return f"""<header class="masthead bs-masthead">
   {top}
   {plate}
-  {_bs.primary_nav(current)}
+  {_bs.primary_nav(current, _EDITION.get("towns") or [])}
 </header>"""
 
 
@@ -799,7 +799,7 @@ def page_meeting(m, manifest, base, terms=None):
     score_html = (f'<section class="card bs-scorecard mp-score" id="score"><div class="bs-scorehead">'
                   f'<span class="kicker">the shape of the tape — click anywhere to jump</span>'
                   f'<span class="bs-legend">● a decision, sized by weight · | a question · ▮ tension · $ money named · the eight lanes: where each lens’s words fell</span></div>'
-                  + _charts.score(m, base="/app", questions=True) + '</section>') if m.get("duration") else ""
+                  + _score_pic(m) + '</section>') if m.get("duration") else ""
     # find in this meeting (specs/26 §2.2, on the broadsheet): a real form
     # that searches the record without the script; with it, the transcript
     # folds to the lines that say the word (app.js wireFind adopts this form)
@@ -845,6 +845,16 @@ def page_meeting(m, manifest, base, terms=None):
     og = f'{base}{thumb}' if thumb else ""
     return shell(m["title"], desc, f"{base}/app/m/{m['pid']}", body,
                  "memory", manifest, og_image=og, version=manifest["version"])
+
+
+def _score_pic(m) -> str:
+    """The meeting page's score, with its picture as a file (specs/28 §3.3)."""
+    from . import charts as _charts
+    from . import pictures as _pictures
+    pic = _charts.score(m, base="/app", questions=True)
+    return pic + _pictures.take(f'm-{_pictures.key(m["pid"])}-score', pic, f'The shape of the tape — {m["title"]}',
+                                f'/app/m/{m["pid"]}',
+                                legend="a dot is a decision, sized by its weight; rust, pushback · a tick above, a question · $ a dollar figure · the eight lanes: where each lens’s words fell")
 
 
 def _charts_town_color(town) -> str:

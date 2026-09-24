@@ -354,12 +354,17 @@ class TestTopicPress(unittest.TestCase):
         c.link_segments("issue:testville:artificial-intelligence", [(r["id"], "t3", 1.0, "alias") for r in rows[:3]])
 
     def test_the_front_page_leads_with_the_word_over_time(self):
+        """specs/25 on the broadsheet (specs/29): the featured word leads the
+        Threads section — its card first, its search and its own page linked
+        — and the story itself is pressed whole on that page."""
         home = self.home
-        self.assertIn('href="#topic-ai" data-story="topic-ai"', home)
-        self.assertIn('aria-current="true" href="#topic-ai"', home)
-        self.assertIn("the front page’s 3 stories", home)
-        self.assertLess(home.index('id="topic-ai"'), home.index('id="over-time"'))
-        story = home[home.index('id="topic-ai"'):home.index('id="over-time"')]
+        threads = home[home.index('id="threads"'):home.index("</section>", home.index('id="threads"'))]
+        first = threads[threads.index('<article class="bs-thread">'):threads.index("</article>")]
+        self.assertIn('class="bs-thread-name" href="/app/s?q=AI&amp;town=Testville"', first)
+        self.assertIn('href="/app/topic/ai/"', first)
+        page = (self.out / "topic" / "ai" / "index.html").read_text()
+        home = page
+        story = home[home.index('id="topic-ai"'):home.index('</article>', home.index('id="topic-ai"'))]
         self.assertIn("How Testville talks about AI", story)
         # the lede, counted: the first word, the silent meeting, the peak, the total, the latest, elsewhere
         self.assertIn('The first time anyone said “AI” on Testville’s record was <a href="/app/m/t1#t10">December 9, 2025</a>, 0:10 into a Select Board meeting', story)
@@ -392,7 +397,7 @@ class TestTopicPress(unittest.TestCase):
         self.assertIn("the full cut — 4 clips", story)
         # the close: the search itself, the story's own page, the thread the record tracks
         self.assertIn('href="/app/s?q=AI&amp;town=Testville">search “AI” yourself →', story)
-        self.assertIn('href="/app/topic/ai/">this story’s own page →', story)
+        self.assertIn('href="/app/">← the record’s front page', story)   # on its own page the close leads home
         self.assertIn('href="/app/i/issue_testville_artificial-intelligence">the thread the record tracks: Artificial Intelligence →', story)
         # the laws: counted, never modeled — and byte-clean of the studio
         self.assertIn("no model wrote a line of it", story)
@@ -673,7 +678,7 @@ class TestTopicPress(unittest.TestCase):
             _bake.bake(str(db), str(Path(d) / "app"), "9.9.9", "https://example.org")
             home = (Path(d) / "app" / "index.html").read_text()
             self.assertNotIn('data-story="topic-ai"', home)
-            self.assertIn('href="#over-time" data-story="over-time" aria-current="true"', home)
+            self.assertNotIn('href="/app/topic/ai/"', home)
             self.assertFalse((Path(d) / "app" / "topic").exists())
             self.assertEqual(json.loads((Path(d) / "app" / "topics" / "index.json").read_text()), [])
 
