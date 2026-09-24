@@ -78,7 +78,7 @@
     initStudio();
     wireStoryTabs();   // the front page's stories, one at a time (specs/24, /25)
     hydrateTopicTicks();   // a topic story's chapters grow their cut ticks — on the front page and on the story's own page (specs/25)
-    if (/\/app\/m\//.test(path)) meeting();
+    if (/\/app\/m\//.test(path)) { meeting(); wireFind(); }
     else if (/\/app\/r$/.test(path)) reel();
     else if (/\/app\/p$/.test(path)) paper();
     else if (/\/app\/s$/.test(path)) search();
@@ -89,7 +89,197 @@
     else if (path === "/app") home();
     registerSW();
     wireSlashFocus();
+    wireKeys();   // ? — the keys sheet, on every page (specs/26 §2.5)
   });
+
+
+  /* ================= FIND IN THIS MEETING (specs/26 §2.2) ==================
+     Community Highlighter's search-within-a-video, in the paper: a find box
+     over the transcript, minted here (a pressed box that did nothing with
+     the script off would be the dishonesty the covenant is against). Whole-
+     word, case-blind, over the rows already on the page; the matching rows
+     stay, the rest fold away; a sparkline says where on the night the word
+     fell; ▶ plays the mentions as a reel; ✂ puts them on the tray. The word
+     cloud's words run it. Nothing leaves the browser. */
+  let MPF = null;
+  function wireFind() {
+    const tr = $("#transcript"); if (!tr) return;
+    const rows = $$("#transcript .seg"); if (!rows.length) return;
+    const host = $(".mp-words") || $(".tbar");
+    const form = document.createElement("form");
+    form.className = "mp-find"; form.setAttribute("role", "search");
+    form.innerHTML = `<input type="search" name="q" placeholder="find in this meeting — a word or phrase" aria-label="find in this meeting" autocomplete="off">
+      <button class="btn" type="submit">find</button>
+      <span class="mp-findn" aria-live="polite"></span>
+      <div class="mp-found" hidden></div>`;
+    if (host && host.classList.contains("mp-words")) host.insertBefore(form, host.firstChild.nextSibling);
+    else if (host) host.before(form);
+    else tr.before(form);
+    const input = $("input", form);
+    MPF = { rows, input, form, found: $(".mp-found", form), n: $(".mp-findn", form), q: "" };
+    form.addEventListener("submit", e => { e.preventDefault(); mpFind(input.value); });
+    let deb;
+    input.addEventListener("input", () => {
+      clearTimeout(deb);
+      const v = input.value.trim();
+      if (!v) { mpFind(""); return; }
+      if (v.length < 3) return;
+      deb = setTimeout(() => mpFind(v), 300);
+    });
+    input.addEventListener("keydown", e => { if (e.key === "Escape") { input.value = ""; mpFind(""); } });
+    // a word of the cloud finds every line that says it (its href — the
+    // first mention — stays the answer with the script off)
+    const cloud = $(".mp-words svg");
+    if (cloud) cloud.addEventListener("click", e => {
+      const a = e.target.closest("a"); if (!a) return;
+      // the word is the <text>'s own first text node — its <title> child
+      // (the tooltip) is not the word (a pane catch)
+      const tx = a.querySelector("text");
+      const w = tx && tx.firstChild && tx.firstChild.nodeType === 3 ? tx.firstChild.nodeValue : "";
+      if (!w.trim()) return;
+      e.preventDefault(); input.value = w.trim(); mpFind(w.trim());
+      input.scrollIntoView({ block: "nearest" });
+    });
+    // a link into the tape while the transcript is folded: the row it names
+    // must show, or the jump lands on nothing
+    window.addEventListener("hashchange", () => { if (tr.classList.contains("mp-finding")) mpReveal(); });
+  }
+  function mpReveal() {
+    const m = /^#t(\d+)$/.exec(location.hash); if (!m) return;
+    const row = document.getElementById("t" + m[1]);
+    if (!row) return;
+    // reveal, then land: the page's own focusHash ran first, on a row that
+    // was still folded away (a review catch)
+    row.classList.add("mp-hit");
+    row.scrollIntoView({ block: "center" });
+  }
+  function mpFind(q) {
+    if (!MPF) return;
+    const tr = $("#transcript"), { rows, found, n } = MPF;
+    q = String(q || "").trim();
+    MPF.q = q;
+    if (!q) {
+      tr.classList.remove("mp-finding");
+      for (const r of rows) r.classList.remove("mp-hit");
+      found.hidden = true; found.innerHTML = ""; n.textContent = "";
+      return;
+    }
+    const pats = [phraseRe(q)];
+    const hits = [];
+    for (const r of rows) {
+      const text = (r.querySelector(".sx") || r).textContent || "";
+      const k = mentionsIn(text, "", pats);
+      r.classList.toggle("mp-hit", k > 0);
+      if (k > 0) hits.push({ t: +r.dataset.t || 0, text, mentions: k, row: r });
+    }
+    if (!hits.length) {
+      // a miss keeps the transcript whole — folding everything away would
+      // hide the way back (a review catch)
+      tr.classList.remove("mp-finding");
+      n.textContent = `nothing in this meeting says “${q}”`;
+      found.hidden = true; found.innerHTML = "";
+      return;
+    }
+    tr.classList.add("mp-finding");
+    const total = hits.reduce((a, h) => a + h.mentions, 0);
+    n.textContent = `${tpN(hits.length, "line")} · ${tpN(total, "mention")}`;
+    // where it fell: 48 slices of the tape, each a seek
+    const last = rows[rows.length - 1];
+    const dur = Math.max(1, (CREEL && CREEL.meta && +CREEL.meta.duration) || 0, (+last.dataset.t || 0) + 5, ...hits.map(h => h.t + 1));
+    const bins = new Array(TP_BINS).fill(0);
+    for (const h of hits) bins[Math.min(TP_BINS - 1, Math.floor(TP_BINS * h.t / dur))]++;
+    const mx = Math.max(1, ...bins);
+    const bars = bins.map((c, i) => `<a class="fp-sbar" href="#t${Math.floor(dur * i / TP_BINS)}" title="${hms(dur * i / TP_BINS)}–${hms(dur * (i + 1) / TP_BINS)}: ${tpN(c, "line")}"><i style="height:${c ? 2 + Math.round(20 * c / mx) : 1}px"></i></a>`).join("");
+    // the mentions as clips: each line and the twelve seconds after it —
+    // the sentence, not the caption line — runs merged, never past the
+    // tape: the tray's own rule for a hit, the search page's and the
+    // supercut's (a line alone is four seconds; a reel of those is a jolt)
+    const pid = ($(".meeting") || {}).dataset ? $(".meeting").dataset.pid : "";
+    const clips = tpMerge(hits.map(h => ({ pid, t: h.t })), dur);
+    MPF.clips = clips; MPF.hits = hits;
+    const rt = clips.reduce((a, c) => a + (c.end - c.start), 0);
+    found.hidden = false;
+    found.innerHTML = `<div class="fp-sparks"><div class="fp-spark"><span class="fp-sterm">where it fell</span><span class="fp-sbars">${bars}</span><span class="fp-sn">${tpN(hits.length, "line")}</span></div></div>
+      <div class="sq-acts">
+        <a class="btn primary tp-play" href="${esc(reelShareURL(clips))}">▶ play the ${tpN(clips.length, "clip")} as a reel · ${hms(rt)}</a>
+        <button type="button" class="btn" data-mp="tray">✂ put them on my tray</button>
+        <button type="button" class="btn" data-mp="clear">show the whole transcript</button>
+      </div>
+      <p class="hint">the lines that say “${esc(q)}” stay below, the rest fold away; every bar above opens the tape there</p>`;
+    $("[data-mp=tray]", found).onclick = () => mpTray();
+    $("[data-mp=clear]", found).onclick = () => { MPF.input.value = ""; mpFind(""); MPF.input.focus(); };
+    $$(".fp-sbar", found).forEach(a => a.addEventListener("click", ev => {
+      ev.preventDefault(); const t = +a.getAttribute("href").slice(2);
+      const f = $(".player.facade"); if (f) loadTape(f.dataset.video, t); else ytSeek(t);
+    }));
+  }
+  async function mpTray() {
+    if (!MPF || !MPF.clips || !MPF.clips.length) return;
+    const pid = ($(".meeting") || {}).dataset ? $(".meeting").dataset.pid : "";
+    // the meeting's own facts (the tape, its length, the day) — from the
+    // composer once the plane has landed, else the same cached fetch, so a
+    // press before it lands never stores a tapeless clip (a review catch)
+    let meta = CREEL ? CREEL.meta : null;
+    if (!meta) {
+      const m = await getJSON(`${BASE}/meetings/${encodeURIComponent(pid)}.json`) || {};
+      meta = { video_id: m.video_id || "", title: m.title || "", body: m.body || "",
+               town: m.town || "", date: m.date || "", duration: +m.duration || 0 };
+    }
+    const clips = MPF.clips.map(c => {
+      const h = MPF.hits.find(h => h.t === c.start) || {};
+      return { pid, start: r1(c.start), end: r1(c.end), t: r1(c.start), kind: "segment",
+        quote: cut(String(h.text || "").trim(), 120), video_id: meta.video_id || "", mtitle: meta.title || "",
+        body: meta.body || "", town: meta.town || "", date: meta.date || "", duration: +meta.duration || 0 };
+    });
+    const have = trayClips();
+    const next = takeMerge("append", have, clips, true);
+    const added = next.length - have.length;
+    writeTray(next);
+    toast(added ? `${tpN(added, "clip")} on your tray — ${next.length} in all` : "every one of these was on your tray already");
+  }
+
+  /* ================= THE KEYS — ? (specs/26 §2.5) ==========================
+     One sheet, on every page, that says what the keyboard does here — the
+     Highlighter's shortcuts overlay, in the paper. Script-built, opened by
+     ?, closed by Esc or its button; a <dialog>, so focus and the backdrop
+     are the browser's. It lists only keys this page answers. */
+  function keysFor() {
+    const p = path;   // the page's path as the router reads it (/app/s/ is the search page too)
+    const rows = [["/", "search the record" + ($(".mp-find") ? " — here, find in this meeting" : "")], ["?", "this sheet"], ["Esc", "close it"]];
+    if (/\/app\/s$/.test(p)) rows.push(["j · k", "walk the hits"], ["Enter", "open the tape at the hit"], ["c", "cut the hit under the cursor into your reel"]);
+    if (/\/app\/m\//.test(p) && $("#transcript .seg")) rows.push(["c", "cut the transcript line under the cursor (Tab to its time, then c)"]);
+    if ($(".mp-find")) rows.push(["Esc", "in the find box, show the whole transcript"]);
+    if (/\/app\/r$/.test(p)) rows.push(["Space", "play or pause the reel"], ["← · →", "the previous or next clip"]);
+    if ($(".cz-modebar")) rows.push(["← · →", "Read or Edit, in the mode bar"]);
+    return rows;
+  }
+  function wireKeys() {
+    if (typeof HTMLDialogElement === "undefined") return;   // no <dialog>: the keys still work, the sheet does not
+    document.addEventListener("keydown", e => {
+      if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || (e.target.isContentEditable)) return;
+      e.preventDefault();
+      let d = $(".kb-sheet");
+      if (d && d.open) { d.close(); return; }   // ? again closes it (a review catch)
+      if (!d) {
+        d = document.createElement("dialog"); d.className = "kb-sheet";
+        d.setAttribute("aria-label", "the keys");
+        // a press on the backdrop closes it — the backdrop, not the sheet's own padding
+        d.addEventListener("click", ev => {
+          const r = d.getBoundingClientRect();
+          if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) d.close();
+        });
+        document.body.appendChild(d);
+      }
+      d.innerHTML = `<span class="kicker">the keys — what the keyboard does on this page</span>
+        <dl class="kb-list">${keysFor().map(([k, what]) => `<dt><kbd>${esc(k)}</kbd></dt><dd>${esc(what)}</dd>`).join("")}</dl>
+        <p class="hint">Every key is a shortcut for something a pointer can do; nothing here needs it.</p>
+        <button type="button" class="btn kb-close">close</button>`;
+      $(".kb-close", d).onclick = () => d.close();
+      d.showModal();
+    });
+  }
 
   /* `/` focuses the search field from any page — the field on this page if
      there is one (front page, search page), otherwise a jump to search. */
@@ -5903,6 +6093,7 @@
         <h2 class="fp-hl" id="sq-hl">How ${esc(d.town)} talks about ${esc(q)}</h2>
         ${range}${rangeNote}
         <p class="fp-lede">${tpLede(d, searchHref)}</p>
+        <p class="sq-jump"><a href="#results">the lines themselves ↓</a></p>
         <p class="decksrc">counted in your browser from the record’s own index — every line of every transcript that says “${esc(q)}”, whole-word; no model, nothing sent anywhere; every number opens the tape</p>
         <div class="sq-acts">
           <a class="btn primary tp-play" href="${esc(d.reel.full)}">▶ play all ${tpN(d.reel.full_n, "clip")} as a reel · ${hms(d.reel.full_runtime)}</a>
@@ -6018,7 +6209,10 @@
     // j / k (or the arrows) walk the hits; Enter opens the selected one
     document.addEventListener("keydown", e => {
       const tag = (e.target.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (tag === "input" || tag === "textarea" || tag === "select" || tag === "button") return;
+      // the keys sheet, open, keeps the page's keys out (a re-review catch:
+      // Enter on its close button opened a hit behind the modal)
+      if (e.target.closest && e.target.closest(".kb-sheet")) return;
       const res = $$(".sresult"); if (!res.length) return;
       if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); selMove(res, 1); }
       else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); selMove(res, -1); }

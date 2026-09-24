@@ -257,7 +257,8 @@ def topic_bars(topics: Sequence[dict], base: str = "/app", top: int = 10) -> str
 # --------------------------------------------------------------------------
 
 def word_cloud(words: Sequence[dict], base: str = "/app", width: int = 720, height: int = 300,
-               limit: int = 60, href: Optional[Callable[[dict], str]] = None) -> str:
+               limit: int = 60, href: Optional[Callable[[dict], str]] = None,
+               each: str = "each opens the record’s search for it") -> str:
     """Words sized by count (square-root scale, 11–46 px), placed on a fixed
     Archimedean spiral from the centre, never overlapping — the layout is a
     pure function of the words, so two presses agree byte for byte. Every
@@ -304,7 +305,7 @@ def word_cloud(words: Sequence[dict], base: str = "/app", width: int = 720, heig
                    f'{esc(word)}<title>{esc(tip)}</title></text></a>')
     svg = (f'<svg class="fp-cloud" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
            f'xmlns="http://www.w3.org/2000/svg" role="group" aria-label="the words that came up most, '
-           f'sized by how often — {len(out)} words; each opens the record’s search for it">'
+           f'sized by how often — {len(out)} words; {esc(each)}">'
            + "".join(out) + "</svg>")
     rows = "".join(f'<tr><td>{esc(w["word"])}</td><td>{c}</td></tr>' for w, c in zip(ws, counts))
     return f'<div class="fp-chartwrap fp-cloudwrap">{svg}</div>' + twin(rows, "<th>word</th><th>mentions</th>")

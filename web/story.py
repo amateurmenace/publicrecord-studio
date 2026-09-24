@@ -424,7 +424,8 @@ def latest(m: dict, base: str = "/app") -> str:
     if words:
         w0 = words[0]
         parts.append(f'<section class="fp-part">{kicker("the meeting in words — what was said most")}'
-                     + charts.word_cloud(words, base=base, href=lambda w: at(w.get("t") or 0))
+                     + charts.word_cloud(words, base=base, href=lambda w: at(w.get("t") or 0),
+                                         each="each opens the tape at its first mention")
                      + say(f'“{esc(w0["word"])}” came up {n_of(int(w0["count"]), "time")}. Every word opens the tape at its first mention.') + "</section>")
     topics = _real_topics(an.get("topics"))
     sparks = charts.sparklines(segs, [t["name"] for t in topics[:6]], dur, pid, base=base) if segs and topics else ""
@@ -453,7 +454,11 @@ def latest(m: dict, base: str = "/app") -> str:
              f'<span class="lead-tape">▶ the tape · {hms(dur)} · loads only when you press it</span></a>' if thumb else "")
     meta = " · ".join(x for x in (m.get("town") or "", m.get("date") or "undated",
                                   f'{int(round(dur / 60))} min') if x)
-    close = (f'<div class="fp-close"><a class="btn primary" href="{base}/p#edit&amp;tpl=meeting&amp;ref={esc(pid)}">make this story yours →</a>'
+    from . import cuts as _cuts
+    cut = _cuts.meeting_cuts(m, base=base)
+    night = (f'<a class="btn tp-play" href="{esc(cut["loudest"]["url"])}">▶ the night in {hms(cut["loudest"]["runtime"])}</a>'
+             if cut else "")
+    close = (f'<div class="fp-close">{night}<a class="btn primary" href="{base}/p#edit&amp;tpl=meeting&amp;ref={esc(pid)}">make this story yours →</a>'
              f'<a class="btn" href="{href}">read the meeting →</a></div>')
     return f'''  <article class="lead fp-story fp-latest" id="latest" data-town="{esc(m.get("town") or "")}" data-body="{esc(m.get("body") or "")}" aria-labelledby="fp-latest-hl">
     <span class="kicker">the latest meeting on the record — what happened</span>

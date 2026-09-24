@@ -530,8 +530,8 @@ def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=
     <a class="addline" href="/app/add">＋ Add a meeting</a>
   </form>
   <p class="scopeline" id="scopeline" hidden></p>
-  {body_strip()}
-{tabs}{told}{over}{latest}{door}  <div class="storyrow">
+{tabs}{told}{over}{latest}{door}  {body_strip()}
+  <div class="storyrow">
     <section class="story"><div class="sectionhead"><span class="kicker">also on the record</span></div>
       <div class="mcards briefs">{briefs}</div></section>
     <section class="story"><div class="sectionhead"><span class="kicker">the access ledger</span></div>
@@ -573,6 +573,40 @@ def page_meeting(m, manifest, base):
     else:
         player = ('<div class="player local"><p class="phint">the tape lives at '
                   'the station — this page is the meeting as a document.</p></div>')
+    # the night, cut (specs/26 §2.1): the press's reels from this meeting's
+    # moments — the loudest five, and one per kind — as the viewer's own
+    # links; content in the paper palette, no button, no script
+    from . import cuts as _cuts
+    cut = _cuts.meeting_cuts(m)
+    cut_html = ""
+    if cut:
+        kinds = ""
+        for k in cut["kinds"]:
+            count = str(k["n"]) if k["n"] == k["total"] else f'the first {k["n"]} of {k["total"]}'
+            kinds += (f'<a class="btn mp-kind" href="{esc(k["url"])}">{esc(k["label"])} '
+                      f'<span class="mp-kn">{count} · {hms(k["runtime"])}</span></a>')
+        cut_html = (
+            f'<section class="card mp-cut" id="cut"><span class="tag">the night, cut — reels the press made from this meeting’s moments</span>'
+            f'<div class="tp-cut"><a class="btn primary tp-play" href="{esc(cut["loudest"]["url"])}">▶ the night in {hms(cut["loudest"]["runtime"])}</a>'
+            f'<span class="tp-cutmeta">its {n_of(cut["loudest"]["n"], "loudest moment")}, in order · plays clip to clip · the link is the share</span></div>'
+            + (f'<div class="mp-kinds"><span class="kicker">or one kind of moment</span>{kinds}</div>' if kinds else "")
+            + '<p class="hint">Cut from the analyzer’s scored moments — a measurement, not a choice made for you. '
+              'Open a reel and press <b>make this reel yours</b> to re-cut it; tick any moment or transcript line below to cut your own.</p></section>')
+    # the meeting in words (specs/26 §2.3): the highlighter's word cloud, pressed
+    # — each word a deep link to its first mention; with the script on, a
+    # word finds every line that says it
+    from highlighter import insight as _insight
+    from . import charts as _charts
+    words = _insight.word_freq(m.get("segments") or [], top=80) if m.get("segments") else []
+    words_html = ""
+    if words:
+        words_html = (
+            f'<section class="card mp-words" id="words"><span class="tag">the meeting in words — what was said most; '
+            'press a word to find every line that says it</span>'
+            + _charts.word_cloud(words, base="/app", href=lambda w: f'#t{int(float(w.get("t") or 0))}',
+                                 each="each opens the tape at its first mention; with the script on, it finds every line that says it")
+            + f'<p class="hint">“{esc(words[0]["word"])}” came up {n_of(int(words[0]["count"]), "time")}. Sized by how often; '
+              'civic stopwords out. With JavaScript off, a word opens the tape at its first mention.</p></section>')
     langs = ""
     if m["tracks"]:
         opts = "".join(f'<option value="{esc(t["code"])}">{esc(t["name"])}</option>'
@@ -585,7 +619,7 @@ def page_meeting(m, manifest, base):
     if m["summary"]:
         origin = ("AI summary" if (m["summary_origin"] or "").startswith("ai:")
                   else "summary")
-        summ = (f'<section class="card summary"><span class="tag">{origin} — '
+        summ = (f'<section class="card summary" id="summary"><span class="tag">{origin} — '
                 'supplements the official record</span>'
                 f'<p>{esc(m["summary"])}</p></section>')
     # the reading, drafted (specs/24 §4): a model's three paragraphs — what
@@ -595,7 +629,10 @@ def page_meeting(m, manifest, base):
     draft = (m.get("analysis") or {}).get("draft") or None
     if draft and draft.get("text"):
         from . import charts as _charts
-        summ += (f'<section class="card summary draft"><span class="tag">the reading, drafted by a '
+        # the jump bar's "the summary" lands here when no summary card stands
+        # (the piece is built first: an f-string expression holds no backslash)
+        draft_id = "" if m["summary"] else ' id="summary"'
+        summ += (f'<section class="card summary draft"{draft_id}><span class="tag">the reading, drafted by a '
                  f'model — {esc(draft.get("origin") or "")}, labeled · what it meant, who moved it, '
                  'what to watch · check it against the tape</span>'
                  + _charts.receipt_paras(draft["text"], "") + '</section>')
@@ -615,7 +652,7 @@ def page_meeting(m, manifest, base):
                 f'<span class="outcome">{esc(v.get("outcome",""))}</span></a>'
                 f'<div class="roll">{roll}</div></div>')
         votes_html = (
-            '<section class="card ledger"><span class="tag">the vote ledger — '
+            '<section class="card ledger" id="votes"><span class="tag">the vote ledger — '
             'roll calls read from this meeting</span>'
             f'<div class="vledger">{"".join(vrows)}</div>'
             '<p class="hint">Read from the transcript; a name may be misheard — '
@@ -636,7 +673,7 @@ def page_meeting(m, manifest, base):
             f'<span class="lensn">{l["count"]}</span>'
             f'<span class="lensdrift">{DRIFT.get(l["drift"],"")}</span></div>'
             for l in framing["lenses"])
-        framing_html = ('<section class="card"><span class="tag">how the meeting '
+        framing_html = ('<section class="card" id="framing"><span class="tag">how the meeting '
                         'framed it — eight civic lenses, counted from its own '
                         'words</span>'
                         f'<div class="lenses">{rows}</div>'
@@ -654,7 +691,7 @@ def page_meeting(m, manifest, base):
                       f'<span class="ts">{hms(q["t"])}</span> {esc(q["text"])}</a>'
                       for q in qs[:8]) + '</div>'
             for t, qs in sorted(byt.items()))
-        questions_html = ('<section class="card"><span class="tag">the questions '
+        questions_html = ('<section class="card" id="questions"><span class="tag">the questions '
                           'asked — typed by what they ask about</span>'
                           f'<div class="qgroups">{blocks}</div></section>')
     # the town's paper for this meeting
@@ -667,7 +704,7 @@ def page_meeting(m, manifest, base):
             + f' <span class="lmeta">{d.get("pages",0)} pp</span>'
             + ("</a>" if d.get("url") else "</div>")
             for d in m["documents"])
-        docs_html = ('<section class="card"><span class="tag">the town’s paper — '
+        docs_html = ('<section class="card" id="paper"><span class="tag">the town’s paper — '
                      'agendas, minutes, and packets for this meeting</span>'
                      f'<div class="docrows">{drows}</div></section>')
     # the Moments panel (specs/20 §6) — the analyzer's scored moments as cards,
@@ -705,7 +742,7 @@ def page_meeting(m, manifest, base):
             'draft copy, for a producer.</p>'
             if m.get("video_id") else "")
         moments_html = (
-            '<section class="card moments"><span class="tag">the moments — the '
+            '<section class="card moments" id="moments"><span class="tag">the moments — the '
             'analyzer’s scored read of this meeting; click one to jump the '
             'tape</span>'
             f'<div class="mo-grid">{cards}</div>'
@@ -725,6 +762,17 @@ def page_meeting(m, manifest, base):
     tdl = "".join(f'<a class="dl" href="/app/tracks/{m["pid"]}/{esc(t["code"])}.vtt" download>{esc(t["name"])} .vtt</a>'
                   for t in m["tracks"])
     addl = (f'<a class="dl" href="/app/ad/{m["pid"]}.vtt" download>described .vtt</a>' if m["ad"] else "")
+    # on this page (specs/26 §2.4): a jump bar of the sections this meeting
+    # actually has — a four-hour tape is a long page, and orientation is
+    # pressed prose, not chrome
+    jumps = [("tape", "the tape", True), ("summary", "the summary" if m["summary"] else "the reading", bool(summ)),
+             ("cut", "the night, cut", bool(cut_html)), ("moments", "the moments", bool(moments_html)),
+             ("votes", "the votes", bool(votes_html)), ("paper", "the town’s paper", bool(docs_html)),
+             ("framing", "the framing", bool(framing_html)), ("questions", "the questions", bool(questions_html)),
+             ("words", "in words", bool(words_html)), ("transcript", "the transcript", True),
+             ("downloads", "downloads", True)]
+    jump = ('<nav class="mp-jump" aria-label="on this page"><span class="kicker">on this page</span>'
+            + "".join(f'<a href="#{k}">{esc(label)}</a>' for k, label, have in jumps if have) + '</nav>')
     body = f"""
   <article class="meeting" data-pid="{esc(m["pid"])}" data-town="{esc(m["town"])}" data-body="{esc(m["body"])}">
     <div class="mhead">
@@ -734,17 +782,20 @@ def page_meeting(m, manifest, base):
       <div class="chips">{langs}
         <button class="btn cite-all" type="button" data-cite="all">⧉ Cite this meeting</button></div>
     </div>
-    {player}
+    {jump}
+    <div id="tape">{player}</div>
+    {cut_html}
     {summ}
     {moments_html}
     {votes_html}
     {docs_html}
     {framing_html}
     {questions_html}
-    <div class="tbar">
-      <span class="tag">transcript — select any line to Cite it, click a time to jump</span>
+    {words_html}
+    <div class="tbar" id="downloads">
+      <span class="tag">transcript — select any line to Cite it, click a time to jump; ＋ on a line cuts it into your reel</span>
       <span class="dls">{tdl}{addl}
-        <a class="dl" href="/app/m/{m["pid"]}/transcript.txt" download>transcript .txt</a></span>
+        <a class="dl" href="/app/m/{m["pid"]}/transcript.txt" download>transcript .txt</a>{f'<a class="dl" href="/app/kits/{esc(m["pid"])}.json" download>kit .json</a>' if (m.get("video_id") and cut) else ""}</span>
     </div>
     <div class="transcript" id="transcript">{transcript}</div>
     <p class="disclose">AI-touched surfaces are labeled; verify against the official record.

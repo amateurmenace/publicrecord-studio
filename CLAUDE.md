@@ -68,7 +68,8 @@ without it). **Never rebake the public edition from a local corpus.**
   (tray), `pf-` (featured), `.featline`, `cz-tpl*` — grep the sheet before
   minting more. Plus `tp-`/`tq-` (the topic story, pressed and
   live), `sq-` (the search page's story + progress), `rp-` (the reel
-  viewer's transport) — specs/25.
+  viewer's transport) — specs/25; `mp-` (the meeting page's cut, find,
+  words, jump bar), `kb-` (the keys sheet) — specs/26.
 
 ## Verifying
 

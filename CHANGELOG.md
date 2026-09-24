@@ -44,6 +44,21 @@ every one folded, with tests; the folds re-reviewed and six more folded
 on a reel across meetings loaded the wrong tape; "the latest" is a dated
 night). 623 tests.
 
+And the meeting page becomes the Highlighter's desk, in the paper
+(specs/26): **the night, cut** — the press's reels from the meeting's own
+moments, its five loudest in tape order and one reel per kind, as the
+viewer's links under the tape and at the close of the front page's latest
+story; **find in this meeting** — a find box over the transcript that folds
+it to the lines that say the word, with a sparkline of where on the night
+it fell, ▶ play the mentions as a reel and ✂ put them on my tray; **the
+meeting in words** — the word cloud pressed on every meeting page, each
+word a deep link and, with the script on, a find; **on this page** — a
+jump bar of the sections the meeting has, the downloads with the kit; and
+**?** — one sheet on every page that says what the keys do here. The
+bodies filter moves under the front page's stories, beside the list it
+filters. Reviewed the same way: eleven findings folded, the folds
+re-reviewed, five more folded. 629 tests.
+
 ### The night lands every tape — 2026-09-23 (v2.1.20)
 
 The first night with every switch on landed one meeting and then sat

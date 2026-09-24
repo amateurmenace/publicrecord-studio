@@ -26,7 +26,14 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   · next, the counter, a segment per clip that fills with the tape's own
   time reports, keys, share, an end card). `search/meta.json` carries
   `duration`. Reviewed adversarially (fourteen findings folded, the folds
-  re-reviewed, six more folded). 623 tests. **Next: rebase on main, deploy as v2.1.21 / r44** (v2.1.20 / r43 is
+  re-reviewed, six more folded). 623 tests. Then **the meeting, cut and
+  found** (`specs/26-the-meeting-cut-and-found.md`, `web/cuts.py`): the
+  night cut as pressed reels on the meeting page and the latest story,
+  find in this meeting (folds the transcript, sparkline, ▶ the mentions as
+  a reel, ✂ tray), the word cloud on every meeting page, a jump bar, the
+  `?` keys sheet, the bodies filter under the stories — reviewed the same
+  way (eleven findings folded, five more on re-review). 629 tests. **Next:
+  rebase on main, deploy as v2.1.21 / r44** (v2.1.20 / r43 is
   the embed-budget deploy; OPERATING §5 — press `--version 2.1.21`; the version bump is the cache
   key; parity-check the ten files, now including `web/topic.py`).
 - **LIVE: v2.1.20 / r43** — tag `v2.1.20` at the deployed commit. v2.1.20:
