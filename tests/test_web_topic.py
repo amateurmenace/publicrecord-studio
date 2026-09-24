@@ -409,10 +409,58 @@ class TestTopicPress(unittest.TestCase):
         # six lines say it — "artificial" / "intelligence cameras" broke across two, and counts once
         self.assertEqual((plane["town"], plane["moments"], plane["mentions"], plane["n_meetings"]), ("Testville", 6, 6, 3))
         idx = json.loads((self.out / "topics" / "index.json").read_text())
-        self.assertEqual(idx, [{"slug": "ai", "name": "AI", "q": "AI", "town": "Testville", "mentions": 6, "n_meetings": 3}])
+        self.assertEqual(idx, [{"slug": "ai", "name": "AI", "q": "AI", "town": "Testville",
+                                "phrases": ["AI", "artificial intelligence"], "mentions": 6, "n_meetings": 3}])
         # the search index carries each tape's length now (the live story's clip cap)
         meta = json.loads((self.out / "search" / "meta.json").read_text())
         self.assertEqual({m["pid"]: m["duration"] for m in meta}["t3"], 70.0)
+
+    def test_the_search_for_a_featured_word_counts_what_its_story_counts(self):
+        """The live front page's "80 mentions" opened a search that said 73: the
+        pressed story counts AI or artificial intelligence, the search counted
+        the word typed (specs/27 §2.3). Now the search page reads the featured
+        words' phrases from topics/index.json and gathers their lines by the
+        press's own rule — executed here over the pressed index itself: the
+        story's six lines (one of them broken across a caption, "artificial" /
+        "intelligence cameras") are the search's six."""
+        tw = TestTopicTwins()
+        js = tw.JS
+        lift = tw.lift
+        body = "\n".join([
+            tw.PRELUDE, tw.helpers(),
+            "const fs = require('fs');",
+            f"const OUT = {json.dumps(str(self.out))};",
+            "const getJSON = async u => { try { return JSON.parse(fs.readFileSync(OUT + u.slice(4), 'utf8')); } catch (e) { return null; } };",
+            "let SCOPE = { town: '', body: '' };",
+            lift(r"const inScope = \(town, body\) =>.+?;\n"),
+            lift(r"  function sqHits\(idx, ids, phrases\) \{.+?\n  \}"),
+            lift(r"  async function sqIds\(idx, terms, q\) \{.+?\n  \}"),
+            lift(r"  async function sqFeatured\(q\) \{.+?\n  \}"),
+            lift(r"  async function sqPhraseIds\(idx, phrases\) \{.+?\n  \}"),
+            "(async () => {",
+            "  const idx = { meta: await getJSON('/app/search/meta.json'), segs: await getJSON('/app/search/segs.json') };",
+            "  const meetings = idx.meta.map(m => ({ pid: m.pid, title: m.title, date: m.date, body: m.body, town: m.town, duration: +m.duration || 0 }));",
+            "  const count = async (q, feat) => { const ph = feat ? feat.phrases : [q];",
+            "    const ids = feat ? await sqPhraseIds(idx, ph) : await sqIds(idx, (q.toLowerCase().match(/[a-z0-9]+/g) || []), q);",
+            "    const d = tpAggregate(meetings, sqHits(idx, ids, ph), { slug: '', name: q, q, phrases: ph }, '', false);",
+            "    return [d.town, d.moments, d.mentions, d.n_meetings]; };",
+            "  const feat = await sqFeatured('ai');",
+            "  console.log(JSON.stringify({ feat, featured: await count('AI', feat), typed: await count('AI', null),",
+            "    other: await sqFeatured('parking') }));",
+            "})().catch(e => { console.log('THREW ' + e.stack); process.exit(1); });",
+        ])
+        r = tw.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+        plane = json.loads((self.out / "topics" / "ai.json").read_text())
+        self.assertEqual(got["featured"], [plane["town"], plane["moments"], plane["mentions"], plane["n_meetings"]])
+        self.assertEqual(got["feat"]["phrases"], ["AI", "artificial intelligence"])
+        self.assertEqual(got["feat"]["terms"], ["ai", "artificial", "intelligence"])
+        # the word alone misses the line the phrase broke across — the old 73
+        self.assertEqual(got["typed"][1], plane["moments"] - 1)
+        self.assertIsNone(got["other"])
+        # and the page says which words it counted, pointing at the pressed story
+        self.assertIn("the words <a href=\"${BASE}/topic/${encodeURIComponent(feat.slug)}/\">the front page’s story</a> counts", js)
 
     def test_the_search_page_says_what_a_search_can_do(self):
         page = (self.out / "s" / "index.html").read_text()

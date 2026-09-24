@@ -619,9 +619,13 @@ def page_meeting(m, manifest, base):
     if m["summary"]:
         origin = ("AI summary" if (m["summary_origin"] or "").startswith("ai:")
                   else "summary")
+        # a model's summary is rendered as a model's prose (receipts linked,
+        # its Markdown read, never shown); an extractive one is the tape's own
+        # sentences and reads the same way — plain, every receipt a link
+        from . import charts as _charts
         summ = (f'<section class="card summary" id="summary"><span class="tag">{origin} — '
                 'supplements the official record</span>'
-                f'<p>{esc(m["summary"])}</p></section>')
+                + _charts.receipt_paras(m["summary"], "") + '</section>')
     # the reading, drafted (specs/24 §4): a model's three paragraphs — what
     # it meant, who moved it, what to watch — under the model's own name,
     # every receipt a link into the tape below; pressed only when a model
@@ -964,12 +968,6 @@ def page_reel(manifest, base):
   <section class="reel" id="reel">
     <a class="back" href="/app/">← the record</a>
     <h1>A reel from the record</h1>
-    <p class="presslede">A <b>reel</b> is a short sequence of moments — roll
-      calls, decisions, questions, the turns of an argument — pulled from the
-      record, from one meeting or several, and strung together in order. The
-      whole reel rides in the link that brought you here: which meetings, which
-      moments, in what order. Nothing was uploaded, and nothing about you was
-      kept.</p>
     <div class="reelstage" id="reelstage"></div>
     <div class="reelcites" id="reelcites">
       <p class="hint">Playing the reel — seeking the tape from clip to clip —
@@ -978,9 +976,14 @@ def page_reel(manifest, base):
         record</a> or <a href="/app/s">search it</a> to read the moments in
         place.</p>
     </div>
-    <p class="disclose">The tape is embedded from YouTube, never rehosted. The
-      reel lives in this link and your browser — there is no account and no
-      server holding it. Rendering it as a video needs the desk.</p>
+    <p class="presslede">A <b>reel</b> is a short sequence of moments — roll
+      calls, decisions, questions, the turns of an argument — pulled from the
+      record, from one meeting or several, and strung together in order. The
+      whole reel rides in the link that brought you here: which meetings, which
+      moments, in what order. Nothing was uploaded, and nothing about you was
+      kept.</p>
+    <p class="disclose">The tape is embedded from YouTube, never rehosted.
+      Rendering it as a video needs the desk.</p>
   </section>
 """
     return shell("A reel — publicrecord.studio",
@@ -1886,7 +1889,9 @@ def page_ai(manifest, base):
             that wrote the words</td>
           <td>our pipeline, at ingest, over public transcript text</td>
           <td>an extractive summary — sentences drawn from the transcript
-            itself, labeled <code>extractive</code></td></tr>
+            itself, labeled <code>extractive</code>. The same stands when a
+            model's answer comes back cut off at its length limit: a fragment
+            is refused, never pressed</td></tr>
         <tr><td>the reading, drafted</td>
           <td>drafts three short paragraphs — what the meeting meant, who
             moved it, what to watch — with a timestamp beside every claim</td>
@@ -1895,7 +1900,8 @@ def page_ai(manifest, base):
             paper’s reading block</td>
           <td>our pipeline, at ingest, over public transcript text</td>
           <td>the counted reading stands alone — decisions, questions, names
-            and pushback drawn from the transcript by open rules</td></tr>
+            and pushback drawn from the transcript by open rules; a draft cut
+            off at its length limit is refused the same way</td></tr>
         <tr><td>issue names &amp; labels</td>
           <td>suggests a plain name for a thread that spans meetings</td>
           <td>the same Gemini lane, labeled the same way</td>

@@ -110,10 +110,12 @@ def tabs(latest_title: str = "", topics: Sequence[dict] = ()) -> str:
     showing. A featured topic story (specs/25) leads when the record holds
     one — the front page opens on how the town talks about a word."""
     items = []
+    # each tab names its own story — with two words on the strip, "A word,
+    # over time" twice told a reader nothing (specs/27 §3.1)
     for t in topics:
         items.append(f'<a class="stab-a" href="#topic-{esc(t["slug"])}" data-story="topic-{esc(t["slug"])}">'
-                     f'<b>A word, over time</b><span>how {esc(t["town"])} talks about {esc(t["name"])}</span></a>')
-    items.append('<a class="stab-a" href="#over-time" data-story="over-time"><b>Over time</b><span>how the record moved</span></a>')
+                     f'<b>“{esc(t["name"])}”, over time</b><span>how {esc(t["town"])} talks about it</span></a>')
+    items.append('<a class="stab-a" href="#over-time" data-story="over-time"><b>The record, over time</b><span>how it moved</span></a>')
     items.append(f'<a class="stab-a" href="#latest" data-story="latest"><b>The latest meeting</b><span>{esc(latest_title or "what happened")}</span></a>')
     items[0] = items[0].replace('<a class="stab-a" ', '<a class="stab-a" aria-current="true" ', 1) \
         if items[0].startswith('<a class="stab-a" href="#topic') else \
@@ -347,7 +349,9 @@ def latest(m: dict, base: str = "/app") -> str:
     # -- the lede: the labeled summary, then the counted commentary ---------
     origin = ("an AI summary, labeled" if str(m.get("summary_origin") or "").startswith("ai:")
               else "a summary drawn from the tape")
-    summary = (f'<p class="fp-lede">{esc(str(m.get("summary") or "")[:600])}</p>'
+    # whole lines up to 900 characters, receipts linked: a cut at a fixed
+    # character count ended the lede mid-receipt and mid-word
+    summary = (f'<div class="fp-lede fp-summ">{charts.receipt_paras(str(m.get("summary") or ""), href, limit=900)}</div>'
                f'<p class="decksrc">{origin} — supplements the official record</p>' if m.get("summary") else "")
     # the reading, drafted (specs/24 §4) — a model's paragraphs under the
     # model's own name, receipts linked, beside the counted commentary

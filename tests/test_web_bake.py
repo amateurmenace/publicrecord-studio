@@ -110,6 +110,16 @@ class TestScopeResolution(unittest.TestCase):
          ["Brookline"], None, "?body=Select+Board",
          {"town": "Brookline", "body": "Select Board"}),
     ]
+    # specs/27 §2.4: "the whole record" is an answer — once given, the first
+    # visit's question is not asked again (it was, on every page)
+    ASKED = [
+        ("two towns, answered 'the whole record': asked no more",
+         ["Brookline", "Boston"], None, "", {"town": "", "from": "all"}),
+        ("an answer never outranks a link",
+         ["Brookline", "Boston"], None, "?town=Boston", {"town": "Boston", "from": "link"}),
+        ("nor a stored town",
+         ["Brookline", "Boston"], "Boston", "", {"town": "Boston", "from": "stored"}),
+    ]
 
     def test_resolve_runs_in_node(self):
         import shutil
@@ -119,17 +129,20 @@ class TestScopeResolution(unittest.TestCase):
         js = (REPO / "web" / "static" / "app.js").read_text()
         fn = re.search(r"  function resolve\(ed\) \{.+?\n  \}", js, re.S)
         self.assertTrue(fn, "resolve() not found in the reader — did it move?")
-        cases = [{"label": l, "towns": t, "stored": s, "qs": q, "want": w}
-                 for l, t, s, q, w in self.TABLE]
+        cases = ([{"label": l, "towns": t, "stored": s, "qs": q, "want": w, "asked": False}
+                  for l, t, s, q, w in self.TABLE]
+                 + [{"label": l, "towns": t, "stored": s, "qs": q, "want": w, "asked": True}
+                    for l, t, s, q, w in self.ASKED])
         body = "\n".join([
-            "let STORED = null, QS = '';",
+            "let STORED = null, QS = '', ASKED = false;",
             "const readTown = () => STORED || '';",
+            "const readAsked = () => ASKED;",
             "const location = { get search() { return QS; } };",
             fn.group(0),
             "const CASES = " + json.dumps(cases) + ";",
             "let bad = 0;",
             "for (const c of CASES) {",
-            "  STORED = c.stored; QS = c.qs;",
+            "  STORED = c.stored; QS = c.qs; ASKED = c.asked;",
             "  const ed = { towns: c.towns.map(t => ({ town: t })) };",
             "  const got = resolve(ed);",
             "  for (const [k, v] of Object.entries(c.want)) {",

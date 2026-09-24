@@ -31,6 +31,11 @@ from .charts import ARTIFACTS, esc, is_month, search_url  # noqa: F401 — searc
 FEATURED: List[dict] = [
     {"slug": "ai", "name": "AI", "long": "artificial intelligence", "q": "AI",
      "phrases": ["AI", "artificial intelligence"]},
+    # the second case study (specs/27 §3.1): the word every town's record
+    # carries — on Brookline's, 441 lines in 13 of its 14 meetings, peaking
+    # the night the affordable housing trust came up; Boston's said it too
+    {"slug": "housing", "name": "housing", "long": "housing", "q": "housing",
+     "phrases": ["housing"]},
 ]
 FLOOR_MOMENTS = 3        # lines of transcript, in the leading town
 FLOOR_MEETINGS = 2       # meetings those lines span

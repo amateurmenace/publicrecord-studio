@@ -1020,8 +1020,12 @@ class Bake:
         for t in stories:
             _json(self.out / "topics" / f'{t["slug"]}.json', t)
             self.note(f'topics/{t["slug"]}.json', _gz_of(t))
+        # the phrases ride the index (specs/27 §2.3): the search page counts a
+        # featured word the way its pressed story does — "AI" is AI or
+        # artificial intelligence — so the story's own link lands on its number
         _json(self.out / "topics" / "index.json",
               [{"slug": t["slug"], "name": t["name"], "q": t["q"], "town": t["town"],
+                "phrases": t["phrases"],
                 "mentions": t["mentions"], "n_meetings": t["n_meetings"]} for t in stories])
         return stories
 

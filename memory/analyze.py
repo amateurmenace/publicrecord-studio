@@ -22,10 +22,12 @@ from highlighter import insight
 
 _SUMMARY_SYS = (
     "You summarize public civic meetings for residents. Be plain, neutral, and "
-    "concrete. One short paragraph. Name what was discussed and any decisions, "
-    "using the [MM:SS] timestamps from the transcript so a reader can check you. "
-    "Never invent a vote or a name that is not in the passages. This supplements "
-    "the official record; it does not replace it."
+    "concrete. One short paragraph of plain text — no Markdown, no headings, no "
+    "lists, no asterisks. Name what was discussed and any decisions, with the "
+    "transcript's own [timestamps] beside them, exactly as the passages write "
+    "them, so a reader can check you. Never invent a vote or a name that is not "
+    "in the passages. This supplements the official record; it does not "
+    "replace it."
 )
 
 
@@ -72,11 +74,14 @@ def summary(segments: List[dict],
 
 _DRAFT_SYS = (
     "You write a short reading of a public civic meeting for residents: what "
-    "it means, who moved it, and what to watch next. Three short paragraphs, "
-    "plain and neutral. Put the [MM:SS] timestamp from the transcript beside "
-    "every claim so a reader can check you. Never invent a vote, a number, or "
-    "a name that is not in the passages; say when the passages do not settle "
-    "a question. This supplements the official record; it does not replace it."
+    "it means, who moved it, and what to watch next. Three short paragraphs of "
+    "plain text, plain and neutral, beginning 'What it means:', 'Who moved "
+    "it:' and 'What to watch:' — no Markdown, no headings, no lists, no "
+    "asterisks. Put the transcript's own [timestamp] beside every claim, "
+    "exactly as the passages write it, so a reader can check you. Never invent "
+    "a vote, a number, or a name that is not in the passages; say when the "
+    "passages do not settle a question. This supplements the official record; "
+    "it does not replace it."
 )
 
 
@@ -102,10 +107,19 @@ def draft(segments: List[dict],
     return "", "none"
 
 
+def _stamp(t) -> str:
+    """A passage's time the way the page says it: [MM:SS] under the hour,
+    [H:MM:SS] past it — a model echoes what it is shown, and a resident
+    reading "[264:28]" has to do arithmetic to find 4:24:28 on the tape."""
+    t = max(0, int(float(t or 0)))
+    h, m, s = t // 3600, (t % 3600) // 60, t % 60
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+
 def _prompt(segments: List[dict], info: Optional[dict], budget: int = 40000,
             ask: str = "Write the summary paragraph.") -> str:
     title = (info or {}).get("title", "")
-    lines = [f"[{int(s.get('start', 0) // 60):02d}:{int(s.get('start', 0) % 60):02d}] "
+    lines = [f"[{_stamp(s.get('start', 0))}] "
              f"{(s.get('speaker') + ': ') if s.get('speaker') else ''}"
              f"{s.get('text', '')}" for s in segments]
     body = "\n".join(lines)

@@ -414,20 +414,127 @@ def sparklines(segments: Sequence[dict], terms: Sequence[str], duration: float, 
 # small pieces — a numbers strip, question bars, lens bars with drift
 # --------------------------------------------------------------------------
 
-_STAMP = re.compile(r"\[(\d{1,3}):(\d\d)(?::(\d\d))?\]")
+# A model's prose, pressed (specs/27 §2.2). The models write Markdown whether
+# asked to or not — v2.1.21 pressed "**What it means**" and "*   Motion/Vote:"
+# raw onto every meeting page — so the reader renders the small subset they
+# actually use, and nothing else: a heading line, a bullet, **bold**, *italic*;
+# every other asterisk and backtick is dropped as the syntax it is. Escaped
+# FIRST, marked up after: a draft is untrusted text, and no tag it holds
+# survives. The JS twin is app.js receiptParas; a node twin holds them equal.
+_RD_BULLET = re.compile(r"^[*•-][ \t]+(.+)$")
+_RD_HASH = re.compile(r"^#{1,6}[ \t]+(.+)$")
+_RD_BOLDLINE = re.compile(r"^\*\*([^*]{1,80}?):?\*\*:?$")
+_RD_RULE = re.compile(r"^[-*_•]+$")          # a rule, or a bare marker: no content
+_RD_TRIM = re.compile(r"^[ \t\u00a0\ufeff]+|[ \t\u00a0\ufeff]+$")
+_RD_BOLD = re.compile(r"\*\*([^*]{1,200}?)\*\*")
+_RD_ITAL = re.compile(r"\*([^* \t\u00a0](?:[^*]{0,200}?[^* \t\u00a0])?)\*")
+_RD_STAR = re.compile(r"( ?)\*+( ?)")
+_RD_LABEL = re.compile(r"^(what it means|who moved it|what to watch):", re.I | re.A)
+# a receipt group: brackets holding only times and their separators —
+# [1:52:55], [13:15-13:44], [12:12, 17:13]
+_RD_GROUP = re.compile(r"\[([0-9:,; \t–—-]{3,60})\]")
+_RD_TIME = re.compile(r"([0-9]{1,3}):([0-9]{2})(?::([0-9]{2}))?")
 
 
-def receipt_paras(text: str, href_base: str) -> str:
+def _rd_esc(s: str) -> str:
+    """The reader's own esc (app.js): & < > " — so the twins agree byte for
+    byte. Text content and double-quoted attributes only, where ' is inert."""
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _rd_group(m, href_base: str) -> str:
+    """Every time in a receipt group becomes its own bracketed link, said the
+    way the rest of the record says a time (hms: [264:28] reads [4:24:28]).
+    A group holding anything that is not a real time stays as the model
+    wrote it — half-linked is worse than plain."""
+    inner = m.group(1)
+    parts, prev, times = [], 0, 0
+    for t in _RD_TIME.finditer(inner):
+        a, b, c = t.group(1), t.group(2), t.group(3)
+        if c is not None:
+            if int(b) > 59 or int(c) > 59:
+                return m.group(0)
+            sec = int(a) * 3600 + int(b) * 60 + int(c)
+        else:
+            if int(b) > 59:
+                return m.group(0)
+            sec = int(a) * 60 + int(b)
+        sep = inner[prev:t.start()].strip()
+        if times:
+            if "," in sep or ";" in sep:
+                parts.append(", ")
+            elif sep in ("-", "–", "—"):
+                parts.append("–")
+            elif sep == "":
+                parts.append(" ")
+            else:
+                return m.group(0)
+        elif sep:
+            return m.group(0)
+        parts.append(f'<a class="ts" href="{href_base}#t{sec}">[{hms(sec)}]</a>')
+        prev, times = t.end(), times + 1
+    if not times or inner[prev:].strip():
+        return m.group(0)
+    return "".join(parts)
+
+
+def _rd_inline(s: str, href_base: str) -> str:
+    t = _rd_esc(s)
+    t = _RD_BOLD.sub(r"<b>\1</b>", t)
+    t = _RD_ITAL.sub(r"<i>\1</i>", t)
+    # what is left of the syntax goes; an asterisk with a space either side
+    # is not syntax ("3 * 4") and stays
+    t = _RD_STAR.sub(lambda m: m.group(0) if m.group(1) and m.group(2) else m.group(1) + m.group(2), t)
+    t = t.replace("`", "")
+    t = _RD_GROUP.sub(lambda m: _rd_group(m, href_base), t)
+    lab = _RD_LABEL.match(t)
+    if lab:
+        t = f"<b>{lab.group(0)}</b>" + t[lab.end():]
+    return t
+
+
+def receipt_paras(text: str, href_base: str, limit: int = 0) -> str:
     """A model's paragraphs with their receipts turned into links: every
     [MM:SS] or [H:MM:SS] the draft carries opens the tape there
-    (`href_base` is the meeting page, or "" for the page itself). Escaped
-    first, linked after — a draft is untrusted text."""
-    def link(m):
-        a, b, c = m.groups()
-        sec = (int(a) * 3600 + int(b) * 60 + int(c)) if c is not None else (int(a) * 60 + int(b))
-        return f'<a class="ts" href="{href_base}#t{sec}">[{m.group(0)[1:-1]}]</a>'
-    paras = [p.strip() for p in re.split(r"\n\s*\n|\n", str(text or "")) if p.strip()]
-    return "".join(f"<p>{_STAMP.sub(link, esc(p))}</p>" for p in paras)
+    (`href_base` is the meeting page, or "" for the page itself). A heading
+    line is a small head, bullets are a list, **bold** is bold — the rest of
+    Markdown's syntax is dropped, never shown. `limit` keeps whole lines up
+    to that many characters of source (the first line cut at a word), so a
+    front page never ends a draft mid-receipt."""
+    src = re.sub(r"\r\n|[\r\u2028\u2029]", "\n", str(text or ""))
+    lines = [_RD_TRIM.sub("", ln) for ln in src.split("\n")]
+    lines = [ln for ln in lines if ln and not _RD_RULE.match(ln)]
+    if limit:
+        kept, used = [], 0
+        for ln in lines:
+            if kept and used + len(ln) > limit:
+                break
+            kept.append(ln if kept or len(ln) <= limit else cut_words(ln, limit))
+            used += len(ln)
+        lines = kept
+    out: List[str] = []
+    items: List[str] = []
+
+    def flush() -> None:
+        if items:
+            out.append('<ul class="rd-list">' + "".join(f"<li>{x}</li>" for x in items) + "</ul>")
+            items.clear()
+    for ln in lines:
+        b = _RD_BULLET.match(ln)
+        if b:
+            x = _rd_inline(b.group(1), href_base)
+            if x:
+                items.append(x)
+            continue
+        h = _RD_HASH.match(ln) or _RD_BOLDLINE.match(ln)
+        x = _rd_inline(h.group(1) if h else ln, href_base)
+        if not x:
+            continue       # a line that was only syntax (a fence, a bare **) says nothing
+        flush()
+        out.append(f'<p class="rd-h">{x}</p>' if h else f"<p>{x}</p>")
+    flush()
+    return "".join(out)
 
 
 def numbers_strip(cells: Sequence[Tuple[object, str, str]]) -> str:

@@ -193,6 +193,10 @@ def _usage_from(data: dict, provider: str, prompt_len: int) -> tuple:
     if provider == "gemini":
         u = data.get("usageMetadata") or {}
         tin, tout = u.get("promptTokenCount"), u.get("candidatesTokenCount")
+        # the thought is billed as output: an audit that left it out would
+        # show a summary costing a tenth of what it did
+        if u.get("thoughtsTokenCount") is not None:
+            tout = int(tout or 0) + int(u.get("thoughtsTokenCount") or 0)
     else:
         u = data.get("usage") or {}
         if provider == "openai":
@@ -214,7 +218,36 @@ def _gemini_text(data: dict) -> str:
     if not cands:
         return ""
     parts = (cands[0].get("content") or {}).get("parts") or []
-    return "".join(p.get("text", "") for p in parts)
+    return "".join(p.get("text", "") for p in parts if not p.get("thought"))
+
+
+# Gemini's thinking models (2.5, and every model since) spend their thought
+# from the same budget as the answer: `maxOutputTokens` counts both. A
+# 400-token summary on gemini-3.6-flash came back as "At the September 22,
+# 2026," — v2.1.21 pressed every hosted summary and every drafted reading on
+# the record cut off mid-sentence, because the thought had spent the budget
+# before the answer began. The caller's `max_tokens` stays the answer's
+# length; the thought gets room of its own on top of it.
+GEMINI_THINKING_ROOM = 8192
+
+
+def _gemini_budget(max_tokens: int) -> int:
+    return int(max_tokens) + GEMINI_THINKING_ROOM
+
+
+def _cut_off(data: dict, provider: str) -> bool:
+    """Did the answer stop at its length limit rather than at its end? Each
+    provider says so in its own words — Gemini's `finishReason`, OpenAI's
+    `finish_reason`, Anthropic's `stop_reason`. A cut answer is a fragment,
+    and a fragment is never an answer: the caller's own fallback (the
+    extractive summary, no draft at all) is the honest thing to show."""
+    if provider == "gemini":
+        c = (data.get("candidates") or [{}])[0] or {}
+        return str(c.get("finishReason") or "") == "MAX_TOKENS"
+    if provider == "openai":
+        c = (data.get("choices") or [{}])[0] or {}
+        return str(c.get("finish_reason") or "") == "length"
+    return str(data.get("stop_reason") or "") == "max_tokens"
 
 
 def last_usage() -> Optional[dict]:
@@ -274,7 +307,7 @@ def complete(prompt: str, system: str = "", max_tokens: int = 1200,
         # into logs, and the covenant keeps keys out of sight.
         payload = {"contents": [{"role": "user",
                                  "parts": [{"text": prompt}]}],
-                   "generationConfig": {"maxOutputTokens": max_tokens}}
+                   "generationConfig": {"maxOutputTokens": _gemini_budget(max_tokens)}}
         if system:
             payload["systemInstruction"] = {"parts": [{"text": system}]}
         req = urllib.request.Request(
@@ -327,10 +360,15 @@ def complete(prompt: str, system: str = "", max_tokens: int = 1200,
     except ValueError as e:
         raise RuntimeError("the API answered with something that isn't "
                            "JSON") from e
-    if not text.strip():
-        raise RuntimeError("the API answered with no text")
+    # the call was paid for whatever it answered — the audit counts it before
+    # either refusal below
     tin, tout = _usage_from(data, c.get("provider") or "", len(prompt))
     _record(c["model"], c.get("provider") or "", tin, tout, tool=tool)
+    if _cut_off(data, c.get("provider") or ""):
+        raise RuntimeError("the answer was cut off at its length limit — a "
+                           "fragment is not an answer")
+    if not text.strip():
+        raise RuntimeError("the API answered with no text")
     return text
 
 
@@ -362,7 +400,7 @@ def complete_vision(prompt: str, jpeg_b64: str, system: str = "",
         payload = {"contents": [{"role": "user", "parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": jpeg_b64}},
             {"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": max_tokens}}
+            "generationConfig": {"maxOutputTokens": _gemini_budget(max_tokens)}}
         if system:
             payload["systemInstruction"] = {"parts": [{"text": system}]}
         req = urllib.request.Request(
@@ -401,9 +439,12 @@ def complete_vision(prompt: str, jpeg_b64: str, system: str = "",
     else:
         text = "".join(b.get("text", "") for b in data.get("content", [])
                        if b.get("type") == "text")
-    if not str(text).strip():
-        raise RuntimeError("the model answered with no text")
     tin, tout = _usage_from(data, c.get("provider") or "", len(prompt) + 1500)
     _record(c["model"], c.get("provider") or "", tin, tout,
             tool=tool, kind="vision")
+    if _cut_off(data, c.get("provider") or ""):
+        raise RuntimeError("the description was cut off at its length limit "
+                           "— a fragment is not a description")
+    if not str(text).strip():
+        raise RuntimeError("the model answered with no text")
     return str(text)

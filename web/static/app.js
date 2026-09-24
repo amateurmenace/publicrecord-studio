@@ -105,16 +105,15 @@
   function wireFind() {
     const tr = $("#transcript"); if (!tr) return;
     const rows = $$("#transcript .seg"); if (!rows.length) return;
-    const host = $(".mp-words") || $(".tbar");
     const form = document.createElement("form");
     form.className = "mp-find"; form.setAttribute("role", "search");
     form.innerHTML = `<input type="search" name="q" placeholder="find in this meeting — a word or phrase" aria-label="find in this meeting" autocomplete="off">
       <button class="btn" type="submit">find</button>
       <span class="mp-findn" aria-live="polite"></span>
       <div class="mp-found" hidden></div>`;
-    if (host && host.classList.contains("mp-words")) host.insertBefore(form, host.firstChild.nextSibling);
-    else if (host) host.before(form);
-    else tr.before(form);
+    // directly over the lines it folds (specs/27 §2.4): inside the words card
+    // it sat a phone's two screens above them, behind the reading panels
+    tr.before(form);
     const input = $("input", form);
     MPF = { rows, input, form, found: $(".mp-found", form), n: $(".mp-findn", form), q: "" };
     form.addEventListener("submit", e => { e.preventDefault(); mpFind(input.value); });
@@ -138,7 +137,8 @@
       const w = tx && tx.firstChild && tx.firstChild.nodeType === 3 ? tx.firstChild.nodeValue : "";
       if (!w.trim()) return;
       e.preventDefault(); input.value = w.trim(); mpFind(w.trim());
-      input.scrollIntoView({ block: "nearest" });
+      // land on the answer — the count, the sparkline, the lines — not on the cloud
+      form.scrollIntoView({ block: "start" });
     });
     // a link into the tape while the transcript is folded: the row it names
     // must show, or the jump lands on nothing
@@ -1371,7 +1371,14 @@
   const edition = () => (EDP ||= getJSON(`${BASE}/towns.json`)
     .then(d => d || { towns: [], bodies: [], untowned: 0 }));
   const readTown = () => { try { return localStorage.getItem(TOWN_KEY) || ""; } catch { return ""; } };
-  const writeTown = t => { try { t ? localStorage.setItem(TOWN_KEY, t) : localStorage.removeItem(TOWN_KEY); } catch { /* private mode: the visit still scopes */ } };
+  /* "the whole record" is an answer too (specs/27 §2.4): the first-visit
+     question was asked again on every page, because the one answer that
+     stores no town left no trace. Any choice — a town, or all of them —
+     marks the question asked, in this browser and nowhere else. */
+  const ASKED_KEY = "cz-town-asked";
+  const readAsked = () => { try { return localStorage.getItem(ASKED_KEY) === "1"; } catch { return false; } };
+  const writeAsked = () => { try { localStorage.setItem(ASKED_KEY, "1"); } catch { /* private mode: asked again next page */ } };
+  const writeTown = t => { writeAsked(); try { t ? localStorage.setItem(TOWN_KEY, t) : localStorage.removeItem(TOWN_KEY); } catch { /* private mode: the visit still scopes */ } };
   const REDRAW = [];                    /* page hooks re-run on a scope change */
   let SCOPE = { town: "", body: "", from: "none", stored: "", lost: "" };
 
@@ -1399,7 +1406,7 @@
     // them they were reading everything. Widen instead, and say why.
     if (lost) return { town: "", body, from: "lost", stored: "", lost };
     if (names.length === 1) return { town: names[0], body, from: "only", stored: "", lost };
-    return { town: "", body, from: "none", stored: "", lost };
+    return { town: "", body, from: readAsked() ? "all" : "none", stored: "", lost };
   }
 
   async function initScope() {
@@ -1469,9 +1476,11 @@
              <b>${esc(SCOPE.town)}</b>.`;
       acts = [{ label: `switch to ${here}`, town: here, primary: true },
               { label: `stay in ${SCOPE.town}`, dismiss: true }];
-    } else if (SCOPE.from === "none" && many && !SCOPE.body) {
+    } else if (SCOPE.from === "none" && many && !SCOPE.body && (path === "/app" || path === "/app/s")) {
       // first visit, more than one town: an inline row, never a modal. The
       // record stays readable behind it and "not yet" is a real answer.
+      // Asked where the scope shapes the page (the front page, the search);
+      // a shared meeting or reel leads with what was shared (specs/27 §2.4).
       msg = `This edition carries ${ed.towns.length} towns. Pick one and every
              page will scope to it — or read all of them.`;
       acts = ed.towns.map(t => ({ label: t.town, town: t.town }))
@@ -1485,7 +1494,8 @@
       b.type = "button"; b.className = "btn" + (a.primary ? " primary" : "");
       b.textContent = a.label;
       b.onclick = () => {
-        if (a.dismiss) { el.hidden = true; return; }
+        // a first-visit dismissal ("the whole record") is the reader's answer
+        if (a.dismiss) { if (SCOPE.from === "none") { writeAsked(); SCOPE = { ...SCOPE, from: "all" }; } el.hidden = true; return; }
         // "back to my town" from a foreign meeting means leaving the meeting —
         // scoping in place would leave the reader staring at the same page
         if (a.go) { writeTown(a.town); location.href = `${BASE}/`; return; }
@@ -1894,7 +1904,9 @@
     if (bits.length) {
       const wrap = document.createElement("div");
       wrap.innerHTML = bits.join("");
-      $(".transcript").before(...wrap.childNodes);
+      // above the transcript's own bar, so the bar, the find box and the
+      // lines stay one block (specs/27 §2.4)
+      ($(".tbar") || $(".transcript")).before(...wrap.childNodes);
       $$("[data-seek]").forEach(a => a.addEventListener("click", ev => {
         ev.preventDefault(); const t = +a.dataset.seek;
         const f = $(".player.facade"); f ? loadTape(f.dataset.video, t) : ytSeek(t);
@@ -4955,13 +4967,67 @@
      and what was named, where the pushback was — for a meeting; the
      milestones in order, for an issue. Extractive, receipts throughout, no
      model: the analyzer's read, pressed, said as a reading. */
-  /* a model's paragraphs with their receipts as links — escaped first,
-     linked after: a draft is untrusted text */
+  /* a model's prose, read (specs/27 §2.2) — the twin of web/charts.py
+     receipt_paras, byte for byte (a node twin holds them equal). Escaped
+     first, marked up after: a draft is untrusted text. The subset of
+     Markdown the models actually write — a heading line, a bullet, **bold**,
+     *italic*; every other asterisk and backtick dropped as the syntax it is
+     — and every time in a receipt group its own link into the tape, said
+     the way the record says a time ([264:28] reads [4:24:28]). */
+  const RD_BULLET = /^[*•-][ \t]+(.+)$/, RD_HASH = /^#{1,6}[ \t]+(.+)$/,
+    RD_BOLDLINE = /^\*\*([^*]{1,80}?):?\*\*:?$/, RD_RULE = /^[-*_•]+$/,
+    RD_TRIM = /^[ \t\u00a0\ufeff]+|[ \t\u00a0\ufeff]+$/g,
+    RD_BOLD = /\*\*([^*]{1,200}?)\*\*/g, RD_ITAL = /\*([^* \t\u00a0](?:[^*]{0,200}?[^* \t\u00a0])?)\*/g,
+    RD_LABEL = /^(what it means|who moved it|what to watch):/i,
+    RD_GROUP = /\[([0-9:,; \t\u2013\u2014-]{3,60})\]/g,
+    RD_TIME = /([0-9]{1,3}):([0-9]{2})(?::([0-9]{2}))?/g;
+  /* a receipt group: every real time its own bracketed link; a group
+     holding anything that is not a real time stays as written */
+  function rdGroup(m0, inner, hrefBase) {
+    const parts = []; let prev = 0, times = 0, t;
+    RD_TIME.lastIndex = 0;
+    while ((t = RD_TIME.exec(inner))) {
+      const a = +t[1], b = +t[2], c = t[3];
+      let sec;
+      if (c != null) { if (b > 59 || +c > 59) return m0; sec = a * 3600 + b * 60 + +c; }
+      else { if (b > 59) return m0; sec = a * 60 + b; }
+      const sep = inner.slice(prev, t.index).trim();
+      if (times) {
+        if (sep.includes(",") || sep.includes(";")) parts.push(", ");
+        else if (sep === "-" || sep === "\u2013" || sep === "\u2014") parts.push("\u2013");
+        else if (sep === "") parts.push(" ");
+        else return m0;
+      } else if (sep) return m0;
+      parts.push(`<a class="ts" href="${hrefBase}#t${sec}">[${hms(sec)}]</a>`);
+      prev = t.index + t[0].length; times++;
+    }
+    if (!times || inner.slice(prev).trim()) return m0;
+    return parts.join("");
+  }
+  function rdInline(s, hrefBase) {
+    let t = esc(s).replace(RD_BOLD, "<b>$1</b>").replace(RD_ITAL, "<i>$1</i>")
+      .replace(/( ?)\*+( ?)/g, (m0, a, b) => a && b ? m0 : a + b).replace(/`/g, "")
+      .replace(RD_GROUP, (m0, inner) => rdGroup(m0, inner, hrefBase));
+    const lab = RD_LABEL.exec(t);
+    if (lab) t = `<b>${lab[0]}</b>` + t.slice(lab[0].length);
+    return t;
+  }
   function receiptParas(text, hrefBase) {
-    return String(text || "").split(/\n+/).map(p => p.trim()).filter(Boolean).map(p =>
-      `<p>${esc(p).replace(/\[(\d{1,3}):(\d\d)(?::(\d\d))?\]/g, (m0, a, c, s) => {
-        const sec = s != null ? (+a * 3600 + +c * 60 + +s) : (+a * 60 + +c);
-        return `<a class="ts" href="${hrefBase}#t${sec}">[${m0.slice(1, -1)}]</a>`; })}</p>`).join("");
+    const lines = String(text || "").replace(/\r\n|[\r\u2028\u2029]/g, "\n").split("\n")
+      .map(l => l.replace(RD_TRIM, "")).filter(l => l && !RD_RULE.test(l));
+    const out = [], items = [];
+    const flush = () => { if (items.length) { out.push(`<ul class="rd-list">${items.map(x => `<li>${x}</li>`).join("")}</ul>`); items.length = 0; } };
+    for (const l of lines) {
+      const b = RD_BULLET.exec(l);
+      if (b) { const x = rdInline(b[1], hrefBase); if (x) items.push(x); continue; }
+      const h = RD_HASH.exec(l) || RD_BOLDLINE.exec(l);
+      const x = rdInline(h ? h[1] : l, hrefBase);
+      if (!x) continue;    // a line that was only syntax says nothing
+      flush();
+      out.push(h ? `<p class="rd-h">${x}</p>` : `<p>${x}</p>`);
+    }
+    flush();
+    return out.join("");
   }
   function renderReading(b, mby, iby, tried) {
     const part = (kicker, rows) => rows ? `<div class="pb-rdpart"><span class="kicker">${kicker}</span>${rows}</div>` : "";
@@ -6040,10 +6106,12 @@
     }
     return out;
   }
-  async function sqStory(q, ids, idx) {
+  async function sqStory(q, ids, idx, feat) {
     const box = $("#sq-story"); if (!box) return;
     if (!ids.length) { box.innerHTML = ""; return; }
-    const phrases = [q.trim()];
+    const phrases = feat ? feat.phrases : [q.trim()];
+    // what the count read, said the way the pressed story says it
+    const saidAs = phrases.map(p => `“${esc(p)}”`).join(" or ");
     // the meetings the story counts are the ones in the reader's scope —
     // a body scope must not count the other bodies' nights as silence
     const meetings = idx.meta.filter(m => m && m.pid && inScope(m.town || "", m.body || "")).map(m => ({ pid: m.pid, title: m.title || m.pid, date: m.date || "",
@@ -6073,7 +6141,7 @@
         const others = d ? [d, ...d.elsewhere].map(e => `${e.moments} in ${esc(e.town || "meetings with no town recorded")}`).join(", ") : "";
         const why = (!whole && hitsAll.length && !since)
           ? `the ${tpN(hitsAll.length, "line")} below are from meetings with no town recorded — the story needs a town to count by`
-          : `nothing says “${esc(q)}” in ${esc(scopeName)}${since ? ` since ${esc(tpDay(since))}` : ""}${others ? ` — elsewhere on the record: ${others}` : ""}`;
+          : `nothing says ${saidAs} in ${esc(scopeName)}${since ? ` since ${esc(tpDay(since))}` : ""}${others ? ` — elsewhere on the record: ${others}` : ""}`;
         box.innerHTML = `<section class="sq-story tp-story"><span class="kicker">a word, over time — this search, told as a story</span>
           <h2 class="fp-hl" id="sq-hl">How ${esc(townFixed || "the record")} talks about ${esc(q)}</h2>${range}${rangeNote}
           <p class="hint">${why}.</p></section>`;
@@ -6094,7 +6162,7 @@
         ${range}${rangeNote}
         <p class="fp-lede">${tpLede(d, searchHref)}</p>
         <p class="sq-jump"><a href="#results">the lines themselves ↓</a></p>
-        <p class="decksrc">counted in your browser from the record’s own index — every line of every transcript that says “${esc(q)}”, whole-word; no model, nothing sent anywhere; every number opens the tape</p>
+        <p class="decksrc">counted in your browser from the record’s own index — every line of every transcript that says ${saidAs}, whole-word${feat ? `, the words <a href="${BASE}/topic/${encodeURIComponent(feat.slug)}/">the front page’s story</a> counts` : ""}; no model, nothing sent anywhere; every number opens the tape</p>
         <div class="sq-acts">
           <a class="btn primary tp-play" href="${esc(d.reel.full)}">▶ play all ${tpN(d.reel.full_n, "clip")} as a reel · ${hms(d.reel.full_runtime)}</a>
           <button type="button" class="btn" data-sq="tray">✂ put every clip on my tray</button>
@@ -6107,7 +6175,7 @@
         <section class="fp-part"><div class="sectionhead"><span class="kicker">where it fell — every night that said it, slice by slice</span></div>${tpTapes(d.meetings)}
           <p class="fp-say">Each row is a tape, start to end; a taller bar is a slice where “${esc(q)}” came up more. On ${esc(tpDay(p.date))} the ${esc(p.body || "board")} said it ${tpN(p.mentions, "time")} ${tpSpan(p.span)}. Every bar opens the tape there.</p></section>
         ${d.cowords.length ? `<section class="fp-part"><div class="sectionhead"><span class="kicker">the words beside it — what was said in the same breath</span></div>${tpCowordBars(d.cowords, q, SCOPE.town || "")}
-          <p class="fp-say">Counted in each line that says “${esc(q)}” and the lines either side of it, civic stopwords out. Each word opens the record’s search for the two together.</p></section>` : ""}
+          <p class="fp-say">Counted in each line that says ${saidAs} and the lines either side of it, civic stopwords out. Each word opens the record’s search for the two together.</p></section>` : ""}
         <p class="sq-count">the ${tpN(ids.length, "line")} themselves, newest first${d.elsewhere.length ? ` — ${d.moments} in ${esc(d.town)}, ${d.elsewhere.map(e => `${e.moments} in ${esc(e.town || "meetings with no town recorded")}`).join(", ")}` : ""}${since ? ` (the list is the whole record; the count above is ${esc((SQ_RANGES.find(r => r[0] === SQ_RANGE) || SQ_RANGES[3])[1])})` : ""} — press <b>＋ reel</b> on any to cut it; <b>j</b> / <b>k</b> walk them, <b>c</b> cuts the one under the cursor</p>
       </section>`;
       wireRange();
@@ -6308,10 +6376,44 @@
   async function sqStoryFor(q, terms) {
     const idx = await sqIndex(); if (!idx) { sqProgress(null); return; }
     sqProgress(1, `reading the lines that say “${q}”…`);
-    const ids = await sqIds(idx, terms, q);
+    const feat = await sqFeatured(q);
+    const ids = feat ? await sqPhraseIds(idx, feat.phrases) : await sqIds(idx, terms, q);
     sqProgress(2, `${tpN(ids.length, "line")} — counting, month by month…`);
-    await sqStory(q, ids, idx);
+    await sqStory(q, ids, idx, feat);
     sqProgress(3, `${tpN(ids.length, "line")} counted`);
+  }
+  /* the front page's featured words (topics/index.json, specs/27 §2.3): a
+     search for one counts every phrase its pressed story counts — "AI" is
+     AI or artificial intelligence — so the story's own "80 mentions" link
+     lands on 80. Malformed rows are no featured word, never a throw. */
+  async function sqFeatured(q) {
+    const list = await getJSON(`${BASE}/topics/index.json`);
+    const k = String(q || "").trim().toLowerCase();
+    const t = Array.isArray(list) && k ? list.find(t => t && typeof t.q === "string"
+      && t.q.trim().toLowerCase() === k && Array.isArray(t.phrases)) : null;
+    if (!t) return null;
+    const phrases = t.phrases.filter(p => typeof p === "string" && p.trim()).map(p => p.trim());
+    if (!phrases.length) return null;
+    return { slug: String(t.slug || ""), phrases,
+             terms: [...new Set(phrases.flatMap(p => p.toLowerCase().match(/[a-z0-9]+/g) || []))] };
+  }
+  /* a featured word's lines: for each phrase, the index's postings for its
+     first word, kept where the phrase itself starts in the line (read with
+     the next line joined on — mentionsIn, the press's own rule), in the
+     index's order — so the count is the pressed story's, line for line */
+  async function sqPhraseIds(idx, phrases) {
+    const keep = new Set();
+    for (const p of phrases) {
+      const toks = p.toLowerCase().match(/[a-z0-9]+/g) || [];
+      if (!toks.length) continue;
+      const pats = [phraseRe(p)];
+      for (const id of await sqIds(idx, [toks[0]], toks[0])) {
+        const s = idx.segs[id], nx = idx.segs[id + 1];
+        const after = nx && nx[0] === s[0] ? String(nx[3]) : "";
+        if (mentionsIn(s[3], after, pats)) keep.add(id);
+      }
+    }
+    return [...keep].sort((a, b) => a - b);
   }
   /* the index's postings for the terms, intersected, exact-phrase-first —
      the one rule both the list and the story read by */
@@ -6378,7 +6480,9 @@
     // each term's prefix shard, intersected; exact-phrase-first on a
     // multi-word query (hits stays a list of segIds so a peek can reach
     // the ±1 neighbours) — the one rule the story counts by too
-    let hits = await sqIds(idx, terms, q);
+    const feat = await sqFeatured(q);
+    let hits = feat ? await sqPhraseIds(idx, feat.phrases) : await sqIds(idx, terms, q);
+    const marks = feat ? feat.terms : terms;
     sqProgress(2, `${tpN(hits.length, "line")} — counting, month by month…`);
     const storyIds = hits.slice();
     // scope BEFORE the cut, or the 80-hit ceiling would be spent on meetings
@@ -6429,13 +6533,13 @@
         const [mi, t, spk, text] = segs[id];
         const m = meta[mi] || {};
         return `<div class="swrap"><a class="sresult" data-sid="${id}" href="${BASE}/m/${m.pid}#t${Math.floor(t)}">
-          <span class="ts">${hms(t)}</span>${mark(text, terms)}
+          <span class="ts">${hms(t)}</span>${mark(text, marks)}
           <span class="smeta">${esc([m.title, m.body, SCOPE.town ? "" : m.town, m.date].filter(Boolean).join(" · "))}${spk ? " · " + esc(spk) : ""}</span>${peek(segs, id, mi)}</a>${searchTick(m.pid, t, text, m.title, m.body, m.town, m.date)}</div>`;
       }).join("");
     paintCutTicks();
     selReset();
     // the story of the search, over every line it found (not the eighty shown)
-    await sqStory(q, storyIds, idx);
+    await sqStory(q, storyIds, idx, feat);
     sqProgress(3, `${tpN(storyIds.length, "line")} counted`);
   }
   /* The peek: ±1 segment of context from the segs plane, already in hand
