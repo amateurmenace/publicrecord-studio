@@ -71,7 +71,9 @@ without it). **Never rebake the public edition from a local corpus.**
   viewer's transport) — specs/25; `mp-` (the meeting page's cut, find,
   words, jump bar), `kb-` (the keys sheet) — specs/26; `rd-` (a model's
   prose, read: its heading lines and lists), `pic-` (a picture's download
-  line), `dg-` (drag to reorder), `gl-` (the glossary) — specs/27.
+  line), `dg-` (drag to reorder), `gl-` (the glossary) — specs/27. Plus `bs-` (the civic
+  broadsheet: the masthead, the spine and its type-ahead, the score, the
+  year, the columns, the river, the strips, the doors) — specs/29.
 - **A model's answer is whole or it is nothing** (specs/27): the seam gives
   a thinking model its own room (`GEMINI_THINKING_ROOM`) and refuses an
   answer cut off at its length limit on every provider; a caller's fallback

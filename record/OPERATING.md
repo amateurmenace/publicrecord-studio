@@ -458,6 +458,29 @@ seam's reason, in parentheses, when it fell back. One repair runs at a time
 before the real run: each call it made (one or two, by what the first
 planned meeting needs) must say `ai:gemini-…` and `— whole`.
 
+### The pictures the press presses (specs/29 §P0.2)
+
+The broadsheet reads a meeting around its tape — the poster large, three
+frames from inside the night, every tape of the year as its own still — and
+the covenant says the reader page loads nothing from a third party. So the
+press fetches each tape's `hqdefault.jpg` and `hq1–3.jpg` from
+`i.ytimg.com` ONCE and presses them into the edition at `app/stills/<pid>.jpg`
+and `<pid>-1..3.jpg` (`record/stills.py`). The cache lives outside the
+edition directory (`RECORD_STILLS_DIR`, default `/tmp/record-stills` — the
+press wipes the edition directory on every run), and because a Cloud Run
+job's disk is new every night, `record.press` seeds that cache from the
+edition bucket's `app/stills/` before it fetches: YouTube is asked only for
+the tapes that landed since the last pressing. A frame YouTube does not have
+comes back as a ~1 KB grey card with a 200; anything under 2.5 KB, or not a
+JPEG, is not a still and is not pressed — the page shows the town's colour
+instead. `--no-stills` presses none. A desk bake (`web.bake`) presses none
+unless `--stills` is given, so a test bake never touches the network; the
+edition stays byte-identical either way.
+
+The stills ride the normal sync (JPEG is never gzipped; `.jpg` is in
+`_TYPES`) and the nightly carry (the gunzip loop skips them by magic). The
+service worker caches them like any other `/app/` plane.
+
 ### Hand-files at the Pages-repo root
 
 (The press's own output inside `app/` grew in v2.1.23 — `app/pictures/*.svg`,

@@ -2,6 +2,54 @@
 
 ## unreleased
 
+### The civic broadsheet — the record as a front page, the tape as the sun, search as its spine — 2026-09-24 (v2.2.0)
+
+Stephen's verdict on the site was that it was lifeless: too much text down
+a single column, too stacked, too confusing. specs/29 answered with a
+design, and this release presses it. The front page is a paper now, on a
+twelve-column grid in Fraunces, IBM Plex Sans and IBM Plex Mono (self-hosted
+in the edition; nothing loads from a third party). The masthead carries the
+municipality switch and a READ stamp; under the wordmark the search spine —
+a real form that reaches the search page with scripts off, six of the
+record's own words to try, and the sentence that explains the page:
+*everything you see is a search*. With the script on the spine answers as
+you type, over the index that already ships with the edition — moments to
+play, the meetings that took the word up, the threads, an over-time
+sparkline — keyboard-first, and nothing leaves the browser.
+
+Then the tape is the sun. Tonight's meeting opens as its frame, large, with
+*Play from* its loudest moment and the caption under the playhead; beneath
+it the score of the night — the tape as a timeline, the decisions as dots
+sized by their weight, tension in rust, every dollar figure the room named
+as a labelled tick, and eight lanes showing where each lens's words fell
+(`analysis.framing.track`, sixty slices per lens, counted at press time
+with the lenses' own word lists so a lane's bins sum to its lens's count).
+Beside it the counted headline and lede, a *now at* card, and money named
+on the tape; across it a filmstrip of three real frames from inside the
+night with the decisions that fall in each. Click anything and the
+playhead, the caption and the frame move together; on the meeting page the
+same click seeks the video. The pictures are YouTube's own — the poster and
+the three in-tape frames — fetched once by the press into `app/stills/`,
+cached across pressings (the bucket seeds the cache), never hot-linked.
+
+Below: the year in tapes, every meeting as its own still on the month axis,
+sized by its hours, town-coloured on its top edge, with four chapters
+written from the counts; four columns to delve into (two towns' vocabularies
+as a butterfly, who and when as a dot matrix, the roll calls as a grid with
+the one that failed in rust, the widest thread's season); how the talk
+flowed, meeting by meeting, as a river of eight bands with a dashed line
+where the second town joins; the front pages the press builds; this week;
+the threads as small multiples; and the three doors into writing under the
+rust line. Every picture is pressed SVG with its numbers beside it as
+`data-bs-*` JSON — the reader re-lights it and the node twins hold the two
+sides equal; every picture downloads as an .svg; with scripts off every
+chart is a still and every control an anchor. The meeting page gets the
+score as its jump bar and a pressed find box; the search page gets the
+timeline of town-coloured dots and the reel with stills. The page stays
+byte-clean of the studio, takes zero fuchsia, presses byte-identical, and
+the constitution's ledger does not change: nothing new is written by a
+model. Reviewed by four lenses, {FINDINGS}; {TESTS} tests.
+
 ### The verdict, read on a phone — the model's words whole, the search's numbers the story's, and the desk's last pieces in the paper — 2026-09-24 (v2.1.23)
 
 Read on a phone, the live record was saying things that were not whole.

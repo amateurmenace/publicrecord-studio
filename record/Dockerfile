@@ -76,7 +76,8 @@ COPY highlighter/ /app/highlighter/
 # transitively (bake_kits imports it lazily), so name it explicitly.
 RUN python -c "import record.app, record.store, record.press, record.pipeline, \
     record.connectors.youtube, memory.ingest, web.bake, web.emit, web.kit, \
-    web.pictures, web.glossary, record.repair"
+    web.pictures, web.glossary, record.repair, \
+    web.broadsheet, web.charts, web.story, record.stills"
 
 EXPOSE 8330
 CMD ["uvicorn", "record.app:app", "--host", "0.0.0.0", "--port", "8330"]

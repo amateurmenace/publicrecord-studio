@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.1.23, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.0, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,78 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, {DEPLOYZ} — v2.2.0 / r47 IS LIVE: the civic broadsheet (specs/29 P0)
+
+The front page is a paper. specs/29 is the design (and its canvas,
+<https://claude.ai/artifact/HgMxn4cApHgdYqu5P1aGJy>, is the spec for the
+colours, type, grid and copy); the CHANGELOG entry says what shipped. The
+shape of the build, for whoever touches it next:
+
+- **The planes**: `analysis.framing.track` — sixty slices per lens, counted
+  at press time by `memory.analyze.framing_track` with the lenses' own word
+  lists (a lane's bins sum to its lens's count; a test holds it). No
+  pipeline backfill was needed: the framing was always computed at press
+  time from the transcript, and so is the track. `entities.people/places`
+  already carry their first mention's `t` where the captions allow (Boston's
+  all-caps captions yield none — a limit of the analyzer, not of the press).
+  The `/app/ai` ledger did not change: nothing new is written by a model.
+- **The pictures**: `record/stills.py` presses the poster and three in-tape
+  frames per meeting into `app/stills/` (`<pid>.jpg`, `<pid>-1..3.jpg`),
+  fetched once from YouTube, cached under `RECORD_STILLS_DIR`
+  (`/tmp/record-stills`) and seeded from the edition bucket before each
+  cloud press, so a still is fetched on the night its meeting lands and never
+  again. A desk bake presses none unless `web.bake --stills`; the pages
+  show the town's colour where a still is missing (determinism holds). The
+  meeting plane carries `still` and `frames`; `search/meta.json` carries
+  `still` (1/0). `bake_stills` is the first stage in both presses (the
+  parity test holds the sequences equal).
+- **The pictures of the page** (`web/charts.py`, appended): `score` (with
+  `score_data` / `score_state`), `filmstrip`, `year_tapes` (with
+  `year_layout`), `butterfly`, `who_when`, `vote_grid`, `lens_river`,
+  `thread_spark`, `timeline_dots` — pure, deterministic, each with its
+  numbers beside it as `data-bs-*` JSON and a table twin; every one
+  downloads as an .svg through the other session's `web/pictures.py`.
+  The words are `web/story.py` (appended): `tonight`, `chapters`,
+  `vocab_words`, `names_words`, `rolls_words`, `thread_words`,
+  `river_words` — counted, never modeled. `web/broadsheet.py` lays the page
+  out and owns the masthead's pieces (`topbar`, `nameplate`, `municipality`,
+  `spine`, `primary_nav`); `emit.masthead` calls them on every page.
+- **The reader** (`app.js`, the section headed THE CIVIC BROADSHEET):
+  `paintModeBar` now paints the READ/EDIT stamp (`#bs-stamp`) from
+  `shownMode()`; `bsSpine` is the type-ahead over the shipped index
+  (`bsGroup` is the pure grouping; ↑↓ move, ⇥ next group, ↵ opens, ⌘↵ the
+  reel, Esc closes); `bsScore` re-lights the score (`bsScoreState` is the
+  twin of `charts.score_state`) and, on the meeting page, seeks the tape
+  and follows it (`BS_FOLLOW` from `tick`); `bsYear` (`bsYearState`),
+  `bsRiver`, `bsSearchExtras` (`bsTimeline` is the twin of
+  `charts.timeline_dots`). `wireFind` adopts the pressed find form.
+- **The look**: `brand/tokens/broadsheet.css` is the single source (paper,
+  ink, rust, the two towns' colours, the three faces); `emit._brand_tokens`
+  re-points the old semantic tokens at it, so every older rule reads on
+  paper. Fraunces (roman + italic, variable), IBM Plex Sans (variable) and
+  IBM Plex Mono (400/500) are vendored in `web/static/fonts/` with their
+  OFL texts (209 KB in all; Inter and JetBrains Mono are gone). The
+  namespace is `bs-`.
+- **Tests**: `tests/test_web_broadsheet.py` (its own pressing of the fixture
+  corpus; the node twins lift `bsScoreState`, `bsYearState`, `bsMonthX`,
+  `bsGroup` and `bsScore` from the reader and run them against the press's
+  answers; decodeReel's law for the score's JSON; the no-script submit; the
+  byte-clean and zero-fuchsia scans of every pressed page; the stills desk
+  with a fake fetcher). The older pins were rewritten to the broadsheet.
+  {TESTS} tests.
+- **Reviewed**: four lenses (press-time Python; the reader; the stills, press
+  and deploy seams; CSS, design conformance and accessibility), {FINDINGS}.
+- **Still Stephen's / next (P1, then P2 — specs/29)**: the studio restyled
+  as the board (block shelf, rust block frames, the writing desk), five more
+  templates, the issue-over-time template redrawn, new ref-only kinds
+  (`lead:<pid>`, `week`, `threads`, `strip`, `names`, `search`), `v=5`
+  links — version 2.2.1; then the gallery — 2.2.2. Read the live front page
+  on a phone and say what is still unclear. The CSP still allows
+  `img-src https://i.ytimg.com` because the studio's paper cards and the
+  reel viewer's facade still read `thumb`; the pressed reader pages load no
+  third-party image — narrowing the CSP is a follow-on once those two read
+  `still`. {NOTES}
 
 ## 2026-09-24, 04:03Z — v2.1.23 / r46 IS LIVE: the model's words whole; the desk's last pieces in the paper
 
