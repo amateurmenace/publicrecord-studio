@@ -10,7 +10,15 @@ name: nightly edition
 on:
   schedule:
     - cron: "30 8 * * *"        # 04:30 America/New_York (EDT) — after the ingest
+    # GitHub's schedule is best-effort: on 2026-09-24 the 04:30 run never
+    # appeared (three hand dispatches did). A second slot an hour later is
+    # the belt to that brace; when both fire, the carry guard makes the
+    # second a no-op unless the record changed in between.
+    - cron: "30 9 * * *"        # 05:30 America/New_York (EDT) — the fallback
   workflow_dispatch:
+concurrency:
+  group: nightly-edition
+  cancel-in-progress: false
 permissions:
   contents: read
   id-token: write               # Workload Identity Federation, no key files
