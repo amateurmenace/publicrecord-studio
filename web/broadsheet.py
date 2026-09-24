@@ -250,6 +250,10 @@ def year_section(meetings: Sequence[dict], votes: Sequence[dict], analytics: dic
     at = year_pic.find('<div class="bs-yearphone">')
     phone_take = pictures.take("year-by-month", year_pic[at:] if at >= 0 else "", "The year, month by month", f"{base}/",
                                legend="a dot per meeting in its town’s colour, month by month; the count above each month")
+    # a phone shows board 3's dots and never the tapes, so it never fetches
+    # their stills: the page's <image>s wait (data-href) until the strip has
+    # a box — app.js bsYearStills — while the picture file keeps them whole
+    year_pic = year_pic.replace('<image href="', '<image data-href="')
     year_pic += ((f'<div class="bs-onwide">{wide_take}</div>' if wide_take else "")
                  + (f'<div class="bs-onphone">{phone_take}</div>' if phone_take else ""))
     return f'''<section class="bs-year-sec" id="year" aria-labelledby="bs-year-hl">

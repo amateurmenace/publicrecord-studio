@@ -438,7 +438,7 @@ class TestGalleryPress(unittest.TestCase):
                       'const take = from === "stored"', "a steward reads the ask, and a page taken down is gone at the next night’s press",
                       'minted.includes(location.search)', 'map(a => a.search)', 'if (r.status === 410) { copyText(paperShareURL(p), said + " — full link copied instead"); return; }'):
             self.assertIn(token, JS)
-        self.assertIn("bsSpine(); bsScore(); bsYear(); bsRiver(); bsGallery();", JS)
+        self.assertIn("bsSpine(); bsScore(); bsYear(); bsYearStills(); bsRiver(); bsGallery();", JS)
 
 
 if __name__ == "__main__":

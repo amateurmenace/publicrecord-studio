@@ -399,6 +399,68 @@ class TestTheChartsArePure(unittest.TestCase):
             self.assertIn(rule, css)
         self.assertIn(".rc-nostill{display:none}", css[css.index("@media print{\n  .bs-spine"):])
 
+    def test_a_phone_never_fetches_the_tapes_it_does_not_show(self):
+        """The year strip's stills are SVG <image>s, which cannot load lazily,
+        and a phone's sheet hides the strip — yet it fetched every still
+        (v2.2.8). The page's stills now wait (data-href) until the strip has a
+        box, while the picture file keeps them whole; every tape is its town's
+        colour and its day beneath its still, so a still not yet come (or the
+        script off) leaves a tape like the older ones. Executed over fakes:
+        hidden, a screen turned across 720px, and paper."""
+        from web import broadsheet, pictures
+        ms = [{"pid": f"p{i}", "date": f"2026-0{1 + i}-10", "town": "Brookline", "body": "B", "title": f"t{i}",
+               "duration": 3600, "votes": []} for i in range(3)]
+        stills = {"p0": {"poster": True}, "p1": {"poster": True}}                      # p2 has none
+        html_ = broadsheet.year_section(ms, [], {}, stills)
+        wide = html_[html_.index('<svg class="bs-year-svg"'):]
+        wide = wide[:wide.index("</svg>")]
+        self.assertEqual(re.findall(r'<image data-href="([^"]+)"', wide), ["/app/stills/p0.jpg", "/app/stills/p1.jpg"])
+        self.assertNotIn("<image href=", html_)                                         # nothing on the page fetches unseen
+        pic = pictures._PENDING.get("year-in-tapes", "")
+        self.assertEqual(len(re.findall(r'<image href="[^"]+/app/stills/p[01]\.jpg"', pic)), 2)   # the file keeps them whole
+        self.assertNotIn("data-href", pic)
+        # every tape is its colour and its day first, its still (if any) over them
+        for pid in ("p0", "p1", "p2"):
+            tape = wide[wide.index(f'data-pid="{pid}"'):]
+            tape = tape[:tape.index("</a>")]
+            self.assertLess(tape.index("<rect"), tape.index("<text"))
+            if pid != "p2":
+                self.assertLess(tape.index("<text"), tape.index("<image"))
+        body = "\n".join([
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const mk = h => { const a = { 'data-href': h }; const im = { a, on: {}, gone: false, getAttribute: k => a[k] ?? null, setAttribute: (k, v) => { a[k] = String(v); }, removeAttribute: k => { delete a[k]; },",
+            "  addEventListener: (e, f, o) => { im.on[e] = f; }, remove: () => { im.gone = true; } }; return im; };",
+            "const ims = [mk('/app/stills/p0.jpg'), mk('/app/stills/p1.jpg')];",
+            "let boxes = 0; const svg = { getClientRects: () => ({ length: boxes }) };",
+            "const $ = s => s === '.bs-year-svg' ? svg : null;",
+            "const $$ = (s, root) => s === 'image[data-href]' && root === svg ? ims.filter(i => 'data-href' in i.a) : [];",
+            "const mq = { fns: [], addEventListener: (e, f) => mq.fns.push(f), removeEventListener: (e, f) => { mq.fns = mq.fns.filter(g => g !== f); } };",
+            "const win = { fns: {}, matchMedia: q => { if (q !== 'screen and (max-width:720px)') fail('the query: ' + q); return mq; },",
+            "  addEventListener: (e, f) => { (win.fns[e] ||= []).push(f); }, removeEventListener: (e, f) => { win.fns[e] = (win.fns[e] || []).filter(g => g !== f); } };",
+            "const window = win;",
+            lift(r"  function bsYearStills\(\) \{.+?\n  \}"),
+            "bsYearStills();",
+            "if (ims.some(i => 'href' in i.a)) fail('a hidden strip fetched');",
+            "if (mq.fns.length !== 1 || (win.fns.beforeprint || []).length !== 1) fail('it waits for a turn and for paper');",
+            "mq.fns[0]();                                                  // a turn that leaves it hidden",
+            "if (ims.some(i => 'href' in i.a)) fail('still hidden, still waiting');",
+            "boxes = 1; mq.fns[0]();                                       // turned wide: the strip has a box",
+            "if (ims.map(i => i.a.href).join() !== '/app/stills/p0.jpg,/app/stills/p1.jpg' || ims.some(i => 'data-href' in i.a)) fail('turned wide, the stills come');",
+            "if (mq.fns.length || (win.fns.beforeprint || []).length) fail('done waiting, it stops listening');",
+            "ims[1].on.error(); if (!ims[1].gone || ims[0].gone) fail('a still that cannot come goes, and leaves the tape its colour');",
+            "ims[1].gone = false;",
+            "ims.forEach(i => { i.a['data-href'] = i.a.href; delete i.a.href; }); boxes = 0;",
+            "bsYearStills(); win.fns.beforeprint[0]();                      // paper prints the wide strip",
+            "if (ims.some(i => !i.a.href)) fail('printed, the stills come');",
+            "boxes = 1; ims.forEach(i => { i.a['data-href'] = i.a.href; delete i.a.href; }); mq.fns = []; win.fns = {};",
+            "bsYearStills();                                               // a wide screen: at once, and no listener",
+            "if (ims.some(i => !i.a.href) || mq.fns.length || (win.fns.beforeprint || []).length) fail('wide at once');",
+            "console.log('ok');",
+        ])
+        r = node(body)
+        self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
+        self.assertIn("bsYear(); bsYearStills();", JS)
+
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
         ms = [{"pid": f"p{i}", "date": f"2026-0{1 + i % 9}-{10 + i % 15:02d}", "town": "Boston" if i % 2 else "Brookline",
@@ -691,7 +753,7 @@ class TestTheBroadsheetPage(unittest.TestCase):
 
     def test_the_reader_wires_the_broadsheet_and_the_stamp_replaces_the_mode_bar(self):
         boot = JS[JS.index('document.addEventListener("DOMContentLoaded"'):JS.index("registerSW();")]
-        self.assertIn("bsSpine(); bsScore(); bsYear(); bsRiver();", boot)
+        self.assertIn("bsSpine(); bsScore(); bsYear(); bsYearStills(); bsRiver();", boot)
         bar = lift(r"  function paintModeBar\(\) \{.+?\n  \}")
         self.assertIn('$("#bs-stamp")', bar)
         self.assertIn("shownMode()", bar)                 # controls describe the painted state

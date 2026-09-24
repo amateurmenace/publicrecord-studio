@@ -1266,14 +1266,16 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
                    f'<text x="{_r(x0 + 6)}" y="{height - 8}" font-size="12" fill="{MUTED}" style="{MONO}">{month_short(mo)}</text>')
     # the sixty most recent tapes carry their still (an SVG <image> cannot
     # load lazily); older ones are the town's colour, still the meeting's link
+    # — and so is every tape under its still, until the still arrives (the
+    # page's stills wait for the strip to be seen: broadsheet.year_section)
     with_still = {t["pid"] for t in sorted(tapes, key=lambda t: (t["date"], t["pid"]), reverse=True)[:YEAR_STILLS]}
     for t in tapes:
         dim = "" if (not lit or t["month"] in lit) else " bs-dim"
         src = still_src(stills, t["pid"], 0, base) if t["pid"] in with_still else ""
-        pic = (f'<image href="{esc(src)}" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" preserveAspectRatio="xMidYMid slice"/>'
-               if src else
-               f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="{town_light(t["town"])}" rx="2"/>'
+        pic = (f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="{town_light(t["town"])}" rx="2"/>'
                f'<text x="{_r(t["x"] + t["w"] / 2)}" y="{_r(t["y"] + t["h"] / 2 + 4)}" font-size="11" fill="{town_color(t["town"])}" text-anchor="middle" style="{MONO}">{esc(day_short(t["date"]))}</text>')
+        if src:
+            pic += f'<image href="{esc(src)}" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" preserveAspectRatio="xMidYMid slice"/>'
         tip = f'{t["title"]} — {t["date"]} · {t["town"]} · {t["body"]} · {t["hours"]} h'
         out.append(f'<a href="{base}/m/{esc(t["pid"])}" class="bs-tape{dim}" data-pid="{esc(t["pid"])}" data-month="{esc(t["month"])}">'
                    f'<title>{esc(tip)}</title>{pic}'

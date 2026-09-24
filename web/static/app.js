@@ -94,7 +94,7 @@
     initStudio();
     wireStoryTabs();   // the front page's stories, one at a time (specs/24, /25)
     hydrateTopicTicks();   // a topic story's chapters grow their cut ticks — on the front page and on the story's own page (specs/25)
-    bsSpine(); bsScore(); bsYear(); bsRiver(); bsGallery();   // the broadsheet re-lit: the spine's type-ahead, the score, the year, the river, the front pages' filters (specs/29)
+    bsSpine(); bsScore(); bsYear(); bsYearStills(); bsRiver(); bsGallery();   // the broadsheet re-lit: the spine's type-ahead, the score, the year (and its stills, once seen), the river, the front pages' filters (specs/29)
     if (/\/app\/m\//.test(path)) { meeting(); wireFind(); }
     else if (/\/app\/r$/.test(path)) reel();
     else if (/\/app\/p$/.test(path)) paper();
@@ -8444,6 +8444,35 @@
     if (narrow) { if (narrow.addEventListener) narrow.addEventListener("change", letGo); else if (narrow.addListener) narrow.addListener(letGo); }
     // the first press on a still names the meeting; a second opens it (the link)
     tapes.forEach(a => a.addEventListener("click", e => { if (pick === a.dataset.pid) return; e.preventDefault(); pick = a.dataset.pid; paint(); }));
+  }
+  /* the year's stills wait to be seen: a phone shows board 3's dots and
+     never the tapes, so the pressed <image>s carry data-href and take their
+     still only once the strip has a box — on a wide screen, when a screen
+     turns across 720px, or on paper (which does not wait for them: a phone's
+     print may carry a tape's colour where its still had not yet come). With
+     the script off each tape stays its town's colour and its day, as the
+     older tapes are. */
+  function bsYearStills() {
+    const svg = $(".bs-year-svg"); if (!svg) return;
+    let wait = $$("image[data-href]", svg); if (!wait.length) return;
+    const narrow = window.matchMedia ? window.matchMedia("screen and (max-width:720px)") : null;
+    const show = () => {
+      for (const im of wait) {
+        // a still that cannot come — offline and never cached (a phone
+        // turned wide), a 404 — goes, and the tape's colour and day stand,
+        // not the browser's broken picture over them (a review catch)
+        im.addEventListener("error", () => im.remove(), { once: true });
+        im.setAttribute("href", im.getAttribute("data-href") || ""); im.removeAttribute("data-href");
+      }
+      wait = [];
+      if (narrow) { if (narrow.removeEventListener) narrow.removeEventListener("change", check); else if (narrow.removeListener) narrow.removeListener(check); }
+      window.removeEventListener("beforeprint", show);
+    };
+    const check = () => { if (wait.length && svg.getClientRects().length) show(); };
+    check();
+    if (!wait.length) return;
+    if (narrow) { if (narrow.addEventListener) narrow.addEventListener("change", check); else if (narrow.addListener) narrow.addListener(check); }
+    window.addEventListener("beforeprint", show);
   }
   /* the front pages (board 9): a filter narrows the grid — by who made a
      page, by town, by the week, by kind — and the count line says what
