@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, {DEPLOYZ} — v2.2.0 / r47 IS LIVE: the civic broadsheet (specs/29 P0)
+## 2026-09-24, 05:28Z — v2.2.0 / r47 IS LIVE: the civic broadsheet (specs/29 P0)
 
 The front page is a paper. specs/29 is the design (and its canvas,
 <https://claude.ai/artifact/HgMxn4cApHgdYqu5P1aGJy>, is the spec for the
@@ -152,7 +152,8 @@ shape of the build, for whoever touches it next:
   answers; decodeReel's law for the score's JSON; the no-script submit; the
   byte-clean and zero-fuchsia scans of every pressed page; the stills desk
   with a fake fetcher). The older pins were rewritten to the broadsheet.
-  850 tests.
+  852 tests. Tag `v2.2.0` at 2e0e907; the service and all four jobs on r47;
+  the press at `--version 2.2.0`; Pages cf14c4d (the workflow carried it).
 - **Reviewed**: four lenses (press-time Python; the reader; the stills, press
   and deploy seams; CSS, design conformance and accessibility), 53 findings — the two-towns reading that collapsed to a period on the live record, a calendar-invalid day that would have stopped a press, a night that could have emptied the bucket's stills, the spine's Tab trap, the stamp rebuilt under the reader's focus, a search box with no focus ring — 44 folded, the folds re-reviewed by two skeptics.
 - **Still Stephen's / next (P1, then P2 — specs/29)**: the studio restyled
