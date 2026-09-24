@@ -157,6 +157,11 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24 (00:40Z) — measured: the embed pace is the database, not the
+  API — 100 vector updates take 341 s on `db-f1-micro` (HNSW on a micro);
+  the embedding call takes 1 s. Options and the spend decision are in the
+  next-session prompt. The nightly-edition workflow carried v2.1.20 itself
+  once the token's repository was fixed.
 - 2026-09-23 (later still, on branch `topic-story`) — **a word, over time**
   (specs/25) is BUILT, not yet merged or deployed: the front page leads with
   *How Brookline talks about AI*, the search page tells the same story live

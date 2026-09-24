@@ -272,10 +272,15 @@ gcloud scheduler jobs create http record-nightly-embed --location=us-east1 \
   --attempt-deadline=1800s
 ```
 
-Two embedders running at once (a pipeline and a backfill, or two pipelines)
-share the same throttled endpoint and both crawl — the 05:45 slot is after
-the pipeline's worst case on purpose. The pace is readable in the `spend`
-ledger (one row per batch, `added_at` apart).
+**The pace is the database's, not the API's** (measured 2026-09-24: the
+embedding call for 100 texts takes 1 s; the 100 row updates behind it take
+341 s on `db-f1-micro`, because the HNSW index on `emb_neural` cannot sit
+in its memory — `specs/next-session-prompt.md` has the numbers and the
+options, and a larger instance is a spend decision). Two embedders running
+at once (a pipeline and a backfill, or two pipelines) share the same slow
+writes and both crawl — the 05:45 slot is after the pipeline's worst case
+on purpose. The pace is readable in the `spend` ledger (one row per batch,
+`added_at` apart).
 
 A job killed by its timeout mid-ingest leaves its submission at `queued`
 and its meeting shell at `transcribing` or `analyzing`. Cloud Run retries

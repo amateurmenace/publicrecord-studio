@@ -127,6 +127,38 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
    name, a search, its phrases); the front page grows a fourth tab. And a
    `chart·topic` paper block (a new stored kind — his sign-off first).
 
+## The embed pace — measured, and it is the database (2026-09-24)
+
+Not the API and not a quota: in eight hours the Generative Language API
+answered all 72 embedding calls with 200 (no 429s), billing is on, and a
+probe from Cloud Run embeds 100 texts in **0.8 s**. One batch of the backfill
+loop, timed phase by phase against the live corpus (`record-embed` one-off,
+00:40Z): the SELECT of 100 NULL rows **9.5 s**, the embedding call **1.0 s**,
+the 100 `UPDATE segments SET emb_neural = …` in one transaction **341 s**
+(per row min/median/max 0.5 / 3.0 / 9.3 s). `segments` is 601 MB, 111,712
+rows, **70,698 still NULL**, with two HNSW indexes (`idx_seg_emb` on the
+lexical `emb`, `idx_seg_emb_neural` on `emb_neural`, both m=16,
+ef_construction=64) on Cloud SQL **`db-f1-micro`** (shared core, ~0.6 GB,
+10 GB disk): an HNSW insert on an index that cannot sit in memory is
+random I/O, seconds per row. The same cost is paid on every ingest, because
+`replace_segments` writes `emb` — a 4,800-segment meeting spends minutes in
+"placing it on the long view". At this pace the nightly embed job clears
+~1,000 rows an hour; the backlog is a month of nights.
+
+**Stephen's decision, not the next session's alone** (it is spend): a
+larger instance (`db-g1-small`, 1.7 GB, ~+$17/mo; or `db-custom-1-3840`)
+is the plain fix. **Without spend**, the next session can: (1) drop
+`idx_seg_emb_neural` for the backfill and rebuild it once (HNSW build on the
+micro is itself slow — measure first); (2) index the backfill's own SELECT
+(`(meeting_id, id) WHERE emb_neural IS NULL`); (3) consider IVFFlat for
+`emb_neural`, or no index at all — an exact scan over ~110K × 768 floats is
+~0.5–1 s a query, and search traffic is small; (4) lower `ef_construction`.
+Whatever is chosen: measure a batch the same way before and after. The
+120 s budget in the pipeline is what keeps a night moving meanwhile —
+note the deadline is checked between batches, so the first batch always
+runs and costs ~4–6 min at today's pace; `RECORD_EMBED_BUDGET_S` cannot
+skip it (0 means no budget).
+
 ## Another session, same checkout
 
 On 2026-09-23 a second session was building **specs/25 — the topic story**
