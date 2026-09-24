@@ -153,12 +153,19 @@ the embed job were found still on `r18`/`r20` on 2026-09-23 — two months of
 connector fixes never reached the night. One line per job, every time:
 
 ```bash
-for j in record-press record-pipeline record-poll record-embed; do
+for j in record-press record-pipeline record-poll record-embed record-migrate record-seed; do
   gcloud run jobs update $j --region=us-east1 \
     --image=us-east1-docker.pkg.dev/publicrecord-studio/record/api:NEXT
 done
 # record-press also needs its --args bumped to the new --version (below)
 ```
+
+Six jobs, not four: `record-migrate` and `record-seed` are run by hand, not
+by a schedule, and were left on an old image by two deploys running (found
+on 2026-09-24 at r45 while everything nightly was on r47) — a hand-run
+migration from an image that predates the migration file is a migration
+that never happens. The loop above is the whole list; when a job is added,
+it is added here.
 
 **Rolling back** is instant and does not require a build:
 

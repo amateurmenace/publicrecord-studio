@@ -159,7 +159,8 @@ section below, updated on main.
 
 - 2026-09-24 05:28Z — **v2.2.0 / r47 is LIVE: the civic broadsheet**
   (specs/29 P0; tag `v2.2.0` at 2e0e907, the commit the image was built from; the
-  service and all four jobs on r47; the press at `--version 2.2.0`). The
+  service and all six jobs on r47 — `record-migrate` and `record-seed`
+  moved too, after a peer found them on r45; the press at `--version 2.2.0`). The
   front page on the grid: the masthead with the municipality switch and the
   READ stamp, the search spine with its type-ahead over the shipped index,
   tonight's tape with the score of the night and a filmstrip, the year in
