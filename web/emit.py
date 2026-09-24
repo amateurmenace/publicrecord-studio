@@ -238,6 +238,7 @@ def scope_bar():
 # borrows a masthead it did not earn.
 NAV = [("home", "The record", "/app/"),
        ("search", "Search", "/app/s"),
+       ("glossary", "The glossary", "/app/glossary/"),
        ("officials", "The votes", "/app/officials"),
        ("analytics", "The record drawn", "/app/analytics"),
        ("graph", "The issue graph", "/app/graph"),
@@ -544,7 +545,19 @@ def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=
                  f"{base}/app/", body, "home", manifest, version=manifest["version"])
 
 
-def page_meeting(m, manifest, base):
+def page_glossary(meetings, manifest, base, counts=None):
+    """The words the record uses, explained — /app/glossary/ (specs/27 §3.4).
+    Content in the paper: every entry a plain definition, its sources, and
+    the record's own count of it; the page says which half a model wrote."""
+    from . import glossary
+    return shell("The glossary — publicrecord.studio",
+                 "The words the record uses — warrant article, free cash, override, docket — "
+                 "in plain language, with their sources and how often the record says them.",
+                 f"{base}/app/glossary/", glossary.body(meetings, "/app", counts), "glossary", manifest,
+                 version=manifest["version"])
+
+
+def page_meeting(m, manifest, base, terms=None):
     # the transcript as a real document (JS-off complete)
     rows = []
     last_spk = None
@@ -600,11 +613,15 @@ def page_meeting(m, manifest, base):
     words = _insight.word_freq(m.get("segments") or [], top=80) if m.get("segments") else []
     words_html = ""
     if words:
+        from . import pictures as _pictures
+        cloud = _charts.word_cloud(words, base="/app", href=lambda w: f'#t{int(float(w.get("t") or 0))}',
+                                   each="each opens the tape at its first mention; with the script on, it finds every line that says it")
         words_html = (
             f'<section class="card mp-words" id="words"><span class="tag">the meeting in words — what was said most; '
             'press a word to find every line that says it</span>'
-            + _charts.word_cloud(words, base="/app", href=lambda w: f'#t{int(float(w.get("t") or 0))}',
-                                 each="each opens the tape at its first mention; with the script on, it finds every line that says it")
+            + cloud
+            + _pictures.take(f'm-{_pictures.key(m["pid"])}-words', cloud, f'The meeting in words — {m["title"]}',
+                             f'/app/m/{m["pid"]}', hash_page=f'/app/m/{m["pid"]}')
             + f'<p class="hint">“{esc(words[0]["word"])}” came up {n_of(int(words[0]["count"]), "time")}. Sized by how often; '
               'civic stopwords out. With JavaScript off, a word opens the tape at its first mention.</p></section>')
     langs = ""
@@ -777,6 +794,12 @@ def page_meeting(m, manifest, base):
              ("downloads", "downloads", True)]
     jump = ('<nav class="mp-jump" aria-label="on this page"><span class="kicker">on this page</span>'
             + "".join(f'<a href="#{k}">{esc(label)}</a>' for k, label, have in jumps if have) + '</nav>')
+    # the words this meeting uses that the glossary explains (specs/27 §3.4) —
+    # "what is a warrant article?" answered one press from the page
+    if terms:
+        jump += ('<p class="mp-terms"><span class="kicker">words this meeting uses</span> '
+                 + " · ".join(f'<a href="/app/glossary/#{esc(t["slug"])}">{esc(t["term"])}</a>' for t in terms)
+                 + ' — <a href="/app/glossary/">the glossary</a> says what they mean</p>')
     body = f"""
   <article class="meeting" data-pid="{esc(m["pid"])}" data-town="{esc(m["town"])}" data-body="{esc(m["body"])}">
     <div class="mhead">
@@ -1902,6 +1925,17 @@ def page_ai(manifest, base):
           <td>the counted reading stands alone — decisions, questions, names
             and pushback drawn from the transcript by open rules; a draft cut
             off at its length limit is refused the same way</td></tr>
+        <tr><td>the glossary</td>
+          <td>wrote the plain definitions of the civic words the record uses —
+            warrant article, free cash, override, docket — paraphrasing the
+            public source each entry names</td>
+          <td>Anthropic <code>Claude</code> — labeled on the glossary’s own
+            page</td>
+          <td>the desk, once, in the open repository — never at press time,
+            never in your browser; the counts beside each word are the
+            press’s, and no model counts them</td>
+          <td>the words, their counts and their sources stand; the source each
+            entry names is the authority, and a correction annotates</td></tr>
         <tr><td>issue names &amp; labels</td>
           <td>suggests a plain name for a thread that spans meetings</td>
           <td>the same Gemini lane, labeled the same way</td>
@@ -2247,6 +2281,10 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     v = manifest["version"]
     # before a single stub renders: the chrome needs to know what it may offer
     set_edition(towns)
+    # the pictures as files (specs/27 §3.3): collected as the pages render,
+    # written once at the end — the desk bake and the hosted press share this
+    from . import pictures as _pictures
+    _pictures.reset(base, manifest.get("edition_date") or "")
     # the featured papers are computed HERE, from arguments bake and press
     # already pass identically — so the two pressings cannot drift apart
     featured = featured_papers(meetings, issues, stats)
@@ -2314,10 +2352,18 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
         d = out / "k" / kit["slug"]
         d.mkdir(parents=True, exist_ok=True)
         (d / "index.html").write_text(page_kit(kit, manifest, base), encoding="utf-8")
+    # the glossary (specs/27 §3.4): counted once, over every transcript, for
+    # its own page and for each meeting page's line of words it explains
+    from . import glossary as _glossary
+    gcounts = _glossary.count(meetings)
+    (out / "glossary").mkdir(parents=True, exist_ok=True)
+    (out / "glossary" / "index.html").write_text(
+        page_glossary(meetings, manifest, base, counts=gcounts), encoding="utf-8")
     for m in meetings:
         d = out / "m" / m["pid"]
         d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(page_meeting(m, manifest, base), encoding="utf-8")
+        (d / "index.html").write_text(
+            page_meeting(m, manifest, base, terms=_glossary.terms_on(m, gcounts)), encoding="utf-8")
         (d / "transcript.txt").write_text(page_meeting_txt(m), encoding="utf-8")
     for i in issues:
         d = out / "i" / i["slug"]
@@ -2340,3 +2386,5 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
             d.mkdir(parents=True, exist_ok=True)
             (d / "index.html").write_text(
                 page_door_stub(t, manifest, base), encoding="utf-8")
+    # the pictures the pages above collected, written once (specs/27 §3.3)
+    _pictures.flush(out)

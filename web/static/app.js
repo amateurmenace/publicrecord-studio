@@ -700,7 +700,7 @@
       const from = c.mtitle || c.pid || "";
       const label = (c.quote || "").trim() || `(${c.kind || "moment"})`;
       return `<div class="cz-rclip" data-i="${i}">
-        <span class="cz-rord">${i + 1}</span>
+        <span class="cz-rord"${n > 1 ? ` data-grip title="drag to move this clip — or use ↑ ↓"` : ""}>${n > 1 ? '<span class="dg-grip" aria-hidden="true">⠿</span>' : ""}${i + 1}</span>
         <span class="cz-rmain">
           <span class="cz-rquote" tabindex="-1" title="${esc(label)}">${esc(label)}</span>
           <span class="cz-rmeta"><button type="button" class="cz-rquotebtn" data-cz="pquote" data-i="${i}"
@@ -739,6 +739,7 @@
       + `<p class="cz-hint">The reel lives in this browser and its link — no
          account, no server. Trims snap to the record’s own lines; filing it
          into your paper keeps a snapshot, and the tray keeps rolling.</p>`;
+    wireDrag($(".cz-rclips", body), ".cz-rclip", (from, to, key) => trayMove(from, to, undefined, key));
     if (mini) { mini.hidden = false; mini.href = url;
       mini.textContent = `▶ ${n} clip${n > 1 ? "s" : ""} · ${hms(reelRuntime(clips))}`; }
     pvShow();   // the row being previewed keeps its mark across the repaint
@@ -2401,7 +2402,7 @@
     const rows = clips.map((c, i) => {
       const other = c.pid && c.pid !== CREEL.pid;   // a clip from another meeting than the one on screen
       return `<div class="rt-clip${other ? " rt-other" : ""}" data-i="${i}">
-        <div class="rt-ord">${i + 1}</div>
+        <div class="rt-ord"${clips.length > 1 ? ` data-grip title="drag to move this clip — or use ↑ ↓"` : ""}>${clips.length > 1 ? '<span class="dg-grip" aria-hidden="true">⠿</span>' : ""}${i + 1}</div>
         <div class="rt-main">
           ${(multi || other) ? `<div class="rt-from">${esc(c.mtitle || c.pid || "another meeting")}</div>` : ""}
           <div class="rt-quote">${esc((c.quote || "").slice(0, 120)) || "(moment)"}</div>
@@ -2462,6 +2463,7 @@
     });
     $$("[data-out]", tray).forEach(b => b.onclick = () => output(b.dataset.out));
     const url = $(".rt-url", tray); if (url) url.onclick = () => url.select();
+    wireDrag($(".rt-clips", tray), ".rt-clip", (from, to, key) => trayMove(from, to, "tray", key));
   }
   function clipAct(i, act) {
     // the meeting tray and the panel tray are the same tray — one engine
@@ -2577,6 +2579,79 @@
       else c.end = r1(Math.min(dur, Math.max(stepEdge(c.end, act[1], segs, dur), c.start + MIN_CLIP)));
     } else return;
     writeTray(clips, focus, origin);
+  }
+  /* a drag's drop (specs/27 §3.2): the clip the grip lifted — re-found by
+     its identity, so a tray another tab rewrote mid-drag moves the right
+     clip or none — lands at `to`; focus comes back to its row */
+  function trayMove(from, to, origin, key) {
+    const clips = trayClips();
+    const i = key ? clips.findIndex(c => clipKey(c) === key) : from;
+    if (i < 0 || !clips[i]) return;
+    const j = Math.max(0, Math.min(clips.length - 1, to));
+    if (i === j) return;
+    clips.splice(j, 0, clips.splice(i, 1)[0]);
+    writeTray(clips, { act: "row", i: j }, origin);
+    toast(`clip moved to ${j + 1} of ${clips.length}`);
+  }
+  /* drag to reorder (specs/27 §3.2) — the Highlighter's timeline, in the
+     paper: press a row's grip, move, let go. Pointer events, so a finger
+     drags as a mouse does; a line says where it will land; held near an
+     edge, the list (or the page) scrolls; Esc puts it back. The ↑ ↓ buttons
+     stand — they are the keyboard's way, and the grip says so. One engine
+     for both trays; nothing leaves the browser. */
+  /* where a drop lands: past every other row whose middle is above the
+     pointer — the dragged row's new index in the list without it */
+  const dgSlot = (y, rects) => rects.reduce((n, b) => n + (b.top + b.height / 2 < y ? 1 : 0), 0);
+  function wireDrag(list, rowSel, onMove) {
+    if (!list) return;
+    list.addEventListener("pointerdown", e => {
+      const grip = e.target.closest && e.target.closest("[data-grip]");
+      if (!grip || !list.contains(grip) || (e.pointerType === "mouse" && e.button !== 0)) return;
+      const row = grip.closest(rowSel), rows = $$(rowSel, list), from = rows.indexOf(row);
+      if (from < 0 || rows.length < 2) return;
+      const clip = trayClips()[from], key = clip ? clipKey(clip) : "";
+      e.preventDefault();
+      try { grip.setPointerCapture(e.pointerId); } catch { /* an old engine: the drag still follows */ }
+      row.classList.add("dg-lift");
+      const line = document.createElement("div"); line.className = "dg-line"; line.hidden = true;
+      list.appendChild(line);
+      const others = rows.filter(r => r !== row);
+      const scroller = list.scrollHeight > list.clientHeight + 1 ? list : null;
+      let to = from, lastY = e.clientY, raf = 0;
+      const place = y => {
+        const pos = dgSlot(y, others.map(r => r.getBoundingClientRect()));
+        to = pos;
+        const lr = list.getBoundingClientRect();
+        const at = pos < others.length ? others[pos].getBoundingClientRect().top - 3
+          : others[others.length - 1].getBoundingClientRect().bottom + 1;
+        line.style.top = `${Math.round(at - lr.top + list.scrollTop)}px`;
+        line.hidden = to === from;
+      };
+      const edge = () => {
+        const top = scroller ? scroller.getBoundingClientRect().top : 0;
+        const bottom = scroller ? scroller.getBoundingClientRect().bottom : innerHeight;
+        const d = lastY < top + 40 ? -10 : lastY > bottom - 40 ? 10 : 0;
+        if (d) { if (scroller) scroller.scrollBy(0, d); else scrollBy(0, d); place(lastY); }
+        raf = requestAnimationFrame(edge);
+      };
+      const move = ev => { lastY = ev.clientY; place(ev.clientY); };
+      const onKey = ev => { if (ev.key === "Escape") { ev.preventDefault(); done(null); } };
+      const done = ev => {
+        cancelAnimationFrame(raf);
+        grip.removeEventListener("pointermove", move);
+        grip.removeEventListener("pointerup", done);
+        grip.removeEventListener("pointercancel", done);
+        document.removeEventListener("keydown", onKey, true);
+        row.classList.remove("dg-lift"); line.remove();
+        if (ev && ev.type === "pointerup" && to !== from) onMove(from, to, key);
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", done);
+      grip.addEventListener("pointercancel", done);
+      document.addEventListener("keydown", onKey, true);
+      place(e.clientY);
+      raf = requestAnimationFrame(edge);
+    });
   }
   /* the meeting a single-meeting reel belongs to: this page's when its clips are
      from here, else reconstructed from what a clip carries (a reel built on
@@ -6027,6 +6102,106 @@
         <span class="lensbar"><i style="width:${Math.round(100 * w.count / mx)}%"></i></span><span class="lensn">${w.count}</span><span class="lensdrift"></span></div>`;
     }).join("") + `</div>`;
   }
+  /* ---- the pictures as files (specs/27 §3.3) — the twins of web/pictures.py
+     months_svg / tapes_svg / words_svg, byte for byte (a node twin holds
+     them equal): the search page's live story downloads its pictures the
+     way the pressed story does, a white page with its title and source */
+  const TP_PIC = { GREEN: "#052e16", INK: "#0f172a", SLATE: "#475569", HAIR: "#e2e8f0",
+    FONT: "JetBrains Mono, ui-monospace, Menlo, Consolas, monospace" };
+  const TP_NUM = /^[ \t\n\r]*[+-]?([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?[ \t\n\r]*$/;
+  const tpPicN = v => {
+    if (typeof v === "string") { if (!TP_NUM.test(v)) return 0; } else if (typeof v !== "number") return 0;
+    const f = +v; return Number.isFinite(f) ? Math.trunc(Math.min(Math.max(f, 0), 1e9)) : 0; };
+  const tpPicS = v => typeof v === "string" ? v : "";
+  const tpPicCut = (s, n) => { const cp = Array.from(s); return cp.length <= n ? s : cp.slice(0, n - 1).join("") + "…"; };
+  const tpPicTrim = s => s.replace(/^[ \t\n\r]+|[ \t\n\r]+$/g, "");
+  const tpPicPage = (w, h, title, source, inner) => {
+    const src = String(source), i = src.indexOf(" · ");
+    const where = i < 0 ? src : src.slice(0, i), how = i < 0 ? "" : src.slice(i + 3);
+    h += 14;
+    return '<?xml version="1.0" encoding="UTF-8"?>\n'
+      + `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" font-family="${TP_PIC.FONT}">`
+      + `<rect width="${w}" height="${h}" fill="#ffffff"/>`
+      + `<text x="16" y="26" font-size="13" font-weight="700" fill="${TP_PIC.INK}">${esc(title)}</text>`
+      + inner + `<text x="16" y="${h - 26}" font-size="10" fill="${TP_PIC.SLATE}">${esc(where)}</text>`
+      + `<text x="16" y="${h - 12}" font-size="10" fill="${TP_PIC.SLATE}">${esc(how)}</text></svg>\n`; };
+  const tpObj = v => v && typeof v === "object" && !Array.isArray(v);
+  function tpMonthsSvg(months, title, source) {
+    const { GREEN, INK, SLATE, HAIR } = TP_PIC;
+    const ms = (Array.isArray(months) ? months : []).filter(m => tpObj(m) && /^[0-9]{4}-(0[1-9]|1[0-2])/.test(tpPicS(m.month)));
+    const colw = 40, barMax = 72, n = ms.length;
+    const mx = Math.max(1, ...ms.map(m => tpPicN(m.mentions)));
+    const most = Math.min(20, Math.max(0, ...ms.map(m => tpPicN(m.meetings))));
+    const dotRows = Math.max(1, Math.floor((most + 4) / 5));
+    const baseY = 58 + barMax, labelY = baseY + 10 + dotRows * 7 + 10;
+    const W = Math.max(32 + n * colw, 600), H = labelY + 14 + 12 + 36, x0 = Math.floor((W - n * colw) / 2);
+    const parts = [`<line x1="${x0}" y1="${baseY}" x2="${x0 + n * colw}" y2="${baseY}" stroke="${HAIR}"/>`];
+    let prevYear = "";
+    ms.forEach((m, i) => {
+      const mo = String(m.month), c = tpPicN(m.mentions);
+      const meets = Math.min(20, tpPicN(m.meetings)), said = Math.min(meets, tpPicN(m.said));
+      const cx = x0 + i * colw + Math.floor(colw / 2);
+      if (c) {
+        const h = 4 + Math.floor((barMax - 4) * c / mx);
+        parts.push(`<rect x="${cx - 12}" y="${baseY - h}" width="24" height="${h}" fill="${GREEN}"/>`);
+        parts.push(`<text x="${cx}" y="${baseY - h - 5}" text-anchor="middle" font-size="11" font-weight="700" fill="${INK}">${c}</text>`);
+      } else parts.push(`<rect x="${cx - 12}" y="${baseY - 2}" width="24" height="2" fill="${HAIR}"/>`);
+      for (let k = 0; k < meets; k++) {
+        const row = Math.floor(k / 5), col = k % 5, inRow = Math.min(5, meets - row * 5);
+        const dx = cx + col * 7 - Math.floor((inRow - 1) * 7 / 2), dy = baseY + 10 + row * 7;
+        parts.push(k < said ? `<circle cx="${dx}" cy="${dy}" r="2.5" fill="${GREEN}"/>`
+                            : `<circle cx="${dx}" cy="${dy}" r="2.5" fill="#ffffff" stroke="${GREEN}"/>`);
+      }
+      parts.push(`<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="10" fill="${meets ? SLATE : HAIR}">${TP_MON[+mo.slice(5, 7)]}</text>`);
+      if (mo.slice(0, 4) !== prevYear) {
+        parts.push(`<text x="${cx}" y="${labelY + 12}" text-anchor="middle" font-size="9" fill="${SLATE}">${mo.slice(0, 4)}</text>`);
+        prevYear = mo.slice(0, 4);
+      }
+    });
+    return tpPicPage(W, H, title, source, parts.join(""));
+  }
+  function tpTapesSvg(rows, title, source) {
+    const { GREEN, INK, SLATE, HAIR } = TP_PIC;
+    const said = (Array.isArray(rows) ? rows : []).filter(r => tpObj(r) && tpPicN(r.n));
+    const rowH = 24, bw = 6, W = 640, H = 52 + said.length * rowH + 36, parts = [];
+    said.forEach((r, i) => {
+      const y = 52 + i * rowH;
+      const counts = Array.isArray(r.bins) ? r.bins.map(tpPicN).slice(0, 64) : [];
+      const mx = Math.max(1, ...counts), date = tpPicS(r.date);
+      const when = /^[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(date) ? date.slice(5, 10) : "undated";
+      const label = tpPicCut(`${when} · ${tpPicS(r.body)}`, 26);
+      parts.push(`<text x="16" y="${y + 16}" font-size="11" fill="${INK}">${esc(label)}</text>`);
+      parts.push(`<line x1="200" y1="${y + 18}" x2="${200 + counts.length * bw}" y2="${y + 18}" stroke="${HAIR}"/>`);
+      counts.forEach((c, j) => { if (c) { const h = 2 + Math.floor(14 * c / mx);
+        parts.push(`<rect x="${200 + j * bw}" y="${y + 18 - h}" width="${bw - 1}" height="${h}" fill="${GREEN}"/>`); } });
+      const n = tpPicN(r.n);
+      parts.push(`<text x="${210 + counts.length * bw}" y="${y + 16}" font-size="11" fill="${SLATE}">${n} ${n === 1 ? "line" : "lines"}</text>`);
+    });
+    return tpPicPage(W, H, title, source, parts.join(""));
+  }
+  function tpWordsSvg(words, title, source) {
+    const { GREEN, INK } = TP_PIC;
+    const ws = (Array.isArray(words) ? words : []).filter(w => tpObj(w) && tpPicTrim(tpPicS(w.word)));
+    const rowH = 20, W = 600, H = 52 + ws.length * rowH + 36, parts = [];
+    const mx = Math.max(1, ...ws.map(w => tpPicN(w.count)));
+    ws.forEach((w, i) => {
+      const y = 52 + i * rowH, c = tpPicN(w.count), bar = 2 + Math.floor(298 * c / mx);
+      parts.push(`<text x="16" y="${y + 13}" font-size="11" fill="${INK}">${esc(tpPicCut(tpPicTrim(tpPicS(w.word)), 18))}</text>`);
+      parts.push(`<rect x="150" y="${y + 4}" width="${bar}" height="11" fill="${GREEN}"/>`);
+      parts.push(`<text x="${150 + bar + 8}" y="${y + 13}" font-size="11" font-weight="700" fill="${INK}">${c}</text>`);
+    });
+    return tpPicPage(W, H, title, source, parts.join(""));
+  }
+  /* the file itself: a Blob, a click, the address let go a moment later
+     (revoked at once, some browsers drop the download) — nothing leaves */
+  function tpPicSave(svg, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`${name} downloaded — the picture, its title and its source`);
+  }
+  const tpPicSlug = s => String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "picture";
   const tpDay = d => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(d || ""));
     if (!m) return "an undated meeting";
     const dt = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));   // a real calendar day, or undated
@@ -6148,6 +6323,8 @@
         wireRange(); return;
       }
       const searchHref = location.pathname + location.search;
+      // each picture downloads as the pressed story's do (specs/27 §3.3) — drawn on the press, not before
+      const picBtn = kind => `<p class="pic-dl"><button type="button" class="pic-dlb" data-pic="${kind}">↓ this picture, as .svg</button></p>`;
       const cells = [[d.mentions, "mentions", searchHref], [`${d.n_meetings} of ${d.n_town_meetings}`, "meetings", `${BASE}/s`],
         [d.bodies.length, "bodies", `${BASE}/analytics`],
         [tpMonthName(d.first.date).replace(" ", " "), "first said", `${BASE}/m/${encodeURIComponent(d.first.pid)}#t${Math.floor(d.first.t)}`],
@@ -6170,17 +6347,29 @@
         </div>
         <section class="fp-part"><div class="sectionhead"><span class="kicker">“${esc(q)}”, by the numbers</span></div>
           <div class="lead-nums">${cells.map(c => `<a class="ln" href="${esc(c[2])}"><b>${esc(c[0])}</b><span>${esc(c[1])}</span></a>`).join("")}</div></section>
-        <section class="fp-part"><div class="sectionhead"><span class="kicker">mentions, month by month</span></div>${tpMonthBars(d.months, d.meetings)}
+        <section class="fp-part"><div class="sectionhead"><span class="kicker">mentions, month by month</span></div>${tpMonthBars(d.months, d.meetings)}${d.months.length ? picBtn("months") : ""}
           ${busiest && busiest.mentions ? `<p class="fp-say">${esc(tpMonthName(busiest.month))} was the loudest month — ${tpN(busiest.mentions, "mention")} in ${busiest.said} of ${tpN(busiest.meetings, "meeting")}${silent ? `; in ${tpN(silent, "month")} the town met and never said it` : ""}. A dot is a meeting: filled where the word came up, hollow where it did not. Every bar opens the tape at the month’s first mention.</p>` : ""}</section>
-        <section class="fp-part"><div class="sectionhead"><span class="kicker">where it fell — every night that said it, slice by slice</span></div>${tpTapes(d.meetings)}
+        <section class="fp-part"><div class="sectionhead"><span class="kicker">where it fell — every night that said it, slice by slice</span></div>${tpTapes(d.meetings)}${picBtn("tapes")}
           <p class="fp-say">Each row is a tape, start to end; a taller bar is a slice where “${esc(q)}” came up more. On ${esc(tpDay(p.date))} the ${esc(p.body || "board")} said it ${tpN(p.mentions, "time")} ${tpSpan(p.span)}. Every bar opens the tape there.</p></section>
-        ${d.cowords.length ? `<section class="fp-part"><div class="sectionhead"><span class="kicker">the words beside it — what was said in the same breath</span></div>${tpCowordBars(d.cowords, q, SCOPE.town || "")}
+        ${d.cowords.length ? `<section class="fp-part"><div class="sectionhead"><span class="kicker">the words beside it — what was said in the same breath</span></div>${tpCowordBars(d.cowords, q, SCOPE.town || "")}${picBtn("words")}
           <p class="fp-say">Counted in each line that says ${saidAs} and the lines either side of it, civic stopwords out. Each word opens the record’s search for the two together.</p></section>` : ""}
         <p class="sq-count">the ${tpN(ids.length, "line")} themselves, newest first${d.elsewhere.length ? ` — ${d.moments} in ${esc(d.town)}, ${d.elsewhere.map(e => `${e.moments} in ${esc(e.town || "meetings with no town recorded")}`).join(", ")}` : ""}${since ? ` (the list is the whole record; the count above is ${esc((SQ_RANGES.find(r => r[0] === SQ_RANGE) || SQ_RANGES[3])[1])})` : ""} — press <b>＋ reel</b> on any to cut it; <b>j</b> / <b>k</b> walk them, <b>c</b> cuts the one under the cursor</p>
       </section>`;
       wireRange();
       const tray = $("[data-sq=tray]", box), share = $("[data-sq=share]", box);
       if (tray) tray.onclick = () => sqTray(d, q, idx);
+      const told = `How ${d.town} talks about ${q}`;
+      const ed = ($(".dateline b") || {}).textContent || "";
+      const src = `${location.origin}${location.pathname}${location.search} · counted in the browser from the record’s index, no model`
+        + (ed ? ` · the record of ${ed}` : "") + " · CC BY-SA 4.0";
+      const draws = { months: () => tpMonthsSvg(d.months, `${told} — mentions, month by month`, src),
+                      tapes: () => tpTapesSvg(d.meetings, `${told} — where it fell, night by night`, src),
+                      words: () => tpWordsSvg(d.cowords, `${told} — the words beside it`, src) };
+      const what = { months: "mentions month by month", tapes: "where it fell", words: "the words beside it" };
+      $$("[data-pic]", box).forEach(b => b.onclick = () => {
+        const k = b.dataset.pic; if (!draws[k]) return;
+        tpPicSave(draws[k](), `${tpPicSlug(`${told} ${what[k]}`)}.svg`);
+      });
       if (share) share.onclick = () => copyText(location.href, "link copied — this search, its scope and all");
     };
     const wireRange = () => {

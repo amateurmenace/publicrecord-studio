@@ -21,7 +21,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Dict, List, Optional, Sequence
 
-from . import charts
+from . import charts, pictures
 from .charts import esc, hms, n_of, ARTIFACTS, cut_words
 
 
@@ -203,8 +203,12 @@ def over_time(meetings: Sequence[dict], issues: Sequence[dict], stats: dict,
     topics = _real_topics(an.get("topics"))
     if topics:
         t0 = topics[0]
+        # a phrase the glossary explains says where (specs/27 §3.4)
+        from . import glossary as _glossary
+        g0 = _glossary.entry_for(t0["name"])
+        meaning = f' (<a href="{base}/glossary/#{esc(g0["slug"])}">what it means</a>)' if g0 else ""
         lede.append(
-            f'“{esc(t0["name"])}” came up {n_of(t0["count"], "time")} across {n_of(len(t0["meetings"]), "meeting")}'
+            f'“{esc(t0["name"])}”{meaning} came up {n_of(t0["count"], "time")} across {n_of(len(t0["meetings"]), "meeting")}'
             + (f'; “{esc(topics[1]["name"])}” and “{esc(topics[2]["name"])}” keep coming back too' if len(topics) > 2 else "")
             + '.')
 
@@ -247,8 +251,10 @@ def over_time(meetings: Sequence[dict], issues: Sequence[dict], stats: dict,
     see_all = f'<a class="seeall" href="{base}/officials">the votes →</a>'
     teaser_block = (f'<div class="fp-sub">{kicker("the latest roll calls", see_all)}'
                     f'<div class="vteasers">{teaser}</div></div>' if teaser else "")
+    vpic = charts.votes_over_time(votes, base)
     parts.append(f'<section class="fp-part">{kicker("votes over time — every roll call, meeting by meeting")}'
-                 + charts.votes_over_time(votes, base) + vsay + teaser_block + "</section>")
+                 + vpic + pictures.take("record-votes", vpic, "The record’s roll calls, meeting by meeting", f"{base}/")
+                 + vsay + teaser_block + "</section>")
     # the long view
     months = [x["month"] for x in cov]
     isay = ""
@@ -291,8 +297,10 @@ def over_time(meetings: Sequence[dict], issues: Sequence[dict], stats: dict,
         wsay = say(f'“{esc(w0["word"])}” came up most — {n_of(int(w0["count"]), "mention")} across the record'
                    + (f'; “{esc(words[1]["word"])}” and “{esc(words[2]["word"])}” next' if len(words) > 2 else "")
                    + '. Sized by how often, placed by rank; every word opens the search for it.')
+    wpic = charts.word_cloud(words, base=base)
     parts.append(f'<section class="fp-part">{kicker("the record in words — what was said most")}'
-                 + charts.word_cloud(words, base=base) + wsay + "</section>")
+                 + wpic + pictures.take("record-words", wpic, "The record in words — what was said most", f"{base}/")
+                 + wsay + "</section>")
     # what changed
     resurf = stats.get("resurfacings") or []
     rrows = "".join(
@@ -400,8 +408,11 @@ def latest(m: dict, base: str = "/app") -> str:
     parts.append(f'<section class="fp-part">{kicker("the meeting in numbers")}{charts.numbers_strip(cells)}</section>')
     shape_say = say('Where the night’s moments fell on the tape, scored by the analyzer — not chosen for you. '
                     'Every mark opens the tape where it fell; the table under it reads them in order.') if mos else ""
+    spic = charts.meeting_shape(m.get("moments") or [], dur, pid, base=base)
     parts.append(f'<section class="fp-part">{kicker("the shape of the meeting")}'
-                 + charts.meeting_shape(m.get("moments") or [], dur, pid, base=base) + shape_say + "</section>")
+                 + spic + pictures.take(f"m-{pictures.key(pid)}-shape", spic,
+                                        f"The shape of the meeting — {m.get('title') or pid}", f"{base}/m/{pid}")
+                 + shape_say + "</section>")
     if top:
         pulls = "".join(
             f'<a class="pull" href="{at(mo["t"])}"><span class="ts">{hms(mo["t"])}</span>'
@@ -427,9 +438,11 @@ def latest(m: dict, base: str = "/app") -> str:
     words = [w for w in insight.word_freq(segs, top=80)] if segs else []
     if words:
         w0 = words[0]
+        mpic = charts.word_cloud(words, base=base, href=lambda w: at(w.get("t") or 0),
+                                 each="each opens the tape at its first mention")
         parts.append(f'<section class="fp-part">{kicker("the meeting in words — what was said most")}'
-                     + charts.word_cloud(words, base=base, href=lambda w: at(w.get("t") or 0),
-                                         each="each opens the tape at its first mention")
+                     + mpic + pictures.take(f"m-{pictures.key(pid)}-words", mpic,
+                                            f"The meeting in words — {m.get('title') or pid}", f"{base}/m/{pid}")
                      + say(f'“{esc(w0["word"])}” came up {n_of(int(w0["count"]), "time")}. Every word opens the tape at its first mention.') + "</section>")
     topics = _real_topics(an.get("topics"))
     sparks = charts.sparklines(segs, [t["name"] for t in topics[:6]], dur, pid, base=base) if segs and topics else ""
@@ -587,10 +600,22 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
                    f'{n_of(int(busiest["mentions"]), "mention")} in {busiest["said"]} of {n_of(int(busiest["meetings"]), "meeting")}'
                    + (f'; in {n_of(len(silent), "month")} the town met and never said it' if silent else "")
                    + '. A dot is a meeting: filled where the word came up, hollow where it did not. Every bar opens the tape at the month’s first mention.')
+    # the three pictures as files (specs/27 §3.3) — the lead story's are the
+    # record's most shareable, and a slide deck wants the picture, not a screenshot
+    story_page = f"{base}/topic/{d['slug']}/"
+    how_it_talks = f"How {town} talks about {name}"
+    def pic(kind: str, svg: str, what: str) -> str:
+        return pictures.link(pictures.put(f"topic-{pictures.slug(d['slug'])}-{kind}", svg),
+                             pictures.slug(f"{how_it_talks} {what}") + ".svg")
+    src = pictures.source(story_page)
+    mpic = pic("months", pictures.months_svg(d["months"], f"{how_it_talks} — mentions, month by month", src),
+               "mentions month by month") if d["months"] else ""
     parts.append(f'<section class="fp-part">{kicker("mentions, month by month")}'
-                 + charts.month_bars(d["months"], d["meetings"], base=base) + msay + "</section>")
+                 + charts.month_bars(d["months"], d["meetings"], base=base) + mpic + msay + "</section>")
     tapes = charts.term_tapes(d["meetings"], base=base)
     if tapes:
+        tapes += pic("tapes", pictures.tapes_svg(d["meetings"], f"{how_it_talks} — where it fell, night by night", src),
+                     "where it fell")
         parts.append(f'<section class="fp-part">{kicker("where it fell — every night that said it, slice by slice")}' + tapes
                      + say(f'Each row is a tape, start to end; a taller bar is a slice where “{esc(q)}” came up more. '
                            f'On {esc(_day_words(peak["date"]))} the {esc(peak["body"] or "board")} said it '
@@ -599,6 +624,8 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
         w0 = d["cowords"][0]
         parts.append(f'<section class="fp-part">{kicker("the words beside it — what was said in the same breath")}'
                      + charts.coword_bars(d["cowords"], q, base=base, town=town)
+                     + pic("words", pictures.words_svg(d["cowords"], f"{how_it_talks} — the words beside it", src),
+                           "the words beside it")
                      + say(f'Counted in each line that says “{esc(q)}” and the lines either side of it, civic stopwords out: '
                            f'“{esc(w0["word"])}” led with {n_of(int(w0["count"]), "mention")}. Each word opens the record’s search for the two together.') + "</section>")
     # the chapters — the first time it came up, each night; cuttable

@@ -1821,6 +1821,42 @@ a.tp-mcol:hover b{text-decoration:underline}
 .seg.mp-hit{background:var(--tint-2);border-radius:var(--radius-sm)}
 @media (max-width:720px){.mp-found .fp-spark{grid-template-columns:80px 1fr 56px}}
 
+/* the pictures as files (specs/27 §3.3, pic-): a quiet line under each
+   picture — the pressed anchor and the live story's button read alike */
+.pic-dl{font-family:var(--font-mono);font-size:var(--text-xs);margin:var(--space-2) 0 0}
+.pic-dl a,.pic-dlb{color:var(--text-secondary);text-decoration:underline;text-underline-offset:2px;
+  background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.pic-dl a:hover,.pic-dlb:hover{color:var(--accent)}
+.pic-dlb:focus-visible{outline:var(--border-w-strong) solid var(--focus-ring, var(--state));outline-offset:2px}
+
+/* drag to reorder (specs/27 §3.2, dg-): the grip is the row's number, the
+   line says where it lands; the arrows stay the keyboard's way */
+.rt-clips,.cz-rclips{position:relative}
+[data-grip]{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.dg-grip{display:block;font-size:12px;line-height:1;color:var(--text-secondary);letter-spacing:0}
+.dg-lift{opacity:.55}
+.dg-line{position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--accent);pointer-events:none;z-index:2}
+
+/* the glossary (specs/27 §3.4, gl-): an entry is a term, where it applies,
+   its plain meaning, its sources, and the record's own count of it */
+.glpage h1{font-size:30px;margin:var(--space-2) 0 var(--space-3)}
+.gl-label{max-width:72ch;font-size:var(--text-sm);color:var(--text-secondary);border-left:var(--border-w-strong) solid var(--border-hairline);
+  padding-left:var(--space-3);margin:var(--space-3) 0 var(--space-4)}
+.gl-index{font-family:var(--font-mono);font-size:var(--text-xs);line-height:2;margin:0 0 var(--space-5);max-width:96ch}
+.gl-index a{white-space:nowrap;margin-right:var(--space-2)}
+.gl-group{margin:var(--space-6) 0 0}
+.gl-entry{padding:var(--space-3) 0;border-top:var(--border-w) solid var(--border-hairline);max-width:72ch;scroll-margin-top:var(--space-5)}
+.gl-entry:target{background:var(--surface-card);outline:var(--border-w) solid var(--border-hairline);padding-left:var(--space-3);padding-right:var(--space-3)}
+.gl-term{font-family:var(--font-mono);font-size:var(--text-lg);font-weight:var(--weight-black);margin:0}
+.gl-wheres{margin:2px 0 var(--space-2)}
+.gl-where{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-label);
+  color:var(--text-secondary);border:var(--border-w) solid var(--border-hairline);border-radius:var(--radius-sm);padding:1px 5px;margin-right:4px}
+.gl-says{margin:0 0 var(--space-2);line-height:var(--leading-body)}
+.gl-src,.gl-rec{font-size:var(--text-sm);margin:0 0 2px;color:var(--text-secondary)}
+.gl-src .kicker,.gl-rec .kicker{margin-right:var(--space-2)}
+.mp-terms{font-size:var(--text-sm);margin:var(--space-2) 0 0;color:var(--text-secondary)}
+.mp-terms .kicker{margin-right:var(--space-2)}
+
 /* the keys sheet — ?, on every page (kb-) */
 /* margin:auto is the dialog's own centring — the sheet's reset (*{margin:0})
    had pinned it to the top-left corner of a phone (specs/27 §2.4) */
