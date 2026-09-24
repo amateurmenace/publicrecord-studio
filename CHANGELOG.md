@@ -2,6 +2,22 @@
 
 ## unreleased
 
+### Every reel row pictures its meeting — 2026-09-24 (v2.2.7)
+
+Board 6 draws a paper's reel with a still on every row — the picture, the
+line that was said, where and when, and the time to play from — and the
+built rows had none. A reel row on a paper now carries its meeting's own
+pressed poster, up to 160 by 90, sized by its row so a reel in a half column
+or beside the studio's panel keeps its words, with the town's light colour
+where the edition keeps no still. The meeting page's tray, which
+specs/26 hoped would carry thumbnails, carries the same picture at 96 by 54
+for the meetings the index says have one, and lets it go where the tray is
+narrow, where the trim controls need the row. The pictures are the edition's own files, so no clip asks a third
+party's server for anything, and specs/26's open question — a YouTube
+thumbnail per clip, click to load — does not arise. They picture the
+meeting rather than the clip's own frame, so they are decorative: the row's
+words name the moment.
+
 ### The front page on a phone, as board 3 draws it — 2026-09-24 (v2.2.6)
 
 The spec asks the phone to stack the front page in the same order, the

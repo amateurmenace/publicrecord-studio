@@ -2223,6 +2223,14 @@
     const segs = $$("#transcript .seg").map(s => +s.dataset.t)
       .filter(t => isFinite(t)).sort((a, b) => a - b);
     CREEL = { pid: m.pid, meta, moments: m.moments || [], clips: loadReel(), segs };
+    // the tray's pictures wait for the index (precached by the worker); read
+    // once, then the tray repaints with them
+    getJSON(`${BASE}/search/meta.json`).then(rows => {
+      const s = Object.create(null);
+      for (const r of (Array.isArray(rows) ? rows : [])) if (r && r.pid && r.still) s[r.pid] = true;
+      TRAY_STILLS = s;
+      if (CREEL && CREEL.clips.length) buildTray();
+    });
     wireTicks();
     wireSegTicks();   // every transcript row grows its quiet tick (specs/22 §5.1)
     buildTray();
@@ -2478,9 +2486,14 @@
     ? `<img class="${cls}" src="${esc(still)}" alt="" loading="lazy" width="160" height="90">`
     : `<span class="${cls} rc-nostill" style="background:${bsTownLight(town)}"></span>`;
   // the tray's clips come from any meeting and carry no still path: the
-  // edition's own address for the meeting's poster, and a picture that fails
-  // to load simply leaves the row (the tray's captured error listener)
-  const trayStillOf = pid => PAPER_REF.test(String(pid || "")) ? `${BASE}/stills/${encodeURIComponent(pid)}.jpg` : "";
+  // index says which meetings the edition keeps a still for (search/meta.json,
+  // `still` — pressed so a page need not probe), and only those get the
+  // edition's own address; until the index is read, no picture is drawn, so a
+  // repaint never re-asks for a still that is not there (a review catch: a
+  // missing still's row jumped sideways on every press until its 404 came back)
+  let TRAY_STILLS = null;          // pid → true, once the index is read
+  const trayStillOf = pid => PAPER_REF.test(String(pid || "")) && TRAY_STILLS && TRAY_STILLS[pid]
+    ? `${BASE}/stills/${encodeURIComponent(pid)}.jpg` : "";
   function buildTray(focus) {
     let tray = $("#reeltray");
     if (!CREEL.clips.length) {
@@ -2508,7 +2521,7 @@
       const pic = trayStillOf(c.pid);
       return `<div class="rt-clip${other ? " rt-other" : ""}" data-i="${i}">
         <div class="rt-ord"${clips.length > 1 ? ` data-grip title="drag to move this clip — or use ↑ ↓"` : ""}>${clips.length > 1 ? '<span class="dg-grip" aria-hidden="true">⠿</span>' : ""}${i + 1}</div>
-        ${pic ? `<img class="rt-still" src="${esc(pic)}" alt="" loading="lazy" width="96" height="54">` : ""}
+        ${pic ? `<img class="rt-still" src="${esc(pic)}" alt="" loading="lazy" width="96" height="54" draggable="false">` : ""}
         <div class="rt-main">
           ${(multi || other) ? `<div class="rt-from">${esc(c.mtitle || c.pid || "another meeting")}</div>` : ""}
           <div class="rt-quote" tabindex="-1">${esc((c.quote || "").slice(0, 120)) || "(moment)"}</div>

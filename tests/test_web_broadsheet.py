@@ -363,14 +363,16 @@ class TestTheChartsArePure(unittest.TestCase):
         grab = lambda pat: re.search(pat, JS, re.S).group(0)
         src = "\n".join([
             'const BASE = "/app";',
-            'const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", \'"\': "&quot;" }[c]));',
+            grab(r"const esc = s => String\(s == null[\s\S]*?\[c\]\)\);"),
             grab(r"const PAPER_REF = [^\n]+"),
             grab(r"const BS_TOWNS = [^\n]+"),
             grab(r"const bsTownLight = [^\n]+"),
             grab(r"const reelStill = \(still, town, cls\) => still[\s\S]*?;\n"),
-            grab(r"const trayStillOf = [^\n]+"),
+            'let TRAY_STILLS = { vid1: true };',
+            grab(r"const trayStillOf = pid => [\s\S]*?: \"\";"),
             'console.log(JSON.stringify([reelStill("/app/stills/vid1.jpg", "Brookline", "rc-still"), reelStill("", "Brookline", "rc-still"),',
-            '  reelStill("", "", "rc-still"), trayStillOf("vid1"), trayStillOf("has space"), trayStillOf(""), reelStill("/app/stills/a\\"b.jpg", "", "rc-still")]));'])
+            '  reelStill("", "", "rc-still"), trayStillOf("vid1"), trayStillOf("has space"), trayStillOf(""), reelStill("/app/stills/a\\"b.jpg", "", "rc-still"),',
+            '  trayStillOf("vid2")]));'])
         r = subprocess.run(["node", "-e", src], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         got = json.loads(r.stdout)
@@ -380,16 +382,22 @@ class TestTheChartsArePure(unittest.TestCase):
         self.assertEqual(got[3], "/app/stills/vid1.jpg")
         self.assertEqual(got[4:6], ["", ""])                                                        # not a meeting id: no picture asked for
         self.assertIn("a&quot;b.jpg", got[6])                                                       # escaped into the attribute
+        self.assertEqual(got[7], "")                                                                # the index keeps no still for it: no picture, no probe
         # the paper's reel rows read the plane's own still; the tray asks the edition and lets a failure go
         self.assertIn('still: typeof m.still === "string" ? m.still : "", town: m.town || "" };', JS)
         self.assertIn('<span class="rc-ord">${i + 1}</span>${reelStill(c.still, c.town, "rc-still")}', JS)
-        self.assertIn('<img class="rt-still" src="${esc(pic)}" alt="" loading="lazy" width="96" height="54">', JS)
+        self.assertIn('<img class="rt-still" src="${esc(pic)}" alt="" loading="lazy" width="96" height="54" draggable="false">', JS)
+        self.assertIn("if (r && r.pid && r.still) s[r.pid] = true;", JS)                          # the tray reads the index's own flag
+        self.assertNotIn("m.thumb", JS[JS.index('if (b.kind === "reel") {'):JS.index("const multi = reelPids(clips).length > 1;")])   # the plane's still, never a third party's thumb
         self.assertIn('if (im && im.classList && im.classList.contains("rt-still")) im.remove(); }, true);', JS)
         css = (REPO / "web" / "static" / "app.web.css").read_text()
-        for rule in (".rc-still{flex:0 0 160px;width:160px;height:90px;", ".rt-still{flex:0 0 96px;width:96px;height:54px;",
+        for rule in (".reelcitelist,.rt-clips{container-type:inline-size}",
+                     ".rc-still{flex:0 1 160px;width:160px;max-width:30%;height:auto;aspect-ratio:16/9;",
+                     ".rt-still{flex:0 1 96px;width:96px;max-width:25%;height:auto;aspect-ratio:16/9;",
+                     "@container (max-width:360px){.rc-still{display:none}}", "@container (max-width:520px){.rt-still{display:none}}",
                      "@media (max-width:600px){.rt-still{display:none}}"):
             self.assertIn(rule, css)
-        self.assertNotIn("i.ytimg.com", JS[JS.index("const reelStill"):JS.index("function buildTray")])   # nothing third-party
+        self.assertIn(".rc-nostill{display:none}", css[css.index("@media print{\n  .bs-spine"):])
 
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts

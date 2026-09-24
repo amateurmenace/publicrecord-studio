@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.6, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.7, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,49 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, ⟦TIME⟧ — v2.2.7 / r54 IS LIVE: every reel row pictures its meeting
+
+The second item on the list (the first, one real shared page on the
+gallery, is Stephen's to share). The shape:
+
+- **`app.js::reelStill(still, town, cls)`** — an `<img>` of the edition's
+  own still, or a `.rc-nostill` span in `bsTownLight(town)`;
+  `trayStillOf(pid)` — the edition's poster address for a `PAPER_REF` pid.
+- **A paper's reel block** (renderBlockInner): each mapped clip carries the
+  meeting plane's `still` and `town`; each `.reelcite` row puts the picture
+  after `.rc-ord` — board 6's 160 × 90, sized by the ROW: `.reelcitelist` is
+  an inline-size container, the picture shrinks to at most 30 % of the row
+  and steps aside below a 360 px row (board 6's own half column, a paper
+  beside the studio's panel — a review catch: a screen-width rule let the
+  quote column fall to nothing in the editor at 1280). Print drops the
+  town-colour placeholder, whose background would not print.
+- **The meeting page's tray** (`buildTray`): each `.rt-clip` row puts a
+  96 × 54 `.rt-still` (not draggable as an image) before `.rt-main`, only
+  for a meeting the index says has a still (`TRAY_STILLS`, read once from
+  `search/meta.json`'s `still` in `wireComposer`, then the tray repaints) —
+  never a probe per repaint (a review catch: a missing still's row jumped
+  sideways on every press until its 404 came back); a captured `error`
+  listener still removes a picture that fails. `.rt-clips` is a container
+  too: the picture goes below a 520 px tray, and below 600 px of screen.
+- **Not done**: the studio panel's reel list and the reel viewer's list
+  carry no pictures (narrower rows, and the viewer has the tape itself).
+- **Tests**: 1008 (110 PG-backed skip without a DSN). In
+  `tests/test_web_broadsheet.py`: `reelStill` and `trayStillOf` lifted and
+  run in node with the reader's own `esc`, the plane's still (never a
+  thumb), the index-gated tray, the container rules, print. Measured with a
+  headless-Chrome harness: board 6's half reel in the editor and studio mode
+  at 768–1440, the tray at 600–1440 (a trim press moves nothing; only real
+  stills requested), the picture never dragged as an image.
+- **Deploy**: r54 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.7`
+  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
+  tag `v2.2.7` at ⟦TAGAT⟧.
+- **Reviewed**: one adversarial pass (five findings, five folded: the
+  picture sized by the screen and not the row, the tray re-probing a
+  missing still on every repaint, the picture draggable as an image, the
+  blank placeholder in print, two weak test assertions), each fold
+  re-measured with the reviewer's own probes.
 
 ## 2026-09-24, 19:44Z — v2.2.6 / r53 IS LIVE: the front page on a phone, as board 3 draws it
 
