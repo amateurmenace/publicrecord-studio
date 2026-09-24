@@ -77,6 +77,7 @@ import gzip
 import hashlib
 import json
 import mimetypes
+import re
 import shutil
 import sys
 import time
@@ -102,12 +103,14 @@ _DOC_LIMIT = 2000
 # it, so a missing directory is a clean "no tracks here" rather than an error.
 _NO_SIDECARS = Path("/var/empty/record-has-no-sidecars")
 
-# Prefixes the delete pass never touches (specs/29 §P0.2): the stills are a
-# cache that outlives a pressing — a night whose seed failed and whose fetch
-# was walled would otherwise press no stills and then delete every still the
-# bucket held, and the Pages repo would follow. A forgotten meeting's stills
-# linger as orphans instead, which is cheap and harmless.
+# The one prefix the delete pass treats by name (specs/29 §P0.2): the stills
+# are a cache that outlives a pressing — a night whose seed failed and whose
+# fetch was walled would otherwise press no stills and then delete every
+# still the bucket held, and the Pages repo would follow. So a still is kept
+# when its meeting is still on the edition (`keep_pids`), pressed tonight or
+# not; a taken-down meeting's stills go with it, as the takedown promise says.
 KEEP_PREFIXES = ("stills/",)
+_STILL_PID = re.compile(r"^(.+?)(?:-[123])?\.jpg$")
 
 # The object metadata key carrying the digest of the *plain* bytes. Comparing
 # GCS's own md5 would compare the gzipped object against the local file and
@@ -267,7 +270,7 @@ def press(corpus, out_dir: str, version: str = "",
           f"record {fingerprint})")
     return {"meetings": len(meetings), "issues": len(issues),
             "manifest": manifest, "out": str(out), "sidecars": False,
-            "fingerprint": fingerprint,
+            "fingerprint": fingerprint, "pids": [m["pid"] for m in meetings],
             "pressed_at": pressing["pressed_at"], **rep}
 
 
@@ -488,7 +491,7 @@ def _should_gzip(rel: str, size: int) -> bool:
 
 
 def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "",
-                keep_prefixes=KEEP_PREFIXES) -> dict:
+                keep_prefixes=KEEP_PREFIXES, keep_pids=None) -> dict:
     """Make a bucket hold exactly this directory — additions, changes, and
     the removals a re-press legitimately makes.
 
@@ -498,7 +501,12 @@ def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "",
     ever uploads would leave those pages reachable at their old URLs forever
     — the record's own index would stop pointing at them while the CDN went
     on serving them. So anything under the prefix that the press did not
-    write is removed.
+    write is removed — with one named exception: under `stills/` (the
+    pictures cache, specs/29 §P0.2) an object is kept when its meeting is in
+    `keep_pids` (the edition's live meetings), pressed tonight or not, so a
+    night whose fetch failed cannot empty the cache; a taken-down meeting's
+    stills are removed with its pages. With `keep_pids` None every still is
+    kept.
 
     That makes an empty or half-written source directory catastrophic, so it
     is refused: `manifest.json` is the sentinel every successful press
@@ -580,12 +588,15 @@ def sync_to_gcs(local_dir: str, bucket: str, prefix: str = "",
             errors.append(f"upload {name}: {exc}")
 
     keep = tuple(f"{prefix}/{k}" if prefix else k for k in (keep_prefixes or ()))
+    live = None if keep_pids is None else {str(p) for p in keep_pids}
     kept = 0
     if not errors:
         for name in sorted(set(remote) - set(local)):
             if name.startswith(keep):
-                kept += 1          # a still the press did not re-press stays (the cache lives here)
-                continue
+                m = _STILL_PID.match(name.rsplit("/", 1)[-1])
+                if live is None or (m and m.group(1) in live):
+                    kept += 1      # a still the press did not re-press stays (the cache lives here)
+                    continue
             try:
                 bkt.blob(name).delete()
                 deleted += 1
@@ -672,7 +683,7 @@ def main(argv=None):
         print("no bucket given — the edition stayed on disk")
         return 0
 
-    sync = sync_to_gcs(out_dir, bucket, args.prefix)
+    sync = sync_to_gcs(out_dir, bucket, args.prefix, keep_pids=report.get("pids"))
     if not sync["ok"]:
         print(f"  ⚠ the edition did not travel: {sync['reason']}")
         for e in sync.get("errors", [])[1:6]:

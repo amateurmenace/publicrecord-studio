@@ -479,7 +479,13 @@ edition stays byte-identical either way.
 
 The stills ride the normal sync (JPEG is never gzipped; `.jpg` is in
 `_TYPES`) and the nightly carry (the gunzip loop skips them by magic). The
-service worker caches them like any other `/app/` plane.
+service worker caches them like any other `/app/` plane. The sync's delete
+pass keeps a still whose meeting is still on the edition even when tonight's
+press did not re-press it (a walled picture host must not empty the cache);
+a taken-down meeting's stills are removed with its pages. A still that
+failed to fetch is retried when the record next moves (`--force` presses
+now); the fetch pass stops early after twelve straight non-answers or three
+minutes and says so in the job's log.
 
 ### Hand-files at the Pages-repo root
 

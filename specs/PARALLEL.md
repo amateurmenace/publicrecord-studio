@@ -167,7 +167,7 @@ section below, updated on main.
   pages, the week, the threads, the doors; the meeting page's score as its
   jump bar; the search page's timeline and reel with stills; the press
   presses stills once and caches them; Fraunces and IBM Plex self-hosted;
-  `analysis.framing.track` on every plane. {TESTS} tests. Next numbers:
+  `analysis.framing.track` on every plane. 850 tests. Next numbers:
   r48 / 2.2.1 are P1's (writing in the same style).
 - 2026-09-24 04:03Z — **v2.1.23 / r46 is LIVE** (specs/28; tag `v2.1.23` at
   02d4e8b, the commit the image was built from; the service and all four jobs

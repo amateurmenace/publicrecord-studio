@@ -152,9 +152,9 @@ shape of the build, for whoever touches it next:
   answers; decodeReel's law for the score's JSON; the no-script submit; the
   byte-clean and zero-fuchsia scans of every pressed page; the stills desk
   with a fake fetcher). The older pins were rewritten to the broadsheet.
-  {TESTS} tests.
+  850 tests.
 - **Reviewed**: four lenses (press-time Python; the reader; the stills, press
-  and deploy seams; CSS, design conformance and accessibility), {FINDINGS}.
+  and deploy seams; CSS, design conformance and accessibility), 53 findings — the two-towns reading that collapsed to a period on the live record, a calendar-invalid day that would have stopped a press, a night that could have emptied the bucket's stills, the spine's Tab trap, the stamp rebuilt under the reader's focus, a search box with no focus ring — 44 folded, the folds re-reviewed by two skeptics.
 - **Still Stephen's / next (P1, then P2 — specs/29)**: the studio restyled
   as the board (block shelf, rust block frames, the writing desk), five more
   templates, the issue-over-time template redrawn, new ref-only kinds
@@ -164,7 +164,17 @@ shape of the build, for whoever touches it next:
   `img-src https://i.ytimg.com` because the studio's paper cards and the
   reel viewer's facade still read `thumb`; the pressed reader pages load no
   third-party image — narrowing the CSP is a follow-on once those two read
-  `still`. {NOTES}
+  `still`. Left as noted, not folded: the standalone year picture (.svg) references
+  the edition's stills by URL, so it draws them only where the file is opened
+  as a document; the nightly seed downloads the whole still set because a
+  job's disk is new each night (≈8 MB now, ≈30 MB at 300 meetings — a GCS
+  volume at `RECORD_STILLS_DIR` is the cheap fix when it matters); a missed
+  still is retried only when the record moves (`--force` presses now); the
+  try chips and the stamp's words sit under a 44 px target (links in running
+  text); the money figures stay in Fraunces and the nav carries six reading
+  words (the glossary joined) — both the board's call to revisit; the find
+  box sits under the score (board 4) rather than over the transcript
+  (specs/27 §2.4) — its found panel now carries a jump to the lines.
 
 ## 2026-09-24, 04:03Z — v2.1.23 / r46 IS LIVE: the model's words whole; the desk's last pieces in the paper
 

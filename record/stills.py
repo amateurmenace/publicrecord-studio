@@ -184,7 +184,7 @@ class Stills:
                     if self._missed_recently(fn):
                         self.remembered += 1
                     elif not _VID.match(vid):
-                        self.missed += 1
+                        pass                                   # not a YouTube id: never asked (counted once below)
                     elif self.clock() - started > self.budget_s:
                         self.stopped = f"the {int(self.budget_s)} s budget ran out"
                     elif straight >= self.breaker:
@@ -196,10 +196,11 @@ class Stills:
                             self.fetched += 1
                             straight = 0
                             self._keep(fn, data)
+                        elif got is None:
+                            straight += 1                  # no answer at all: a miss toward the breaker
                         else:
-                            straight += 1
-                            if got is not None:            # answered, but no picture: remember it
-                                self._remember_miss(fn)
+                            straight = 0                   # the host answered — there is no such frame
+                            self._remember_miss(fn)
                 if data is None:
                     self.missed += 1
                     continue

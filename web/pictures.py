@@ -174,6 +174,7 @@ def _page(w: int, h: int, title: str, source: str, inner: str, legend: str = "")
 # --------------------------------------------------------------------------
 
 _SVG_OPEN = re.compile(r'^<svg\b[^>]*\bwidth="([0-9]+)"[^>]*\bheight="([0-9]+)"[^>]*>')
+_VIEWBOX = re.compile(r'\bviewBox="(-?[0-9.]+) (-?[0-9.]+) ([0-9.]+) ([0-9.]+)"')
 
 
 def standalone(svg: str, title: str, source: str, page: str = "", legend: str = "") -> str:
@@ -184,6 +185,10 @@ def standalone(svg: str, title: str, source: str, page: str = "", legend: str = 
     if not m:
         return ""
     w, h = int(m.group(1)), int(m.group(2))
+    # a picture drawn in its own coordinates (the score's lane labels sit at
+    # x < 0) keeps its viewBox in the file, or the nested viewport clips it
+    vb = _VIEWBOX.search(m.group(0))
+    viewbox = f'{vb.group(1)} {vb.group(2)} {vb.group(3)} {vb.group(4)}' if vb else f"0 0 {w} {h}"
     inner = str(svg).strip()[m.end():]
     if inner.endswith("</svg>"):
         inner = inner[:-len("</svg>")]
@@ -195,7 +200,7 @@ def standalone(svg: str, title: str, source: str, page: str = "", legend: str = 
     W = _fit(max(w + 32, 600), title, source, legend)
     H = 44 + h + 36
     return _page(W, H, title, source,
-                 f'<svg x="{(W - w) // 2}" y="44" width="{w}" height="{h}" viewBox="0 0 {w} {h}">{inner}</svg>',
+                 f'<svg x="{(W - w) // 2}" y="44" width="{w}" height="{h}" viewBox="{viewbox}">{inner}</svg>',
                  legend)
 
 

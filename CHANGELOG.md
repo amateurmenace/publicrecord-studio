@@ -48,7 +48,7 @@ score as its jump bar and a pressed find box; the search page gets the
 timeline of town-coloured dots and the reel with stills. The page stays
 byte-clean of the studio, takes zero fuchsia, presses byte-identical, and
 the constitution's ledger does not change: nothing new is written by a
-model. Reviewed by four lenses, {FINDINGS}; {TESTS} tests.
+model. Reviewed by four lenses, 53 findings — the two-towns reading that collapsed to a period on the live record, a calendar-invalid day that would have stopped a press, a night that could have emptied the bucket's stills, the spine's Tab trap, the stamp rebuilt under the reader's focus, a search box with no focus ring — 44 folded, the folds re-reviewed by two skeptics; 850 tests.
 
 ### The verdict, read on a phone — the model's words whole, the search's numbers the story's, and the desk's last pieces in the paper — 2026-09-24 (v2.1.23)
 

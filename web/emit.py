@@ -1231,13 +1231,15 @@ def page_paper(manifest, base, featured=None):
 def _kit_card(k):
     """A kit in the index — a meeting's still + deck, linking to its kit."""
     meta = k.get("meta") or {}
-    thumb = (meta.get("still") or meta.get("thumb")) or ""
+    # the edition's own still, or the town's colour — never YouTube's poster
+    # on a reader page (specs/29 §P0.2)
+    thumb = meta.get("still") or ""
     n = len(k.get("clips") or [])
     return (f'<a class="mcard" href="/app/k/{esc(k.get("slug", ""))}" '
             f'data-town="{esc(meta.get("town", ""))}" '
             f'data-body="{esc(meta.get("body", ""))}">'
             + (f'<img loading="lazy" src="{esc(thumb)}" alt="" width="96" height="54">'
-               if thumb else "")
+               if thumb else f'<span class="bs-nostill mc-nostill" style="background:{_charts_town_light(meta.get("town"))}"></span>')
             + f'<div class="mc-body"><span class="chip">{esc(meta.get("body") or "meeting")}</span>'
               f'<b>{esc(meta.get("title") or "Community program")}</b>'
               f'<span class="mc-meta">{esc(meta.get("date") or "undated")} · '

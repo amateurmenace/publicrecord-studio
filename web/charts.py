@@ -881,7 +881,7 @@ def day_short(d: str) -> str:
 
 def money_label(name: str) -> str:
     """'$97 MILLION' → '$97 million' — the room's figure, in the paper's case."""
-    s = " ".join(str(name or "").split()).rstrip(".,;:")
+    s = " ".join(str(name or "").split()).rstrip(".,;: ")
     if not s:
         return ""
     head, _, tail = s.partition(" ")
@@ -914,13 +914,17 @@ def loudest_t(m: dict) -> float:
     return max(mos, key=lambda d: (d["score"], -d["t"]))["t"]
 
 
+_SMALL = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
+
+
 def _third_label(i: int, span: float) -> str:
     mins = int(round(span / 60))
     if 50 <= mins <= 70:
         what = "hour"
     elif mins >= 90:
         h, m = divmod(mins, 60)
-        what = f"{h} h {m} min" if m else n_of(h, "hour")
+        hw = _SMALL[h] if h < len(_SMALL) else str(h)
+        what = f"{h} h {m} min" if m else f"{hw} hours"
     else:
         what = n_of(mins, "minute")
     return ("The first", "The second", "The last")[i] + " " + what
@@ -1051,7 +1055,7 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
     while t < dur - 60:
         out.append(f'<text x="{_r(x(t))}" y="166" font-size="10" fill="{MUTED}" text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}">{hms(t)}</text>')
         t += step
-    svg = (f'<svg class="bs-score-svg" width="{W}" height="168" viewBox="-70 0 {W + 80} 168" xmlns="http://www.w3.org/2000/svg" role="img" '
+    svg = (f'<svg class="bs-score-svg" width="{W}" height="168" viewBox="-100 0 {W + 110} 168" xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="the shape of the meeting along the tape: its loudest moments as dots, '
            f'the dollar figures the room named, eight lanes of lens words">' + "".join(out) + "</svg>")
     trows = "".join(f'<tr><td><a href="{at(dc["t"])}">{hms(dc["t"])}</a></td><td>{esc(SHAPE_KINDS.get(dc["kind"], dc["kind"]))}</td>'
@@ -1098,16 +1102,28 @@ YEAR_MONTHS = 12      # the year in tapes is the last twelve months the record h
 YEAR_STILLS = 60      # the most recent tapes carry their still; older ones are the town's colour
 
 
+def year_window(meetings: Sequence[dict]) -> Tuple[List[str], List[dict], bool]:
+    """The year in tapes: the dated meetings of the last twelve months the
+    record holds, in date order, with their run of months — ONE window the
+    strip, its chapters and its words all read from (a skeptic's catch: the
+    strip was windowed and the chapters were not). The flag says whether
+    anything older was left off."""
+    dated = sorted((m for m in meetings if is_month(m.get("date"))),
+                   key=lambda m: (str(m.get("date")), str(m.get("pid"))))
+    months = month_range([str(m["date"])[:7] for m in dated]) if dated else []
+    windowed = len(months) > YEAR_MONTHS
+    if windowed:
+        months = months[-YEAR_MONTHS:]
+        keep = set(months)
+        dated = [m for m in dated if str(m["date"])[:7] in keep]
+    return months, dated, windowed
+
+
 def year_layout(meetings: Sequence[dict], width: int = 1328, height: int = 300) -> Tuple[List[str], List[dict]]:
     """Every dated meeting of the last twelve months as a still on the month
     axis, sized by its length, packed upward so no two overlap — a pure
     layout, so the JS and the press agree on where each tape sits."""
-    dated = sorted((m for m in meetings if is_month(m.get("date"))),
-                   key=lambda m: (str(m.get("date")), str(m.get("pid"))))
-    months = month_range([str(m["date"])[:7] for m in dated]) if dated else []
-    if len(months) > YEAR_MONTHS:
-        months = months[-YEAR_MONTHS:]
-        dated = [m for m in dated if str(m["date"])[:7] in set(months)]
+    months, dated, _windowed = year_window(meetings)
     x_of = month_axis(months, width)
     colw = width / max(1, len(months))
     floor_y, gap = height - 34, 6
@@ -1232,8 +1248,10 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
                    f'<title>{esc(tip)}</title>{pic}'
                    f'<rect x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="4" fill="{town_color(t["town"])}"/>'
                    f'<rect class="bs-tape-ring" x="{t["x"]}" y="{t["y"]}" width="{t["w"]}" height="{t["h"]}" fill="none" stroke="none" stroke-width="2.5" rx="2"/></a>')
+    _m, _d, windowed = year_window(meetings)
+    what = "the last twelve months" if windowed else "the record"
     svg = (f'<svg class="bs-year-svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg" role="img" '
-           f'aria-label="every meeting on the record as its own still, placed on the year — {n_of(len(tapes), "tape")}">' + "".join(out) + "</svg>")
+           f'aria-label="every meeting of {what} as its own still, placed on the year — {n_of(len(tapes), "tape")}">' + "".join(out) + "</svg>")
     trows = "".join(f'<tr><td><a href="{base}/m/{esc(t["pid"])}">{esc(t["date"])}</a></td><td>{esc(t["town"])}</td>'
                     f'<td>{esc(t["body"])}</td><td>{esc(t["title"])}</td><td>{t["hours"]}</td></tr>' for t in tapes)
     # the chapters ride whole — the pressed paragraph (with its receipts) as

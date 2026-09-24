@@ -155,6 +155,13 @@ class TestThePressPressesPictures(unittest.TestCase):
             self.assertEqual(have, {})
             self.assertEqual(len(calls), 5)
             self.assertIn("misses in a row", st.stopped)
+            # a placeholder is an ANSWER — it never trips the breaker (a skeptic's catch)
+            cards = []
+            card = lambda url: (cards.append(url), b"\xff\xd8" + b"x" * 500)[1]
+            st0 = Stills(cache=None, fetch=True, fetcher=card, breaker=3)
+            st0.press([(f"c{i}", f"c{i}xxxxxxxxx"[:11]) for i in range(6)], Path(d) / "o0")
+            self.assertEqual(len(cards), 24)
+            self.assertEqual(st0.stopped, "")
             self.assertIn("stopped early", st.note())
             # the wall clock: a fetcher that "takes" a minute each trips a 100 s budget
             now = [0.0]
@@ -198,7 +205,7 @@ class TestThePressPressesPictures(unittest.TestCase):
         home = (OUT / "index.html").read_text()
         self.assertIn('class="bs-nostill"', home)
         self.assertFalse((OUT / "stills").exists())
-        for rel in ("index.html", "m/vid1/index.html", "m/vid2/index.html", "s/index.html"):
+        for rel in ("index.html", "m/vid1/index.html", "m/vid2/index.html", "s/index.html", "k/index.html"):
             page = (OUT / rel).read_text()
             self.assertNotIn("i.ytimg.com", page.split("</head>")[1], rel)   # the CSP line may still allow it; the page uses none
 
@@ -248,6 +255,31 @@ class TestTheChartsArePure(unittest.TestCase):
         self.assertEqual(charts.score_state({"dur": 0, "w": 0, "decisions": []}, -5)["near"], None)
         self.assertEqual(charts.score_state({"dur": 100, "w": 100, "decisions": [{"t": 10}, {"t": 30}]}, 20)["near"], 0)   # ties to the earlier
         self.assertEqual(charts.score_state({"dur": 100, "w": 100, "decisions": [{"t": 10}, {"t": 30}]}, 999)["x"], 100)
+
+    def test_the_year_is_one_window_for_the_strip_and_its_chapters(self):
+        """Fifteen months of tapes: the strip shows the last twelve, and the
+        chapters, the count and the sub read the same window (a skeptic's
+        catch — the strip was windowed and the chapters were not)."""
+        from web import charts, story, broadsheet
+        ms = [{"pid": f"p{i:02d}", "date": f"{2025 + (i + 3) // 12}-{(i + 3) % 12 + 1:02d}-10", "town": "Boston",
+               "body": "B", "title": f"t{i}", "duration": 3600, "votes": []} for i in range(15)]
+        months, dated, windowed = charts.year_window(ms)
+        self.assertTrue(windowed)
+        self.assertEqual(len(months), 12)
+        self.assertEqual(len(dated), 12)
+        chs = story.chapters(dated, [], [])
+        self.assertTrue(all(m in months for c in chs for m in c["months"]))
+        html_ = broadsheet.year_section(ms, [], {}, None)
+        self.assertIn("the last twelve months", html_)
+        self.assertIn("twelve meetings", html_)
+        self.assertEqual(len(re.findall(r'class="bs-tape( bs-dim)?"', html_)), 12)
+
+    def test_the_pressed_picture_keeps_the_scores_own_coordinates(self):
+        """The score is drawn from x = -100 (its lane labels); the picture
+        file keeps that viewBox, or the download clips the labels off."""
+        svg = (OUT / "pictures" / "m-vid1-shape.svg").read_text()
+        self.assertRegex(svg, r'<svg x="\d+" y="44" width="\d+" height="168" viewBox="-100 0 \d+ 168">')
+        self.assertIn(">financial</text>", svg)
 
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
@@ -310,6 +342,14 @@ class TestTheWordsAreCounted(unittest.TestCase):
         self.assertIn('href="/app/m/vid2"', t["lede"])
         self.assertEqual(t["labels"][0], "summary drawn from the tape")
         self.assertEqual(story.hours_prose(10001), "two hours and forty-six minutes")
+        # the count line capitalises the number, never lowercases the town (a fold's regression)
+        two = [{"town": "Brookline", "color": "", "n": 14, "shares": {l: 0.1 for l in story.charts.LENS_ORDER}},
+               {"town": "Boston", "color": "", "n": 12, "shares": {l: 0.1 for l in story.charts.LENS_ORDER}}]
+        two[0]["shares"]["financial"] = 0.4; two[1]["shares"]["community"] = 0.3
+        _h, _s, line = story.vocab_words(two)
+        self.assertTrue(line.startswith("Twelve Boston tapes against fourteen from Brookline"), line)
+        one = [{"town": "Boston", "color": "", "n": 1, "shares": {l: 0.1 for l in story.charts.LENS_ORDER}}] + two[:1]
+        self.assertIn("One Boston tape against", story.vocab_words([two[0], dict(two[1], n=1)])[2])
         self.assertEqual(story.hours_prose(0), "under a minute")
         ms = [json.loads((OUT / "meetings" / f"{p}.json").read_text()) for p in ("vid1", "vid2")]
         votes = [{**v, "pid": "vid1", "date": "2026-03-10"} for v in ms[0]["votes"]]

@@ -918,10 +918,11 @@ def chapters(meetings: Sequence[dict], votes: Sequence[dict], framing_rows: Sequ
                           f'{esc(month_name(busiest + "-01"))} is the busiest month on the record: {n_of(cov[busiest], "tape")}.'))
         towns = sorted({str(m.get("town") or "") for m in ms if m.get("town")})
         bodies = sorted({str(m.get("body") or "") for m in ms if m.get("body")})
-        opener = (f'{n_of(len(ms), "tape")}, {hours_prose_short(ch["hours"])}'
+        opener = ("No tape on the record for these months." if not ms else
+                  f'{n_of(len(ms), "tape")}, {hours_prose_short(ch["hours"])}'
                   + (f' — {esc(the_list(towns))}' if len(towns) > 1 else "")
                   + (f': {esc(the_list(["the " + b for b in bodies[:4]]))}' if bodies else "") + ".")
-        chosen = facts[0] if facts else ("tapes", n_of(len(ms), "tape"), "")
+        chosen = facts[0] if facts else ("tapes", n_of(len(ms), "tape") if ms else "a quiet spell", "")
         used.add(chosen[0])
         title = f'{month_span_words(span)} — {chosen[1]}'
         sentences = [opener] + [f[2] for f in facts[:2] if f[2]]
@@ -977,9 +978,11 @@ def vocab_words(shares: Sequence[dict]) -> Tuple[str, str, str]:
            f'{esc(b["town"])} gives {esc(noun(lb))} {round(100 * b["shares"][lb])}%'
            + (f', {ratio} {esc(a["town"])}’s share' if ratio else "")
            + (f', and {esc(noun(tb))} {round(100 * b["shares"][tb])}%.' if tb != lb else "."))
-    tapes = lambda n, town: f'{number_words(n) if n < 60 else n} {esc(town)} tape{"" if n == 1 else "s"}'
-    count = f'{tapes(b["n"], b["town"]).capitalize()} against {number_words(a["n"]) if a["n"] < 60 else a["n"]} from {esc(a["town"])}' \
-        + (" — early, and already a different accent." if a["n"] + b["n"] < 60 else ".")
+    # the number word alone is capitalised — .capitalize() on the whole line
+    # would lowercase the town (a skeptic's catch on the first fold)
+    count = (f'{number_words(b["n"]).capitalize()} {esc(b["town"])} tape{"" if b["n"] == 1 else "s"} against '
+             f'{number_words(a["n"])} from {esc(a["town"])}'
+             + (" — early, and already a different accent." if a["n"] + b["n"] < 60 else "."))
     return head, say, count
 
 
@@ -1017,8 +1020,11 @@ def rolls_words(votes: Sequence[dict], meetings_by_pid: Dict[str, dict]) -> Tupl
     dated = sorted(str(meetings_by_pid[v["pid"]].get("date") or "") for v in vs if charts.is_month(meetings_by_pid[v["pid"]].get("date")))
     span = (f', {esc(month_name(dated[0]).split()[0])} to {esc(month_name(dated[-1]).split()[0])}' if dated and month_name(dated[0]) != month_name(dated[-1])
             else f', in {esc(month_name(dated[0]))}' if dated else "")
+    # "unanimous among those voting" is read from the rolls — every passed
+    # vote must carry one, and none may hold a no
     rolled = [v for v in vs if v.get("outcome") == "passes" and v.get("roll")]
-    unanimous = bool(rolled) and all(not any(str(r.get("vote") or "").lower() in ("no", "nay", "n") for r in v["roll"]) for v in rolled)
+    unanimous = bool(rolled) and len(rolled) == passed and \
+        all(not any(str(r.get("vote") or "").lower() in ("no", "nay", "n") for r in v["roll"]) for v in rolled)
     say = (f'Every roll call on the record so far is {esc(the_list([w + "’s" for w in who]))}{span}'
            + ("; each unanimous among those voting" if unanimous and passed else "")
            + "; the number in each square is the ayes.")

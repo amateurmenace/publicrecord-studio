@@ -219,18 +219,21 @@ def tonight_section(m: dict, stills: Optional[dict], base: str = "/app") -> str:
 
 def year_section(meetings: Sequence[dict], votes: Sequence[dict], analytics: dict, stills: Optional[dict],
                  base: str = "/app") -> str:
-    chs = story.chapters(meetings, votes, (analytics or {}).get("framing") or [], base=base)
+    # one window for the strip, its chapters and its words (a skeptic's catch)
+    months, dated, windowed = charts.year_window(meetings)
+    chs = story.chapters(dated, votes, (analytics or {}).get("framing") or [], base=base)
     if not chs:
         return ""
     last = chs[-1]
     current = ' aria-current="true"'     # built first: an f-string expression holds no backslash (3.11)
     pills = "".join(f'<a class="bs-chap{" on" if c["i"] == last["i"] else ""}" href="#year" data-chapter="{c["i"]}"'
                     f'{current if c["i"] == last["i"] else ""}>{esc(c["title"])}</a>' for c in chs)
-    n = len([m for m in meetings if charts.is_month(m.get("date"))])
-    months = charts.month_range([str(m.get("date"))[:7] for m in meetings if charts.is_month(m.get("date"))])
+    n = len(dated)
     span = story.month_span_words([months[0], months[-1]]).replace(" and ", " to ") if len(months) > 1 else story.month_span_words(months)
-    sub = f'{story.number_words(n)} meeting{"" if n == 1 else "s"}, {esc(span)} — each tape sized by its length; click one, or a chapter'
-    year_pic = charts.year_tapes(meetings, chs, stills, base=base)
+    sub = (f'{story.number_words(n)} meeting{"" if n == 1 else "s"}, {esc(span)}'
+           + (" — the last twelve months" if windowed else "")
+           + ' — each tape sized by its length; click one, or a chapter')
+    year_pic = charts.year_tapes(dated, chs, stills, base=base)
     year_pic += pictures.take("year-in-tapes", year_pic, "The year in tapes", f"{base}/",
                               legend="every meeting as its own still on the year, sized by its length; the top edge is the town’s colour")
     return f'''<section class="bs-year-sec" id="year" aria-labelledby="bs-year-hl">

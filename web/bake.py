@@ -687,6 +687,7 @@ class Bake:
                            "body": k["meta"].get("body", ""),
                            "town": k["meta"].get("town", ""),
                            "thumb": k["meta"].get("thumb", ""),
+                           "still": k["meta"].get("still", ""),
                            "duration": k["meta"].get("duration", 0),
                            "n_clips": len(k["clips"])} for k in kits]}
         _json(self.out / "kits" / "index.json", index)
