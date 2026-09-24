@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.3, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.4, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,68 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, ⟦TIME⟧ — v2.2.4 / r51 IS LIVE: said alongside it (specs/29 board 6 — the spec is whole)
+
+Stephen said go on the first of the list below; this is it. The CHANGELOG
+entry says what; the shape:
+
+- **The count** (`web/beside.py`): `beside(timeline, meetings_by_id, skip,
+  top=8, prepared=)` — over every bead's line and its neighbours (each
+  line once), two-word phrases from `memory.issues.phrases` (no filler, no
+  procedural grams), a line cut at `_CLAUSE` punctuation first; skipping
+  a phrase that is one of the issue's own names (`own_words(issue)` →
+  `phrases`: name + aliases + keywords, whole) or is made only of the
+  name's own tokens, any stopish token (`highlighter.insight._stopish`)
+  or artifact (`charts.ARTIFACTS`); a bead without a numeric `t` counts
+  nothing;
+  ranked by count then alphabet; `n > 1` only. `prepared` caches a
+  meeting's sorted lines across the issues of one press. `bake_issues`
+  writes it as `beside: [{phrase, n, meetings}]` on `issues/<slug>.json`.
+- **The chips** (`charts.beside_chips(words, pids, base)` ≡ `app.js
+  bsBesideChips`, a node twin): `.pb-chips` of `.pb-chip` anchors,
+  `href=/app/s?q=<phrase>&m=<pids>` (the search page's scope, capped at 64
+  as `scopePids` caps it), the count in `.pb-chip-n`, the title *“phrase”
+  in N meetings — search them*; `charts.js_euc` spells the query as
+  encodeURIComponent does (emit's `_js_euc` now delegates to it). The
+  search page's scope words say *the meetings this link names*, not *a
+  front page cites*. The issue page presses a `.card.pb-beside-card`; the paper's block
+  is `bsBesideBlock` (a kicker naming the issue, the chips, a `pb-say`; or
+  a hint when nothing counted twice).
+- **The kind** `beside` — `record/papers.py` (a slug, exact keys), the
+  codec `e.<slug>` (decodePart, encodePaperQS, portablePaper,
+  normalizeKind), `paperV` → "6", `PAPER_VS` gains "6", `emit._paper_qs`
+  mints it; the head form, the pill (*Said alongside · name*), the shelf
+  (*Said alongside — the words in the same breath*), the pick (`beside`,
+  issues only, and its count line counts issues only; hit kind `be` →
+  `addBesideToPaper`), the issue template (full width under the reel and
+  the framing halves; `draws` says so);
+  `gallery.what_of` says *the words beside an issue*.
+- **Departures from the board**: the board listed the issue's own name
+  among the phrases beside it (*housing trust*, *trust fund* beside the
+  housing trust fund); a phrase that is the issue's name or one of its
+  other names, or is made only of the name's words, is kept out, since it
+  says nothing beside the issue — a phrase that shares a word with it
+  (*affordable housing*) stays unless it is itself an alias. And the board
+  stacks the section under the framing in the right column; the paper's
+  grammar pairs halves side by side, so the block stands full width under
+  the reel and the framing instead.
+- **Tests**: 998 (110 PG-backed skip without a DSN). New
+  `tests/test_web_beside.py`: the count (each line once, a bead between
+  two lines, a cough beside the phrase, junk nodes — fewer phrases, never a
+  throw), the ranking, the cap, determinism and the per-press cache, the
+  chips' links and escaping, the store's slug and nothing else, the plane
+  and the issue page; in `tests/test_web_bake.py`: the chips twin byte for
+  byte, the `e.<slug>` round trip and a bad slug, `paperV` → 6, the press's
+  link builder, the template shapes lit and dark.
+- **Deploy**: r51 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.4`
+  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
+  tag `v2.2.4` at ⟦TAGAT⟧.
+- **Reviewed**: ⟦REVIEW⟧.
+- **Next, in order**: the front page read on a phone and fixed; a second
+  featured word; one real page shared to prove the listing path on
+  production; then the older list below.
 
 ## 2026-09-24, 14:04Z — v2.2.3 / r50 IS LIVE: the decisions made (specs/29, after P2)
 

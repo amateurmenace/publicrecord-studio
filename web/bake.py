@@ -725,8 +725,10 @@ class Bake:
 
     # -- issues (the long view) ------------------------------------------
     def bake_issues(self, meetings_by_id):
+        from . import beside as _beside
         issues = self.c.list_issues(status="active", limit=500)
         full = []
+        prepared = {}   # a meeting's sorted lines, once per press, for the phrases beside each issue
         for it in issues:
             issue = self.c.get_issue(it["id"])
             nodes = self.c.issue_appearances(it["id"])
@@ -766,6 +768,9 @@ class Bake:
                             "outcome": mi.get("outcome", ""),
                             "tally": mi.get("tally", ""), "roll": mi["roll"]})
             ledger.sort(key=lambda v: (v["date"], v["t"]))
+            # said alongside it (specs/29 board 6): the phrases in the same
+            # breath, counted from the beads' lines — web/beside.py
+            said = _beside.beside(timeline, meetings_by_id, _beside.own_words(issue), prepared=prepared)
             doc = {
                 "id": issue["id"], "slug": islug(issue["id"]),
                 "name": issue["name"], "name_origin": issue.get("name_origin", ""),
@@ -778,6 +783,7 @@ class Bake:
                 "first_seen": issue.get("first_seen", ""),
                 "last_seen": issue.get("last_seen", ""),
                 "timeline": timeline, "ledger": ledger,
+                "beside": said,
             }
             _json(self.out / "issues" / f"{islug(issue['id'])}.json", doc)
             self.note(f"issues/{islug(issue['id'])}.json", _gz_of(doc))

@@ -906,6 +906,15 @@ def page_issue(i, manifest, base):
     aliases = "".join(f'<span class="alias">{esc(a)}</span>' for a in i["aliases"])
     related = "".join(f'<span class="rel">{esc(r)}</span>' for r in i["related"])
     ledger = _ledger_html(i.get("ledger", []))
+    # said alongside it (specs/29 board 6): the press's count, each phrase a
+    # search within the issue's own meetings — web/beside.py, the reader's twin
+    from . import charts as _charts
+    chips = _charts.beside_chips(i.get("beside") or [], [n["pid"] for n in i["timeline"]], base="/app")
+    beside = (f'<section class="card pb-beside-card"><span class="tag">said alongside it — the phrases in the same breath</span>{chips}'
+              f'<p class="hint">counted in every line the record filed under this issue and the line either side; '
+              f'a phrase that is only the issue’s own name, or one of its other names, is left out; '
+              f'each opens the record’s search for the phrase within the issue’s own meetings</p></section>'
+              if chips else "")
     body = f"""
   <article class="issue">
     <a class="back" href="/app/">← the record</a>
@@ -917,6 +926,7 @@ def page_issue(i, manifest, base):
     <section class="card"><span class="tag">the long view — every meeting this issue touched</span>
       <div class="timeline">{nodes and "".join(nodes) or '<p class="hint">no appearances</p>'}</div>
     </section>
+    {beside}
     {ledger}
   </article>
 """
@@ -998,10 +1008,9 @@ def page_reel(manifest, base):
 
 
 def _js_euc(s) -> str:
-    """encodeURIComponent's exact charset — everything outside
-    A-Za-z0-9-_.!~*'() is %-escaped as UTF-8, uppercase hex. quote() with
-    that safe set is the byte-for-byte twin; the node parity test holds it."""
-    return quote(str(s), safe="-_.!~*'()")
+    """encodeURIComponent, byte for byte — one copy, in web/charts.py."""
+    from .charts import js_euc
+    return js_euc(s)
 
 
 _BS_PART = {"week": "w", "threads": "k", "strip": "h", "names": "p"}   # app.js BS_PART, held equal by the codec twin
@@ -1034,6 +1043,8 @@ def _paper_qs(title, blocks) -> str:
         # with t:<town> / (names) w:<who>; s — the reader's own grammar
         elif b["kind"] == "lead":
             parts.append("l." + _js_euc(b["pid"]))
+        elif b["kind"] == "beside":
+            parts.append("e." + _js_euc(b["slug"]))    # said alongside an issue (v=6)
         elif b["kind"] == "search":
             parts.append("s")
         elif b["kind"] in _BS_PART:
@@ -1047,7 +1058,8 @@ def _paper_qs(title, blocks) -> str:
              or (b["kind"] == "chart" and (b["chart"] in ("numbers", "shape", "ledger")
                                            or (b["chart"] == "votes" and b.get("pid"))))
              for b in blocks)
-    v = ("5" if any(b["kind"] in ("lead", "search") or b["kind"] in _BS_PART for b in blocks)
+    v = ("6" if any(b["kind"] == "beside" for b in blocks)
+         else "5" if any(b["kind"] in ("lead", "search") or b["kind"] in _BS_PART for b in blocks)
          else "4" if v4 else "2" if any(b["kind"] in ("chart", "note") for b in blocks) else "1")
     qs = "v=" + v
     if title:

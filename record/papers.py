@@ -314,6 +314,14 @@ def _block_kind(b, i):
         if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= DIGEST_MAX:
             raise PaperError(f"{what}: a digest's window is 1 to {DIGEST_MAX} appearances")
         return {"kind": "digest", "slug": slug, "n": n}
+    if kind == "beside":
+        # specs/29 board 6: the phrases said alongside an issue — the press
+        # counts them onto the issue's plane; the block is the slug, no more
+        _exact_keys(b, {"kind", "slug"}, what)
+        slug = b.get("slug")
+        if not isinstance(slug, str) or not _REF.fullmatch(slug):
+            raise PaperError(f"{what}: not an issue slug")
+        return {"kind": "beside", "slug": slug}
     if kind == "lead":
         _exact_keys(b, {"kind", "pid"}, what)
         return {"kind": "lead", "pid": _pid(b, what)}
@@ -341,8 +349,8 @@ def _block_kind(b, i):
         return out
     raise PaperError(f"{what}: unknown kind {kind!r} — this store holds "
                      "stories, reels, charts, notes, quotes, documents, digests, "
-                     "the record's reading, and the broadsheet's blocks "
-                     f"({', '.join(BS_KINDS)})")
+                     "the record's reading, the words beside an issue, and the "
+                     f"broadsheet's blocks ({', '.join(BS_KINDS)})")
 
 
 def canonical(doc) -> str:

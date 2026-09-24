@@ -157,6 +157,8 @@ def what_of(blocks: Sequence[dict], cap: int = 5) -> str:
             w = _CHART.get(str(b.get("chart")), "a chart")
         elif k == "reel":
             w = f"a reel of {n_of(len(_clips(b)), 'clip')}"
+        elif k == "beside":
+            w = "the words beside an issue"
         elif k == "names":
             w = "a name" if b.get("who") else "who and where"
         else:

@@ -777,6 +777,35 @@ def term_tapes(rows: Sequence[dict], base: str = "/app", bins: int = 48) -> str:
             + twin("".join(trows), "<th>meeting</th><th>body</th><th>lines</th><th>first at</th><th>last at</th>"))
 
 
+def js_euc(s) -> str:
+    """encodeURIComponent, byte for byte (web/emit.py _js_euc; app.js)."""
+    from urllib.parse import quote
+    return quote(str(s), safe="-_.!~*'()")
+
+
+SCOPE_CAP = 64   # the search page reads this many pids off m= (app.js scopePids) — the chips name no more
+
+
+def beside_chips(words: Sequence[dict], pids: Sequence[str], base: str = "/app") -> str:
+    """Said alongside it (specs/29 board 6): each phrase a chip with its
+    count, opening the record's search for the phrase within the issue's
+    own meetings (the search page's m= scope, capped as the page caps it);
+    the title says in how many of them it was said. The twin of app.js
+    bsBesideChips — a node test holds them byte for byte."""
+    ws = [w for w in (words or []) if isinstance(w, dict) and str(w.get("phrase") or "").strip()]
+    if not ws:
+        return ""
+    m = ",".join([str(p) for p in (pids or []) if p][:SCOPE_CAP])
+    out = []
+    for w in ws:
+        ph = str(w["phrase"])
+        k = int(w.get("meetings") or 0)
+        out.append(f'<a class="pb-chip" href="{base}/s?q={js_euc(ph)}{"&amp;m=" + m if m else ""}" '
+                   f'title="“{esc(ph)}” in {n_of(k, "meeting")} — search them">{esc(ph)} '
+                   f'<span class="pb-chip-n">{int(w.get("n") or 0)}</span></a>')
+    return f'<div class="pb-chips">{"".join(out)}</div>'
+
+
 def coword_bars(words: Sequence[dict], q: str, base: str = "/app", town: str = "") -> str:
     """The words said beside the word — magnitude bars; each opens the
     record's search for the two together."""

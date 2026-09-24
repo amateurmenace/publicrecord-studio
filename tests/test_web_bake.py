@@ -3212,13 +3212,14 @@ class TestPaper(unittest.TestCase):
             self.PRELUDE, self.helpers(),
             "const one = [ [{kind:'story',story:'meeting',pid:'v'}], [{kind:'note',text:'n'}],",
             "  [{kind:'quote',pid:'v',t:1}], [{kind:'reading',pid:'v'}], [{kind:'lead',pid:'v'}], [{kind:'search'}],",
-            "  [{kind:'week'}], [{kind:'threads',town:'boston'}], [{kind:'strip'}], [{kind:'names',who:'p-x'}] ];",
+            "  [{kind:'week'}], [{kind:'threads',town:'boston'}], [{kind:'strip'}], [{kind:'names',who:'p-x'}],",
+            "  [{kind:'beside',slug:'issue_x'}], [{kind:'story',story:'issue',slug:'issue_x'},{kind:'beside',slug:'issue_x'}] ];",
             "const vs = one.map(blocks => paperV(portablePaper({ title: '', blocks })));",
             "console.log(JSON.stringify({ vs, ok: vs.every(v => PAPER_VS.includes(v)) }));"])
         r = self.node(body)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         got = json.loads(r.stdout)
-        self.assertEqual(got["vs"], ["1", "2", "3", "4", "5", "5", "5", "5", "5", "5"], got)
+        self.assertEqual(got["vs"], ["1", "2", "3", "4", "5", "5", "5", "5", "5", "5", "6", "6"], got)
         self.assertTrue(got["ok"], f"paperV mints a version PAPER_VS does not list: {got}")
 
     def test_the_broadsheet_kinds_are_refs_that_travel_as_v5(self):
@@ -3321,6 +3322,32 @@ class TestPaper(unittest.TestCase):
                          "the Python link-builder drifted from the JS codec:\n"
                          f"{r.stdout}{r.stderr}")
 
+    def test_the_chips_beside_an_issue_are_the_press_s_own_byte_for_byte(self):
+        """specs/29 board 6: charts.beside_chips (the issue page) and app.js
+        bsBesideChips (a paper's block) spell the same chips — the phrase, its
+        count, the search within the issue's meetings — for plain phrases and
+        for one wearing an apostrophe and an ampersand."""
+        from web import charts
+        words = [{"phrase": "free cash", "n": 3, "meetings": 2}, {"phrase": "town's & budget", "n": 2, "meetings": 1}, {"phrase": "", "n": 9}]
+        pids = ["vid1", "vid2"] + [f"p{i}" for i in range(70)]
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            self.lift(r"const esc = s => String\(s == null[\s\S]*?\[c\]\)\);"),
+            self.lift(r"const bsEsc = [^\n]+"),
+            self.lift(r"const tpN = [^\n]+"),
+            self.lift(r"const bsBesideChips = \(words, pids\) => \{.*?\n  \};"),
+            "console.log(JSON.stringify([bsBesideChips(" + json.dumps(words) + ", " + json.dumps(pids) + "),",
+            "  bsBesideChips(" + json.dumps(words) + ", []), bsBesideChips([], " + json.dumps(pids) + ")]));"])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        js = json.loads(r.stdout)
+        self.assertEqual(js[0], charts.beside_chips(words, pids))
+        self.assertEqual(js[1], charts.beside_chips(words, []))
+        self.assertEqual(js[2], charts.beside_chips([], pids))
+        self.assertIn('href="/app/s?q=free%20cash&amp;m=vid1,vid2,p0,', js[0])
+        self.assertNotIn("p62,p63,p64", js[0])                                    # capped at 64, as the search page caps its scope
+        self.assertIn('title="“free cash” in 2 meetings — search them"', js[0])
+
     def test_the_press_side_link_builder_speaks_the_broadsheet_kinds(self):
         """specs/29 P1: `_paper_qs` (the press's twin of encodePaperQS) mints
         the six kinds in the reader's grammar and v=5 — byte for byte — and
@@ -3337,6 +3364,18 @@ class TestPaper(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(qs, r.stdout.strip(), "the press's link builder drifted from the reader's codec")
         self.assertTrue(qs.startswith("v=5&"), qs)
+        # specs/29 board 6: the words beside an issue — e.<slug>, and the page is v=6
+        blocks6 = [{"kind": "story", "story": "issue", "slug": "issue_x"}, {"kind": "beside", "slug": "issue_x"}]
+        qs6 = emit._paper_qs("beside", blocks6)
+        r6 = self.node("\n".join([self.PRELUDE, self.helpers(),
+                                  "const p = { title: 'beside', blocks: " + json.dumps(blocks6) + " };",
+                                  "console.log(encodePaperQS(p));",
+                                  "const back = decodePaper('?' + encodePaperQS(p));",
+                                  "if (back.blocks.length !== 2 || back.blocks[1].kind !== 'beside' || back.blocks[1].slug !== 'issue_x') { console.log('FAIL round trip'); process.exit(1); }",
+                                  "if (decodePaper('?v=6&b=e.has%20space,e.').blocks.length) { console.log('FAIL a bad slug decoded'); process.exit(1); }"]))
+        self.assertEqual(r6.returncode, 0, r6.stdout + r6.stderr)
+        self.assertEqual(qs6, r6.stdout.strip().splitlines()[0])
+        self.assertTrue(qs6.startswith("v=6&") and qs6.endswith("&b=i.issue_x,e.issue_x"), qs6)
         with self.assertRaises(ValueError):
             emit._paper_qs("x", [{"kind": "gallery"}])
 
@@ -3388,10 +3427,12 @@ class TestPaper(unittest.TestCase):
             "  if (saved.tpl !== 'issue') fail('the draft remembers its template: ' + JSON.stringify(saved));",
             # the planes are dark here (getJSON → null): the story stands on
             # the ref alone as the lead; the timeline, the reel and the
-            # framing wait for a plane; the paragraphs and the search box
-            # are always the writer's (specs/29 board 6)
+            # framing wait for a plane; the paragraphs, the words beside it (a
+            # ref the plane fills) and the search box are always written
+            # (specs/29 board 6)
             "  if (saved.blocks[0].slug !== 'budget-override' || saved.blocks[0].layout !== 'lead' || saved.blocks[1].kind !== 'note'",
-            "      || saved.blocks[2].kind !== 'search' || saved.blocks.length !== 3) fail('issue shape '+JSON.stringify(saved.blocks));",
+            "      || saved.blocks[2].kind !== 'beside' || saved.blocks[2].slug !== 'budget-override' || saved.blocks[2].layout",
+            "      || saved.blocks[3].kind !== 'search' || saved.blocks.length !== 4) fail('issue shape '+JSON.stringify(saved.blocks));",
             # the five new templates (specs/29 board 7), planes dark: every
             # ref stands on its own; nothing is written that a plane would
             # have to fill; two towns need a record with two
@@ -3411,7 +3452,7 @@ class TestPaper(unittest.TestCase):
             "    { pid: 'v2', date: '2026-09-16', title: 'September', beads: [{ t: 3, text: 'b' }, { t: 50, text: 'c' }] } ] };",
             "  cur = { title: '', blocks: [] }; saved = null; await applyPaperTemplate('issue', { story: 'issue', slug: 'issue_brookline_budget-override' });",
             "  if (!saved || saved.title !== 'Budget Override — what Brookline said, June to September') fail('lit issue title ' + JSON.stringify(saved && saved.title));",
-            "  if (saved.blocks.map(b => b.kind + ':' + (b.chart || '') + ':' + (b.layout || '')).join() !== 'story::lead,chart:reach:,note::,reel::half,chart:framing:half,search::') fail('lit issue shape ' + JSON.stringify(saved.blocks));",
+            "  if (saved.blocks.map(b => b.kind + ':' + (b.chart || '') + ':' + (b.layout || '')).join() !== 'story::lead,chart:reach:,note::,reel::half,chart:framing:half,beside::,search::') fail('lit issue shape ' + JSON.stringify(saved.blocks));",
             "  if (saved.blocks[3].clips.length !== 2 || saved.blocks[3].clips[0].pid !== 'v1' || saved.blocks[3].clips[1].start !== 0 || saved.blocks[3].clips[1].end !== 43) fail('the reel is the latest beads, clipped from five seconds before to forty after, never below zero: ' + JSON.stringify(saved.blocks[3]));",
             "  if (saved.blocks[4].pid !== 'v2') fail('the framing is the night with the most beads');",
             "  saved = null; if (await applyPaperTemplate('vote', { story: 'issue', slug: 'budget-override' }) || saved) fail('a vote page over an empty ledger is refused');",
@@ -3955,7 +3996,7 @@ class TestPaper(unittest.TestCase):
                       "function addQuoteRef(", "function addDocRef(", "function addDigestRef(",
                       "function linesSearch(", "function docChooser(", "function segLines(",
                       'data-cz="pquote"',
-                      "const PAPER_VS = [\"1\", \"2\", \"3\", \"4\", \"5\"]",
+                      "const PAPER_VS = [\"1\", \"2\", \"3\", \"4\", \"5\", \"6\"]",
                       # specs/29 P1: the broadsheet's kinds, their renders,
                       # the templates table and the slug twin
                       "const BS_KINDS = ", "function renderLead(", "function renderWeek(",
