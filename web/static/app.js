@@ -554,13 +554,18 @@
       return;
     }
     if (!st.dataset.wired) {
-      st.dataset.pressed = st.innerHTML;
+      st.dataset.pressed = st.dataset.pressed || st.innerHTML;
       st.dataset.wired = "1";
       st.setAttribute("role", "radiogroup"); st.setAttribute("aria-label", "reading or editing");
       st.innerHTML = `<button type="button" role="radio" data-czmode="preview" aria-checked="false" tabindex="-1">READ</button>`
         + `<span aria-hidden="true">·</span>`
         + `<button type="button" role="radio" data-czmode="studio" aria-checked="false" tabindex="-1">EDIT</button>`
         + `<span class="bs-stamp-say"></span>`;
+    }
+    // the listeners once, whatever paper mode does to the buttons (a skeptic's
+    // catch: a paper round trip re-registered them and setMode ran N+1 times)
+    if (!st.dataset.listen) {
+      st.dataset.listen = "1";
       st.addEventListener("click", e => {
         const b = e.target.closest && e.target.closest("[data-czmode]");
         if (b && st.contains(b)) { BS_STAMP_ORIGIN = true; setMode(b.dataset.czmode); }
@@ -624,6 +629,7 @@
     });
   }
   function setMode(m) {
+    const fromStamp = BS_STAMP_ORIGIN; BS_STAMP_ORIGIN = false;   // consumed first: a throw below cannot leave it stuck
     if (!MODES.includes(m)) m = "preview";
     if (m !== "studio") pvPause();   // a hidden stage must not keep playing
     writeMode(m); markMode(m); updateModeButtons(); paintModeBar();
@@ -638,7 +644,7 @@
     // keyboard focus must not fall to <body> when the control the reader was on
     // is display:none'd by the switch — land it on a control the new mode shows.
     // A change made on the stamp keeps the keyboard on the stamp (paintModeBar).
-    if (BS_STAMP_ORIGIN) BS_STAMP_ORIGIN = false; else focusModeControl(m);
+    if (!fromStamp) focusModeControl(m);
     // moving into paper is the reader's exit from the studio; moving out restores
     // it. Nothing here touches the paper's own DOM — the shift is a class on
     // <html>, and paper mode carries none of it.
@@ -7266,6 +7272,7 @@
     };
   }
   const bsDayShort = d => TP_DAY.test(String(d || "")) ? `${TP_MON[+String(d).slice(5, 7)]} ${+String(d).slice(8, 10)}` : "undated";
+  const bsEsc = s => esc(s).replace(/'/g, "&#x27;");   // the press's html.escape(quote=True) — the twin holds byte for byte
   function bsTimeline(rows, q, width, height) {
     width = width || 1160; height = height || 170;
     const said = rows.filter(r => r.n && tpIsMonth(r.date));
@@ -7276,12 +7283,12 @@
     out += `<line x1="0" y1="${base}" x2="${width}" y2="${base}" stroke="#D9D1BF" stroke-width="2"/>`;
     for (const r of said.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.pid < b.pid ? -1 : a.pid > b.pid ? 1 : 0))) {
       const cx = x(r.date);
-      out += `<a href="${BASE}/m/${esc(r.pid)}#t${Math.floor(r.first_t || 0)}" class="bs-tdot" data-pid="${esc(r.pid)}"><circle cx="${r1(cx)}" cy="${base}" r="9" fill="${bsTown(r.town)}"><title>${esc(r.title || r.pid)} — ${tpN(+r.n || 0, "line")}</title></circle>`
-        + `<text x="${r1(cx)}" y="${base - 22}" font-size="12" fill="#4B473E" text-anchor="middle" style="font-family:var(--font-sans)">${esc(tpCutWords(r.body, 24))}</text>`
-        + `<text x="${r1(cx)}" y="${base - 38}" font-size="11" fill="#6F6A5B" text-anchor="middle" style="font-family:var(--font-mono)">${esc(bsDayShort(r.date))}</text></a>`;
+      out += `<a href="${BASE}/m/${bsEsc(r.pid)}#t${Math.floor(r.first_t || 0)}" class="bs-tdot" data-pid="${bsEsc(r.pid)}"><circle cx="${r1(cx)}" cy="${base}" r="9" fill="${bsTown(r.town)}"><title>${bsEsc(r.title || r.pid)} — ${tpN(+r.n || 0, "line")}</title></circle>`
+        + `<text x="${r1(cx)}" y="${base - 22}" font-size="12" fill="#4B473E" text-anchor="middle" style="font-family:var(--font-sans)">${bsEsc(tpCutWords(r.body, 24))}</text>`
+        + `<text x="${r1(cx)}" y="${base - 38}" font-size="11" fill="#6F6A5B" text-anchor="middle" style="font-family:var(--font-mono)">${bsEsc(bsDayShort(r.date))}</text></a>`;
     }
     const label = q ? `when “${q}” came up` : "when it came up";
-    return `<div class="bs-timeline"><span class="kicker">${esc(label)} — each dot is a meeting; click one to jump</span><div class="fp-chartwrap"><svg class="bs-timeline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(label)}">${out}</svg></div></div>`;
+    return `<div class="bs-timeline"><span class="kicker">${bsEsc(label)} — each dot is a meeting; click one to jump</span><div class="fp-chartwrap"><svg class="bs-timeline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${bsEsc(label)}">${out}</svg></div></div>`;
   }
   function bsSearchExtras(d, q, idx) {
     const stills = Object.create(null);
@@ -7409,5 +7416,7 @@
       }
     });
     document.addEventListener("click", e => { if (!box.contains(e.target)) close(); });
+    // focus leaving the spine — Shift+Tab, a Tab with no suggestions — closes it too
+    box.addEventListener("focusout", e => { if (!e.relatedTarget || !box.contains(e.relatedTarget)) close(); });
   }
 })();

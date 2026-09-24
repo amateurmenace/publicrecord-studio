@@ -1082,9 +1082,11 @@ def filmstrip(m: dict, stills: Optional[dict] = None, base: str = "/app",
                else f'<span class="bs-nostill" style="background:{town_light(m.get("town"))}"></span>')
         decs = "".join(f'<span class="bs-fdec"><span class="ts">{hms(x["t"])}</span><span>“{esc(x["quote"])}…”</span></span>'
                        for x in th["decisions"])
-        on = " on" if th["i"] == st["third"] else ""
+        lit = th["i"] == st["third"]
+        on = " on" if lit else ""
+        cur = ' aria-current="true"' if lit else ""     # the pressed state says what the script would
         none = '<span class="bs-fdec bs-fnone">no scored decision in this third</span>'
-        out.append(f'<a class="bs-frame{on}" href="{base}/m/{esc(pid)}#t{int(th["mid"])}" data-i="{th["i"]}" data-t="{_r(th["mid"])}">'
+        out.append(f'<a class="bs-frame{on}"{cur} href="{base}/m/{esc(pid)}#t{int(th["mid"])}" data-i="{th["i"]}" data-t="{_r(th["mid"])}">'
                    f'{pic}<span class="bs-fhead"><b>{esc(th["label"])}</b><span class="bs-fspan">{esc(th["span"])}</span></span>'
                    f'{decs or none}</a>')
     return f'<div class="bs-filmstrip">{"".join(out)}</div>'

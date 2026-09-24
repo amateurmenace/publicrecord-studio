@@ -210,49 +210,6 @@ def head(title, desc, canonical, og_image="", version="0", feed=None):
 </head><body>"""
 
 
-def scope_bar():
-    """The town picker, baked into every page (specs/17 §8).
-
-    Three shapes, because the honest answer differs by how many towns the
-    pressing actually holds:
-
-      no town   — nothing to pick; the bar is not rendered at all
-      one town  — the town is *named*, not offered. A picker with one option
-                  is a question whose answer is already known, and asking it
-                  would be the nag specs/17 warns against.
-      many      — real anchors, one per town, plus the whole record.
-
-    The anchors are `<a href>` and not buttons on purpose. A static edition
-    cannot scope server-side, so with JavaScript off these still navigate
-    somewhere true (the record, whole), and the line under them says plainly
-    that the scoping itself is the browser's work. The alternative — controls
-    that look live and silently do nothing — is the dishonesty the covenant
-    is against."""
-    towns = _EDITION.get("towns") or []
-    if not towns:
-        return ""
-    if len(towns) == 1:
-        t = towns[0]
-        return (f'<div class="scope one" id="scope">'
-                f'<span class="scopelabel">town</span>'
-                f'<span class="scopenow" id="scopenow" data-town="{esc(t["town"])}">'
-                f'{esc(t["town"])}</span>'
-                f'<span class="scopehint">the only town on this edition</span>'
-                f'<a class="scopeai" href="/app/ai">Our AI Constitution</a>'
-                f'</div>')
-    links = "".join(
-        f'<a class="scopetown" href="/app/?town={esc(t["town"])}" '
-        f'data-town="{esc(t["town"])}">{esc(t["town"])}'
-        f'<span class="scopen">{t["meetings"]}</span></a>'
-        for t in towns)
-    return (f'<div class="scope" id="scope">'
-            f'<span class="scopelabel">town</span>'
-            f'<span class="scopenow" id="scopenow">the whole record</span>'
-            f'<div class="scopetowns">{links}'
-            f'<a class="scopetown" href="/app/" data-town="">the whole record</a>'
-            f'</div>'
-            f'<a class="scopeai" href="/app/ai">Our AI Constitution</a>'
-            f'</div>')
 
 
 # The record's own surfaces, as a newspaper's section line. The thirteen desk
@@ -277,16 +234,6 @@ def section_nav(current):
     return f'<nav class="sectionnav" aria-label="Sections">{items}</nav>'
 
 
-def folio(manifest):
-    """The line under the nameplate: the towns this edition holds, the dateline
-    (the edition date reading finally as what it is), and the covenant's six
-    words. It informs; unlike the old boxed banner, it does not interrupt."""
-    ed = manifest.get("edition_date") or ""
-    dateline = (f'<span class="dateline">pressed from the record of '
-                f'<b>{esc(ed)}</b></span>') if ed else ""
-    return (f'<div class="folio">{scope_bar()}{dateline}'
-            f'<a class="cov6" href="/app/covenant">'
-            f'no accounts · no tracking · yours</a></div>')
 
 
 def masthead(current, manifest):

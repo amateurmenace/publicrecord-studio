@@ -94,7 +94,7 @@ b,strong{font-weight:var(--weight-bold)}
 .bs-navhint{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--muted);white-space:nowrap}
 .bs-navmuni .bs-muni{flex-direction:row;align-items:center;gap:8px;padding:6px 0}
 .bs-navmuni .bs-muni>.kicker{display:none}
-.bs-navmuni .bs-muni .bs-town{min-height:36px;padding:0 12px;font-size:13px;gap:6px}
+.bs-navmuni .bs-muni .bs-town{min-height:44px;padding:0 12px;font-size:13px;gap:6px}
 .bs-navmuni .bs-muni .bs-town .bs-n{font-size:10px}
 
 /* ============================ footer ============================ */
@@ -2156,7 +2156,7 @@ a.tp-mcol:hover b{text-decoration:underline}
 .mp-find.bs-find input:focus{border-color:var(--write)}
 .mp-find.bs-find .btn{min-height:44px;background:var(--ink);color:var(--paper)}
 .mp-find.bs-find .mp-found{flex-basis:100%}
-.main .ts,.main .seg .ts,.main .pull .ts,.main .summary .ts,.main .mo-head .ts,.main .sresult .ts,.main .tq-ts .ts,.main .rc-meta .ts,.main .bead .ts{color:var(--write)}
+.main .ts{color:var(--write)}          /* a receipt is rust wherever it is read (specs/29) */
 
 /* -- the search page (board 5) -------------------------------------------- */
 .bs-searchpage>.kicker{display:block;margin-top:var(--space-5)}
@@ -2204,8 +2204,9 @@ a.tp-mcol:hover b{text-decoration:underline}
   .bs-spinego{min-height:48px;padding:0 14px;font-size:14px}
   .bs-spine-say{margin-left:0;flex-basis:100%}
   .bs-navrow{flex-wrap:wrap;gap:0}
-  .sectionnav{flex-wrap:wrap;gap:0 16px}
+  .sectionnav{flex-wrap:wrap;gap:0 12px;overflow:visible}
   .navlink{font-size:14px;padding:10px 0}
+  .bs-muni.scope{align-items:flex-start}
   .bs-navhint{display:none}
   .bs-navmuni{width:100%;border-top:1px solid var(--rule)}
   .bs-navmuni .bs-muni-row{justify-content:flex-start}

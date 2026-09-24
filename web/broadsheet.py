@@ -183,8 +183,10 @@ def tonight_section(m: dict, stills: Optional[dict], base: str = "/app") -> str:
         now_card = (f'<div class="bs-now" id="bs-now" aria-live="polite"><span class="bs-now-k">now at <span class="bs-now-t">{st["mmss"]}</span> · <span class="bs-now-kind">'
                     f'{"a decision" if near["kind"] != "tension" else "tension"}</span></span>'
                     f'<span class="bs-now-q">“{esc(near["quote"])}”</span><span class="bs-now-why">{esc(story.now_words(near))}</span></div>')
+    cur = ' class="bs-moneyrow on" aria-current="true"'   # the row under the playhead, at press time
+    plain = ' class="bs-moneyrow"'                          # built first: no backslash in an f-string (3.11)
     money = "".join(
-        f'<a class="bs-moneyrow" href="{href}#t{int(x["t"])}" data-t="{charts._r(x["t"])}">'
+        f'<a{cur if abs(x["t"] - d["t"]) < 1 else plain} href="{href}#t{int(x["t"])}" data-t="{charts._r(x["t"])}">'
         f'<span class="bs-money-l">{esc(x["label"])}</span><span class="bs-money-m">said {n_of(x["count"], "time")} · at {hms(x["t"])}</span></a>'
         for x in w["money"])
     money_box = (f'<div class="bs-moneybox"><span class="kicker bs-money-k">money named on the tape · click to go there</span>{money}</div>'

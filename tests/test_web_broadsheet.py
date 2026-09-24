@@ -435,7 +435,7 @@ class TestBroadsheetTwins(unittest.TestCase):
         """The search page's timeline and the pressed topic page's are one
         picture: the same rows draw the same bytes on both sides."""
         from web import charts
-        rows = [{"pid": "vid1", "date": "2026-03-10", "n": 2, "first_t": 12.97, "town": "Testville", "body": "Board", "title": "Select Board — March"},
+        rows = [{"pid": "vid1", "date": "2026-03-10", "n": 2, "first_t": 12.97, "town": "Testville", "body": "Mayor's Office & Board", "title": "Select Board — March \"quoted\""},
                 {"pid": "vid2", "date": "2026-06-18", "n": 1, "first_t": 40.0, "town": "Boston", "body": "School Committee of the City", "title": "School Committee — June"},
                 {"pid": "vid3", "date": "2026-05-02", "n": 0, "first_t": None, "town": "Testville", "body": "Board", "title": "silent"},
                 {"pid": "vid4", "date": "", "n": 3, "first_t": 1.0, "town": "Testville", "body": "Board", "title": "undated"}]
@@ -452,6 +452,7 @@ class TestBroadsheetTwins(unittest.TestCase):
             lift(r"  const BS_MDAYS = [^\n]+"),
             lift(r"  function bsMonthX\(months, width\) \{.+?\n  \}"),
             lift(r"  const bsDayShort = [^\n]+"),
+            lift(r"  const bsEsc = [^\n]+"),
             lift(r"  function bsTimeline\(rows, q, width, height\) \{.+?\n  \}"),
             f"const got = bsTimeline({json.dumps(rows)}, 'budget'); const want = {json.dumps(want)};",
             "if (got !== want) { let i = 0; while (i < got.length && got[i] === want[i]) i++; fail('drift at ' + i + ': ' + got.slice(i, i + 160) + ' vs ' + want.slice(i, i + 160)); }",
