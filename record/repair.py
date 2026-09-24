@@ -154,8 +154,10 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
     from memory import analyze
     by = {m["id"]: m for m in rows}
     fixed = kept = failed = streak = 0
-    stopped = ""
-    for t in (todo[:1] if probe else todo):
+    stopped, probed = "", False
+    # a probe asks the first planned meeting that has a transcript (one with
+    # none is skipped below, and a probe that asked nothing is no pass)
+    for t in todo:
         m = by[t["id"]]
         an0 = _analysis(m.get("analysis_json"))
         an = dict(an0 or {})
@@ -217,6 +219,7 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
         else:
             streak = 0
         if probe:
+            probed = True
             print("REPAIR PROBE — nothing was written", flush=True)
             break
         cur = c.get_meeting(m["id"]) if len(upd) > 1 and not bad else None
@@ -228,6 +231,12 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
             # forgotten (or re-queued) while the run asked: never re-insert it
             kept += 1
             print(f"  GONE {m['id']} — no longer live; nothing written", flush=True)
+        elif len(upd) > 1 and float(cur.get("updated_at") or 0) != float(m.get("updated_at") or 0):
+            # rewritten while the run asked (a night's re-ingest): the new
+            # reading stands — writing would put the old one back under the
+            # new draft. The next run plans it afresh.
+            kept += 1
+            print(f"  CHANGED {m['id']} — rewritten while it was asked; nothing written", flush=True)
         elif len(upd) > 1:
             # the row as it stood, in the log, before it changes: a run that
             # went wrong is put back from here
@@ -244,7 +253,7 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
             print(f"REPAIR STOPPED — {streak} meetings in a row could not be asked ({stopped}); "
                   "every row after them is unchanged", flush=True)
             break
-    return {"fixed": fixed, "kept": kept, "failed": failed, "stopped": stopped}
+    return {"fixed": fixed, "kept": kept, "failed": failed, "stopped": stopped, "probed": probed}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -300,6 +309,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if lock is not None:
             lock.close()
         c.close()
+    if a.probe and not r["probed"]:
+        print("REPAIR PROBE — no planned meeting had a transcript; nothing was asked", flush=True)
+        return 1
     if not a.probe:
         print(f"REPAIR {'ENDED' if r['stopped'] else 'DONE'} — {r['fixed']} updated, {r['kept']} unchanged, "
               f"{r['failed']} could not be asked", flush=True)

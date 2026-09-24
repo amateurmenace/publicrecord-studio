@@ -654,8 +654,9 @@ class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
         "The next item is the reserve fund transfer requested by the department of public works.",
     ])]
 
-    live = {"m0", "m1", "m2", "n0", "x", "e0"}
+    live = {"m0", "m1", "m2", "n0", "x", "e0", "rw"}
     bare = {"e0"}
+    moved = {"rw": 5.0}              # rewritten (updated_at moved) while the run asked
 
     def run_repair(self, rows, todo, complete, probe=False):
         import contextlib
@@ -664,14 +665,15 @@ class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
         from memory import analyze
         writes, segs = [], self.SEGS
 
-        live = self.live
+        live, moved = self.live, self.moved
 
         class Store:
             def transcript(self, mid):
                 return [] if mid in self.bare else segs
 
             def get_meeting(self, mid):
-                return {"id": mid, "status": "live" if mid in live else "forgotten"}
+                return {"id": mid, "status": "live" if mid in live else "forgotten",
+                        "updated_at": moved.get(mid, 0)}
 
             def upsert_meeting(self, row):
                 writes.append(row)
@@ -808,6 +810,19 @@ class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
         r, writes, out = self.run_repair(gone, [{"id": "zz", "want": ["summary"]}], lambda *a, **k: "Whole.")
         self.assertEqual(writes, [])
         self.assertIn("GONE zz", out)
+        # a meeting rewritten while it was asked keeps its new reading (a final review's catch)
+        moved = [{**self.rows(1)[0], "id": "rw", "updated_at": 0}]
+        r, writes, out = self.run_repair(moved, [{"id": "rw", "want": ["summary", "draft"]}], lambda *a, **k: "Whole.")
+        self.assertEqual(writes, [])
+        self.assertIn("CHANGED rw", out)
+        # a probe asks the first planned meeting that HAS a transcript
+        two = [{"id": "e0", "title": "T", "summary": "At", "summary_origin": "ai:gemini-3.6-flash", "analysis_json": "{}"},
+               self.rows(1)[0]]
+        r, writes, out = self.run_repair(two, [{"id": "e0", "want": ["summary"]}, {"id": "m0", "want": ["summary"]}],
+                                         lambda *a, **k: "Whole.", probe=True)
+        self.assertTrue(r["probed"])
+        self.assertIn("SUMMARY m0 ai:gemini-3.6-flash", out)
+        self.assertEqual(writes, [])
 
     def test_an_analysis_it_cannot_read_is_never_planned_nor_written(self):
         """The planner tolerated bad JSON and planned a draft for it; the run
