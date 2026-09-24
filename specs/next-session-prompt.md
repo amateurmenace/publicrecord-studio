@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, ⟦TIME⟧ — v2.2.6 / r53 IS LIVE: the front page on a phone, as board 3 draws it
+## 2026-09-24, 19:44Z — v2.2.6 / r53 IS LIVE: the front page on a phone, as board 3 draws it
 
 The phone read the last session's list put first. The CHANGELOG entry says
 what; the shape, for whoever touches it next:
@@ -154,10 +154,10 @@ what; the shape, for whoever touches it next:
   suite with a headless-Chrome harness: masthead heights against main at
   thirteen widths, a meeting page's jump bar at 390 and 720, A4 and Letter
   prints, the filmstrip's focus ring.
-- **Deploy**: r53 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
-  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.6`
-  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.6` at ⟦TAGAT⟧.
+- **Deploy**: r53 (image `sha256:63606123…`, built from 3c107f8) on the service
+  (revision record-api-00045-fqb) and all six jobs; the press at `--version 2.2.6`
+  (execution record-press-gwkll, 19:42Z); Pages b17763c (the workflow carried it, run 36049846382); `sw.js` key `cz-record-2.2.6-9eb9be490f17df4c`;
+  tag `v2.2.6` at 3c107f8.
 - **Reviewed**: one adversarial pass (ten findings, nine folded — the
   hidden strip's stills still download on a phone, noted above), then a
   skeptic on the folds (five, folded: the meeting page's jump bar hidden on

@@ -157,8 +157,8 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
-- 2026-09-24, ⟦TIME⟧ — **v2.2.6 / r53 is LIVE: the front page on a phone, as board 3
-  draws it** (tag `v2.2.6` at ⟦TAGAT⟧, the commit the image was built from;
+- 2026-09-24, 19:44Z — **v2.2.6 / r53 is LIVE: the front page on a phone, as board 3
+  draws it** (tag `v2.2.6` at 3c107f8, the commit the image was built from;
   the service and all six jobs on r53; the press at `--version 2.2.6`). On a
   phone's screen only: the search second in the page itself, tonight's
   score omitted with the still and the now-at card kept, the filmstrip a
