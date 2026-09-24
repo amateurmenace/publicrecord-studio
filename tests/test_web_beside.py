@@ -103,6 +103,99 @@ class TestCounting(unittest.TestCase):
         self.assertEqual(beside.beside(timeline, meetings, set(), prepared=prepared), got)
 
 
+    def test_a_phrase_said_in_both_numbers_shows_once_with_its_own_count(self):
+        """"complete street" and "complete streets" were two chips on one live
+        issue. A phrase said both ways shows once, the way it was said most,
+        with that form's own count and meetings — never a sum: the chip opens
+        the record's search, which reads words exactly, so a summed count would
+        promise lines its search cannot open. The form given up frees its place."""
+        said = (["complete streets on harvard"] * 3 + ["a complete street here"] * 2 + ["the water main broke"] * 2
+                + ["property taxes rose", "property tax relief", "housing policy now", "housing policies then"]
+                + ["bike lane plan", "bike lanes plan"] * 2 + ["the bus stop moved"] * 2 + ["bus stops moved"] * 2)
+        meetings = {"m1": {"segments": [{"start": i * 5.0, "text": s} for i, s in enumerate(said)]}}
+        timeline = [{"meeting_id": "m1", "pid": "p1", "beads": [{"t": i * 5.0} for i in range(0, len(said), 3)]}]
+        got = [(g["phrase"], g["n"]) for g in beside.beside(timeline, meetings, set(), top=20)]
+        self.assertIn(("complete streets", 3), got)
+        self.assertNotIn("complete street", [g[0] for g in got])            # given up to the form said more
+        self.assertIn(("bike lane", 2), got)                                 # a tie keeps the one first in the alphabet
+        self.assertNotIn("bike lanes", [g[0] for g in got])
+        self.assertIn(("bus stop", 2), got)
+        self.assertNotIn("bus stops", [g[0] for g in got])
+        self.assertIn(("water main", 2), got)
+        # a form said once shows nowhere, and gives nothing up ("property tax" / "taxes", "policy" / "policies")
+        self.assertFalse({"property tax", "property taxes", "housing policy", "housing policies"} & {g[0] for g in got})
+        # the cap counts what is shown: "bike lanes", given up, frees its place for "bus stop"
+        top3 = beside.beside(timeline, meetings, set(), top=3)
+        self.assertEqual([g["phrase"] for g in top3], ["complete streets", "bike lane", "bus stop"])
+        # the candidates are only candidates: every English ending, matched against what was counted
+        self.assertLessEqual({"complete streets"}, beside._numbers("complete street"))
+        self.assertLessEqual({"complete street"}, beside._numbers("complete streets"))
+        self.assertLessEqual({"property taxes"}, beside._numbers("property tax"))
+        self.assertLessEqual({"property tax"}, beside._numbers("property taxes"))
+        self.assertLessEqual({"housing policies"}, beside._numbers("housing policy"))
+        self.assertLessEqual({"housing policy"}, beside._numbers("housing policies"))
+        self.assertNotIn("public acces", beside._numbers("public access"))   # a double s is no plural
+        self.assertNotIn("school bu", beside._numbers("school bus"))
+        # a short word's other number too, and either word of the pair (review catches:
+        # "dark sky" beside "dark skies"; "lane plan" beside "lanes plan")
+        self.assertIn("dark skies", beside._numbers("dark sky"))
+        self.assertIn("dark sky", beside._numbers("dark skies"))
+        self.assertIn("lanes plan", beside._numbers("lane plan"))
+        self.assertIn("lane plan", beside._numbers("lanes plan"))
+        self.assertNotIn("lanes plan", [g[0] for g in got])                   # "lane plan", tied, first in the alphabet
+        # -es only after a hiss: "rates" is not "rat"'s, nor "cares" "car"'s (a re-review catch)
+        self.assertNotIn("rates", beside._numbers("rat"))
+        self.assertNotIn("car", beside._numbers("cares"))
+        self.assertIn("care", beside._numbers("cares"))
+        self.assertNotIn("plan", beside._numbers("planes"))
+        self.assertIn("buses", beside._numbers("bus"))
+        self.assertIn("bus", beside._numbers("buses"))
+        self.assertIn("church", beside._numbers("churches"))
+        self.assertIn("mayoral vetoes", beside._numbers("mayoral veto"))       # -es after an o too
+        self.assertIn("hometown hero", beside._numbers("hometown heroes"))
+        self.assertEqual(beside._other("'s"), set())                           # a stray "'s" is no word
+        self.assertNotIn("meter ", beside._numbers("meter 's"))
+        self.assertTrue(all(v.split() == v.split(" ") for v in beside._numbers("meter 's")))
+        # the possessive is another form of the word
+        self.assertIn("historical society's", beside._numbers("historical society"))
+        self.assertIn("historical society", beside._numbers("historical society's"))
+        self.assertIn("residents", beside._numbers("residents'"))
+        sky = {"m1": {"segments": [{"start": i * 5.0, "text": s} for i, s in enumerate(
+            ["dark sky rules"] * 2 + ["dark skies again"] * 3)]}}
+        both = [g["phrase"] for g in beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0.0}, {"t": 15.0}]}], sky, set())]
+        self.assertIn("dark skies", both)
+        self.assertNotIn("dark sky", both)
+
+    def test_the_issue_s_own_name_is_left_out_in_either_number(self):
+        """The live "Complete Streets" issue (alias "complete streets") showed
+        "complete street" beside itself, under words that say its own names
+        are left out (a review catch): its names, and its name's words, are
+        left out in either number — where said, and as a phrase."""
+        own = beside.own_words({"name": "Complete Streets", "aliases": ["complete streets"]})
+        said = ["the complete street design here", "a complete street design again", "street design matters",
+                "street design matters", "the traffic calming plan", "the traffic calming plan"]
+        meetings = {"m1": {"segments": [{"start": i * 5.0, "text": s} for i, s in enumerate(said)]}}
+        got = [g["phrase"] for g in beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0.0}, {"t": 15.0}, {"t": 25.0}]}],
+                                                  meetings, own)]
+        self.assertNotIn("complete street", got)                            # the name, in the other number
+        self.assertIn("traffic calming", got)
+        # "street design" said twice on its own counts; its two edges of the name, said, do not
+        self.assertEqual([g for g in beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0.0}, {"t": 15.0}, {"t": 25.0}]}],
+                                                   meetings, own) if g["phrase"] == "street design"],
+                         [{"phrase": "street design", "n": 2, "meetings": 1}])
+        # the name's words alone, in the other number: "complete street" is the name's own words
+        self.assertEqual(beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0.0}]}],
+                                       {"m1": {"segments": [{"start": 0.0, "text": "complete street"}, {"start": 5.0, "text": "complete street"}]}},
+                                       {"phrases": set(), "tokens": {"complete", "streets"}}), [])
+        # own_words itself is unchanged: the other numbers are the counting's, not the issue's
+        self.assertEqual(own["phrases"], {"complete streets"})
+        # nor the possessive: the live "historical society's" beside a historical society
+        soc = beside.own_words({"name": "Brookline Historical Society", "aliases": ["historical society"]})
+        said = {"m1": {"segments": [{"start": 0.0, "text": "the historical society's archive"},
+                                    {"start": 5.0, "text": "our historical society's archive"}]}}
+        self.assertEqual(beside.beside([{"meeting_id": "m1", "pid": "p1", "beads": [{"t": 0.0}]}], said, soc), [])
+
+
 def _meeting(pid, lines, town="Brookline", people=()):
     return {"pid": pid, "id": pid, "town": town,
             "segments": [{"start": i * 5.0, "text": t} for i, t in enumerate(lines)],

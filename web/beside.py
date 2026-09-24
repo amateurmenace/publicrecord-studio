@@ -10,12 +10,16 @@ it, and a line cut at its punctuation first, so a pair no one said across
 a full stop is not a phrase — with the issue's own names kept out (any
 pair that overlaps its name, its other names or its keywords where they
 are said, and any pair that is one of them or is made only of the name's
-words: a thing is not said beside itself, while a phrase that merely
+words, each in either number: a thing is not said beside itself, while a phrase that merely
 shares a word with it, said elsewhere, stays; the record's tokeniser reads
 a hyphenated word as two, as the search index does), civic stopwords out,
 and transcript artifacts out (an issue was
 never said alongside a cough). Ranked by count, then alphabet; only what
-came up more than once. Pure over the corpus's meetings as the press reads
+came up more than once; a phrase said in both numbers ("complete street",
+"complete streets", "lane plan", "lanes plan") shows once, the way it was said most, with that form's
+own count — the chip opens the record's search, which reads words exactly,
+so a count summed over both would promise lines its search cannot open.
+Pure over the corpus's meetings as the press reads
 them, so two presses of one corpus say the same; nothing here calls a
 model, and nothing here is stored — the press writes it onto the issue's
 plane and the reader renders it (app.js bsBesideBlock).
@@ -229,6 +233,45 @@ def _pairs(clause: str, own_phrases: set) -> List[str]:
     return out
 
 
+_ES = ("s", "x", "z", "ch", "sh", "o")  # the endings English adds -es after (taxes, buses, heroes)
+
+
+def _other(w: str) -> set:
+    """A word's other forms, by the commonest English endings — street and
+    streets, tax and taxes, sky and skies, policies and policy — and its
+    possessive (society and society's, residents and residents'); -es only
+    after a hiss or an o (taxes, heroes), so "rates" is never taken for
+    "rat"'s plural, nor "cares" for "car"'s (re-review catches). Never an
+    empty form: a stray "'s" is no word."""
+    if w.endswith("'s") or w.endswith("s'"):
+        base = w[:-2] if w.endswith("'s") else w[:-1]
+        return {base} if len(base) > 1 else set()
+    alt = {w + "s", w + "'s"}
+    if w.endswith(_ES):
+        alt.add(w + "es")
+    if w.endswith("s"):
+        alt.add(w + "'")
+    if len(w) >= 3 and w.endswith("y") and w[-2] not in "aeiou":
+        alt.add(w[:-1] + "ies")
+    if len(w) > 4 and w.endswith("ies"):
+        alt.add(w[:-3] + "y")
+    if len(w) > 4 and w.endswith("es") and w[:-2].endswith(_ES):
+        alt.add(w[:-2])
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        alt.add(w[:-1])
+    alt.discard(w)
+    return alt
+
+
+def _numbers(p: str) -> set:
+    """A phrase's other numbers, one word changed at a time — "complete
+    streets" for "complete street", "lanes plan" for "lane plan", and back —
+    as candidates only: they are matched against the phrases actually
+    counted (or the issue's own names), so no form is guessed onto a page."""
+    ws = p.split()
+    return {" ".join(ws[:i] + [a] + ws[i + 1:]) for i, w in enumerate(ws) for a in _other(w)}
+
+
 def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
            top: int = TOP, prepared: Optional[dict] = None, names: Optional[dict] = None) -> List[dict]:
     """[{phrase, n, meetings}] — the phrases said beside the issue, over every
@@ -243,6 +286,12 @@ def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
     if not isinstance(own, dict):
         own = {"phrases": set(), "tokens": set(own or ())}
     own_phrases, own_tokens = set(own.get("phrases") or ()), set(own.get("tokens") or ())
+    # the issue's names in either number, or possessive: "Complete Streets"
+    # is not said beside itself as "complete street", nor a society as the
+    # "historical society's" (review catches — the page says its own names
+    # are left out)
+    own_phrases |= {v for q in own_phrases for v in _numbers(q)}
+    own_tokens |= {v for w in own_tokens for v in _other(w)}
     cache = prepared if prepared is not None else {}
     counts: Dict[str, int] = {}
     where: Dict[str, set] = {}
@@ -281,4 +330,12 @@ def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
                     counts[p] = counts.get(p, 0) + 1
                     where.setdefault(p, set()).add(pid)
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    return [{"phrase": p, "n": n, "meetings": len(where[p])} for p, n in ranked[:top] if n > 1]
+    out, kept = [], set()
+    for p, n in ranked:
+        if n < 2 or len(out) >= top:
+            break
+        if _numbers(p) & kept:          # its other number, said more (or first in the alphabet), stands for it
+            continue
+        kept.add(p)
+        out.append({"phrase": p, "n": n, "meetings": len(where[p])})
+    return out
