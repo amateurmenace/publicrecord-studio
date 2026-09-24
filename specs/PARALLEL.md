@@ -157,8 +157,8 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
-- 2026-09-24, ⟦TIME⟧ — **v2.2.7 / r54 is LIVE: every reel row pictures its meeting**
-  (tag `v2.2.7` at ⟦TAGAT⟧, the commit the image was built from; the service
+- 2026-09-24, 21:00Z — **v2.2.7 / r54 is LIVE: every reel row pictures its meeting**
+  (tag `v2.2.7` at e60c48c, the commit the image was built from; the service
   and all six jobs on r54; the press at `--version 2.2.7`). A paper's reel
   rows carry their meeting's own pressed still, as board 6 draws them, and
   the meeting page's tray carries the same thumbnail — the edition's own

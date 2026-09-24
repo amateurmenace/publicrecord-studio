@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, ⟦TIME⟧ — v2.2.7 / r54 IS LIVE: every reel row pictures its meeting
+## 2026-09-24, 21:00Z — v2.2.7 / r54 IS LIVE: every reel row pictures its meeting
 
 The second item on the list (the first, one real shared page on the
 gallery, is Stephen's to share). The shape:
@@ -127,10 +127,10 @@ gallery, is Stephen's to share). The shape:
   headless-Chrome harness: board 6's half reel in the editor and studio mode
   at 768–1440, the tray at 600–1440 (a trim press moves nothing; only real
   stills requested), the picture never dragged as an image.
-- **Deploy**: r54 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
-  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.7`
-  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.7` at ⟦TAGAT⟧.
+- **Deploy**: r54 (image `sha256:42a6a642…`, built from e60c48c) on the service
+  (revision record-api-00046-l4j) and all six jobs; the press at `--version 2.2.7`
+  (execution record-press-22ns7, 20:58Z); Pages a2150cc (the workflow carried it, run 36058303623); `sw.js` key `cz-record-2.2.7-9eb9be490f17df4c`;
+  tag `v2.2.7` at e60c48c.
 - **Reviewed**: one adversarial pass (five findings, five folded: the
   picture sized by the screen and not the row, the tray re-probing a
   missing still on every repaint, the picture draggable as an image, the
