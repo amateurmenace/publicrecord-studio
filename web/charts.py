@@ -498,14 +498,48 @@ def _rd_inline(s: str, href_base: str, plain: bool = False) -> str:
     return t
 
 
+# a receipt group left open at the cut ("[12:12, 17") — only times and their
+# separators after the bracket: a bracket of words ("[inaudible") is prose
+_RD_OPEN_GROUP = re.compile(r"\s*\[[0-9:,; \t–—-]*$")
+# a label standing alone once read ("What to watch:" with nothing after it)
+_RD_LONE_LABEL = re.compile(r"<b>(?:what it means|who moved it|what to watch):</b>", re.I | re.A)
+
+
 def _rd_cut(ln: str, n: int) -> str:
     """A line cut at a word — and never inside a receipt group: an unclosed
     "[12:12, 17…" at the cut is dropped whole, not left half-linked."""
     c = cut_words(ln, n)
     if c.endswith("…") and c != ln:
-        body = re.sub(r"\s*\[[^\]]*$", "", c[:-1])
+        body = _RD_OPEN_GROUP.sub("", c[:-1])
         c = body.rstrip(",;:—- ") + "…"
     return c
+
+
+def _rd_says(ln: str, plain: bool = False) -> str:
+    """What a line says once read, for the lede's cut: "" (nothing — bare
+    syntax), "head" (a heading, or a label standing alone: "**Who moved
+    it:**", "What to watch:"), or "words". A bullet is judged by its own
+    text, the way the renderer reads it."""
+    if plain:
+        return "words" if _rd_inline(ln, "", True).strip(_RD_WS) else ""
+    b = _RD_BULLET.match(ln)
+    t = b.group(1) if b else ln
+    if _RD_HASH.match(t) or _RD_BOLDLINE.match(t):
+        return "head"
+    x = _rd_inline(t, "").strip(_RD_WS)
+    if not x:
+        return ""
+    return "head" if _RD_LONE_LABEL.fullmatch(x) else "words"
+
+
+def _rd_unhead(ln: str) -> str:
+    """A heading-shaped line as plain words — a summary that is one bold
+    headline is still what the summary said. A lone label says nothing."""
+    b = _RD_BULLET.match(ln)
+    t = b.group(1) if b else ln
+    h = _RD_HASH.match(t) or _RD_BOLDLINE.match(t)
+    t = h.group(1) if h else t
+    return "" if _RD_LABEL.match(t.strip(" *`") + ":") else t
 
 
 def receipt_paras(text: str, href_base: str, limit: int = 0, plain: bool = False) -> str:
@@ -521,25 +555,27 @@ def receipt_paras(text: str, href_base: str, limit: int = 0, plain: bool = False
     lines = [ln for ln in lines if ln and (plain or not _RD_RULE.match(ln))]
     if limit:
         # whole lines up to the limit; the first line with words in it always
-        # stands (cut to the room left) — a heading or a line of bare syntax
-        # never spends the cut, and the lede never ends on a heading
-        def head_or_bare(ln: str) -> bool:
-            return (not plain and bool(_RD_HASH.match(ln) or _RD_BOLDLINE.match(ln))) \
-                or not _rd_inline(ln, "", plain).strip(_RD_WS)
+        # stands (cut to the room left) — a heading, a label alone or a line
+        # of bare syntax never spends the cut, and the lede never ends on one
         kept, used, words = [], 0, False
         for ln in lines:
             room = limit - used
             if len(ln) <= room:
                 kept.append(ln)
                 used += len(ln)
-                words = words or not head_or_bare(ln)
+                words = words or _rd_says(ln, plain) == "words"
                 continue
-            if not words and not head_or_bare(ln):
+            if not words and _rd_says(ln, plain) == "words":
                 kept.append(_rd_cut(ln, max(room, 200)))
                 words = True
             break
-        while kept and head_or_bare(kept[-1]):
+        while kept and _rd_says(kept[-1], plain) != "words":
             kept.pop()
+        if not kept:
+            # nothing but headings: a one-line bold headline is the summary
+            heads = [u for u in (_rd_unhead(ln) for ln in lines if _rd_says(ln, plain) == "head")
+                     if u.strip(_RD_WS)]
+            kept = [_rd_cut(heads[0], limit)] if heads else []
         lines = kept
     out: List[str] = []
     items: List[str] = []

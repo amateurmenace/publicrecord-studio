@@ -264,9 +264,11 @@ def translate_cues(cues: List[dict], code: str,
                            max_tokens=3600)
         except RuntimeError as e:
             # a cut answer's last line may be half a line; the lines before it
-            # are whole and are kept — the rest say they fell, below
-            partial = getattr(e, "partial", "") or ""
-            raw = "\n".join(str(partial).splitlines()[:-1])
+            # are whole and are kept — the rest say they fell, below (a
+            # partial that ends on a line break ended on a whole line)
+            partial = str(getattr(e, "partial", "") or "")
+            lines = partial.splitlines()
+            raw = "\n".join(lines if partial.endswith(("\n", "\r")) else lines[:-1])
         for ln in raw.splitlines():
             if "|" not in ln:
                 continue

@@ -51,6 +51,12 @@ function makeWorld() {
       return { top, bottom: top + this.h, height: this.h };
     }
     scrollBy(x, y) { if (this.isConnected) this.scrollTop = Math.max(0, Math.min(this.scrollHeight - this.clientHeight, this.scrollTop + y)); }
+    // a box the page drew: none when detached or hidden (display:none — a
+    // collapsed panel, a switched mode)
+    getClientRects() {
+      for (let e = this; e && e !== DOCEL; e = e.parent) if (e.boxless) return [];
+      return this.isConnected ? [this.getBoundingClientRect()] : [];
+    }
   }
   const DOCEL = new El("html");
   DOCEL.parent = null;
@@ -75,7 +81,7 @@ function makeWorld() {
     return out;
   }
   return { document, El, DOCEL, BODY, W, dispatch, pointer,
-    getComputedStyle: el => ({ overflowY: el.scroller ? "auto" : "visible", position: el.fixed ? "fixed" : "static" }),
+    getComputedStyle: el => W.noStyle ? null : ({ overflowY: el.scroller ? "auto" : "visible", position: el.fixed ? "fixed" : "static" }),
     requestAnimationFrame: cb => { W.rafQ.push({ id: ++W.rafId, cb }); return W.rafId; },
     cancelAnimationFrame: id => { W.rafQ = W.rafQ.filter(x => x.id !== id); },
     scrollBy: (x, y) => { W.winScrolls++; W.scrollY = Math.max(0, Math.min(W.docHeight - W.innerHeight, W.scrollY + y)); },
@@ -190,7 +196,9 @@ const out = {};
   for (const [name, ev] of [["penBarrel", { pointerType: "pen", button: 2 }], ["penEraser", { pointerType: "pen", button: 5 }],
                             ["ctrlClick", { pointerType: "mouse", button: 0, ctrlKey: true }], ["right", { pointerType: "mouse", button: 2 }],
                             ["pen", { pointerType: "pen", button: 0 }]]) {
-    const { rt, tray } = setup(MEETING, 3, ".rt-clip"); down(rt, tray.rows[0].grip, ev);
+    // a pen is judged on the glyph (a pen on the number scrolls, below)
+    const { rt, tray } = setup(MEETING, 3, ".rt-clip");
+    down(rt, ev.pointerType === "pen" ? tray.rows[0].glyph : tray.rows[0].grip, ev);
     res[name] = tray.rows[0].cls.has("dg-lift") ? "drag" : "ignored"; }
   out.buttons = res; }
 // Escape cancels the drag and is the drag's alone
@@ -225,7 +233,46 @@ const out = {};
   a.rt.pointer("pointerdown", { pointerId: 1, pointerType: "touch", button: 0, isPrimary: true, clientY: 0 }, a.tray.rows[0].grip);
   const b = setup(MEETING, 3, ".rt-clip");
   b.rt.pointer("pointerdown", { pointerId: 1, pointerType: "touch", button: 0, isPrimary: true, clientY: 0 }, b.tray.rows[0].glyph);
-  out.touch = { number: a.tray.rows[0].cls.has("dg-lift") ? "drag" : "scrolls", glyph: b.tray.rows[0].cls.has("dg-lift") ? "drag" : "scrolls" }; }
+  out.touch = { number: a.tray.rows[0].cls.has("dg-lift") ? "drag" : "scrolls", glyph: b.tray.rows[0].cls.has("dg-lift") ? "drag" : "scrolls" };
+  // a pen scrolls where a finger does: only the ⠿ says touch-action:none
+  const c = setup(MEETING, 3, ".rt-clip");
+  c.rt.pointer("pointerdown", { pointerId: 1, pointerType: "pen", button: 0, isPrimary: true, clientY: 0 }, c.tray.rows[0].grip);
+  out.touch.penNumber = c.tray.rows[0].cls.has("dg-lift") ? "drag" : "scrolls"; }
+// a list HIDDEN mid-drag (the panel collapsed, its mode switched) ends the drag: no drop
+{ const { rt, tray, env } = setup(PANEL, 4, ".cz-rclip");
+  down(rt, tray.rows[1].grip); const y = tray.rows[1].grip.getBoundingClientRect().top + 5;
+  rt.pointer("pointermove", { pointerId: 1, pointerType: "mouse", buttons: 1, clientY: y + 12 });
+  tray.holder.boxless = true;
+  rt.pointer("pointerup", { pointerId: 1, clientY: y + 12 });
+  const r0 = rt.W.rafRuns; rt.frame(30);
+  out.hidden = { moves: env.MOVES.length, order: env.CLIPS.map(c => c.pid).join(""), raf: rt.W.rafRuns - r0,
+    lifted: tray.rows.filter(r => r.cls.has("dg-lift")).length }; }
+// a browser whose getComputedStyle answers null: the drag still ends, and the next one works
+{ const { rt, tray, env } = setup(MEETING, 3, ".rt-clip"); rt.W.scrollY = 1100; rt.W.noStyle = true;
+  down(rt, tray.rows[0].grip);
+  rt.pointer("pointermove", { pointerId: 1, pointerType: "mouse", buttons: 1, clientY: 330 });
+  rt.pointer("pointerup", { pointerId: 1, clientY: 330 });
+  const first = env.CLIPS.map(c => c.pid).join("");
+  down(rt, tray.rows[0].grip);
+  rt.pointer("pointermove", { pointerId: 1, pointerType: "mouse", buttons: 1, clientY: 330 });
+  rt.pointer("pointerup", { pointerId: 1, clientY: 330 });
+  out.noStyle = { first, second: env.CLIPS.map(c => c.pid).join(""), moves: env.MOVES.length }; }
+// a scroller half off the screen: its edge zone is the part that shows
+{ const { rt, tray } = setup(PANEL, 6, ".cz-rclip");
+  tray.list.scrollTop = 200; rt.W.scrollY = 400;           // the list's top sits 100px above the screen
+  const g = tray.rows[3].grip; down(rt, g, { clientY: 60 });
+  rt.pointer("pointermove", { pointerId: 1, pointerType: "mouse", buttons: 1, clientY: 10 });
+  const t0 = tray.list.scrollTop; rt.frame(5);
+  out.offscreen = { scrolled: t0 - tray.list.scrollTop };
+  rt.pointer("pointerup", { pointerId: 1, clientY: 10 }); }
+// the line in the last slot stays inside a list that does not scroll
+{ const { rt, tray } = setup({ ...PANEL, maxH: 0 }, 3, ".cz-rclip");
+  down(rt, tray.rows[0].grip);
+  rt.pointer("pointermove", { pointerId: 1, pointerType: "mouse", buttons: 1, clientY: 790 });
+  const line = tray.list.kids.find(k => k.cls.has("dg-line"));
+  const last = tray.rows[2];
+  out.lastSlot = { top: parseInt(line.style.top, 10), lowest: last.y0 + last.h, hidden: line.hidden };
+  rt.pointer("pointerup", { pointerId: 1, clientY: 790 }); }
 // a list that does not scroll inside a fixed sidebar: the page behind it never scrolls
 { const { rt, tray } = setup({ ...PANEL, fixed: true, maxH: 0 }, 2, ".cz-rclip");
   down(rt, tray.rows[0].grip);

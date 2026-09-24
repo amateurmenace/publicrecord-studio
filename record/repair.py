@@ -20,10 +20,17 @@ draft stored before `--before` (the fixed image's deploy) — the broken
 budget wrote all of them, and a fragment that happens to end on a
 bracketed receipt looks whole — plus, whenever run, a summary or draft
 that ends mid-sentence or shows raw Markdown, and a live meeting with no
-draft at all. A summary the model still cannot finish falls back to the
-extractive one, labeled so (the seam's rule); a draft that cannot be
-finished is removed, never left a fragment. Re-runs are safe: a repaired
-row is newer than the cutoff. Prints one line per meeting and per call.
+draft at all.
+
+What is written: a whole answer, always. A fallback only when the model
+answered twice and the seam refused both as fragments — then the summary
+is the extractive one, labeled so, and a draft is removed rather than left
+a fragment. A call that FAILED (a quota, a bad key, a request the API
+refused, a timeout) licenses nothing: that row stays exactly as stored,
+the run stops after two such meetings in a row, and it exits 1. Every
+row's old values are printed (BACKUP) before it is written, so a run that
+went wrong can be put back from its own log. Re-runs are safe: a repaired
+row is newer than the cutoff. One repair at a time (an advisory lock).
 """
 
 from __future__ import annotations
@@ -37,6 +44,8 @@ import time
 from typing import Iterable, List, Optional
 
 _END = re.compile(r"[.!?…)\]”\"']\s*$")
+PAUSE = 20            # seconds before the second ask (a 429 or a slow minute)
+STREAK = 2            # meetings in a row that could not be asked → stop
 
 
 def is_cut(text) -> bool:
@@ -57,6 +66,18 @@ def _when(s: str) -> float:
         return _dt.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
 
 
+def _analysis(s) -> Optional[dict]:
+    """The stored analysis — or None when it cannot be read as one: nothing
+    is planned or written into a row this does not understand."""
+    if not s:
+        return {}
+    try:
+        v = json.loads(s)
+    except (TypeError, ValueError):
+        return None
+    return v if isinstance(v, dict) else None
+
+
 def plan(rows: Iterable[dict], before: float = 0.0) -> List[dict]:
     """Which meetings need asking again, and for what — pure over the rows
     (`id`, `summary`, `summary_origin`, `analysis_json`, `updated_at`)."""
@@ -67,40 +88,137 @@ def plan(rows: Iterable[dict], before: float = 0.0) -> List[dict]:
         so = str(m.get("summary_origin") or "")
         if so.startswith("ai:gemini") and (old or is_cut(m.get("summary"))):
             want.append("summary")
-        try:
-            an = json.loads(m.get("analysis_json") or "{}") or {}
-        except (TypeError, ValueError):
-            an = {}
-        d = an.get("draft") if isinstance(an, dict) else None
+        an = _analysis(m.get("analysis_json"))
+        d = an.get("draft") if an is not None else None
         if isinstance(d, dict) and str(d.get("origin") or "").startswith("ai:"):
             dt = str(d.get("text") or "")
             if old or is_cut(dt) or "**" in dt:
                 want.append("draft")
-        elif old:
+        elif old and an is not None:
             want.append("draft")          # a live meeting with no draft: the recovery path
         if want:
             out.append({"id": m["id"], "want": want})
     return out
 
 
-def _usage() -> str:
+def _calls() -> int:
     from czcore import llm
-    u = llm.last_usage() or {}
-    return f"in {u.get('tokens_in', 0)} out {u.get('tokens_out', 0)}" if u else "no call"
+    return int(llm.usage_summary().get("calls") or 0)
 
 
-def _ask(fn, segs, info, tries: int = 2):
-    """One call, and once more after a pause if it fell back — a 429 or a
-    timeout on one night is not a reason to lose a draft."""
+def _spent(n0: int) -> str:
+    """What the calls since `n0` cost — only calls that answered are in the
+    ledger, so a failed call never borrows the last one's numbers."""
+    from czcore import llm
+    s = llm.usage_summary()
+    new = int(s.get("calls") or 0) - n0
+    if new <= 0:
+        return "no call answered"
+    rec = (s.get("recent") or [])[-new:]
+    return (f"in {sum(e['tokens_in'] for e in rec)} out {sum(e['tokens_out'] for e in rec)}"
+            + (f" over {new} calls" if new > 1 else ""))
+
+
+def _ask(fn, kind: str, segs, info, tries: int = 2):
+    """One call, and once more after a pause if it fell back → (text,
+    origin, why, cut). `cut` is True only when the model answered and the
+    seam refused the answer as a fragment — the one failure that licenses a
+    fallback. Any other failure licenses nothing."""
+    from czcore import llm
     from memory import analyze
+    text, origin, why, cut = "", "none", "", False
     for k in range(tries):
         text, origin = fn(segs, info)
         if text and str(origin).startswith("ai:"):
-            return text, origin, ""
-        why = analyze.LAST_FALLBACK.get("summary" if fn is analyze.summary else "draft", "")
+            return text, origin, "", False
+        why = analyze.LAST_FALLBACK.get(kind, "") or "the model gave no answer"
+        cut = isinstance(analyze.LAST_ERROR.get(kind), llm.CutOff)
         if k + 1 < tries:
-            time.sleep(20)
-    return text, origin, why
+            time.sleep(PAUSE)
+    return text, origin, why, cut
+
+
+def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
+    """Ask again for each planned meeting and write what the rules allow
+    (the module's docstring) — `c` needs `transcript(id)` and
+    `upsert_meeting(row)`. Returns the counts; prints one line per call."""
+    from memory import analyze
+    by = {m["id"]: m for m in rows}
+    fixed = kept = failed = streak = 0
+    stopped = ""
+    for t in (todo[:1] if probe else todo):
+        m = by[t["id"]]
+        an0 = _analysis(m.get("analysis_json"))
+        an = dict(an0 or {})
+        upd = {"id": m["id"]}
+        bad = []
+        segs = c.transcript(m["id"])
+        info = {"title": m.get("title") or ""}
+        if "summary" in t["want"]:
+            n0, t0 = _calls(), time.time()
+            s, o, why, cut = _ask(analyze.summary, "summary", segs, info)
+            if str(o).startswith("ai:"):
+                verdict, write = "whole", True
+            elif cut:
+                # the model spoke twice and was refused both times: the tape's
+                # own sentences stand in, labeled — or, when the tape gave
+                # none, no summary at all rather than the stored fragment
+                verdict, write = ("refused twice as a fragment — the extractive summary, labeled" if s
+                                  else "refused twice as a fragment — the tape gave no sentences; none"), True
+                s, o = s or "", "extractive"
+            else:
+                verdict, write = "could not be asked — kept as stored", False
+                bad.append(why)
+            if write and (s, o) != (m.get("summary"), m.get("summary_origin")):
+                upd["summary"], upd["summary_origin"] = s, o
+            print(f"  SUMMARY {m['id']} {o} {len(s or '')} chars {time.time() - t0:.1f}s {_spent(n0)}"
+                  f" — {verdict}" + (f" ({why})" if why else ""), flush=True)
+            if probe:
+                print(f"    {s[:600]!r}", flush=True)
+        if "draft" in t["want"] and an0 is not None:
+            n0, t0 = _calls(), time.time()
+            text, o, why, cut = _ask(analyze.draft, "draft", segs, info)
+            if str(o).startswith("ai:"):
+                an["draft"] = {"text": text, "origin": o}
+                verdict = "whole"
+            elif cut:
+                an.pop("draft", None)
+                verdict = ("refused twice as a fragment — removed" if "draft" in an0
+                           else "refused twice as a fragment — none stored")
+            else:
+                verdict = "could not be asked — kept as stored"
+                bad.append(why)
+            if an != an0:
+                upd["analysis_json"] = json.dumps(an)
+            print(f"  DRAFT {m['id']} {o} {len(text or '')} chars {time.time() - t0:.1f}s {_spent(n0)}"
+                  f" — {verdict}" + (f" ({why})" if why else ""), flush=True)
+            if probe:
+                print(f"    {text[:900]!r}", flush=True)
+        if probe:
+            print("REPAIR PROBE — nothing was written", flush=True)
+            break
+        if len(upd) > 1:
+            # the row as it stood, in the log, before it changes: a run that
+            # went wrong is put back from here
+            print("  BACKUP " + json.dumps({"id": m["id"], "summary": m.get("summary"),
+                                           "summary_origin": m.get("summary_origin"),
+                                           "draft": (an0 or {}).get("draft")}, ensure_ascii=False), flush=True)
+            c.upsert_meeting(upd)
+            fixed += 1
+            print(f"UPDATED {m['id']} {sorted(k for k in upd if k != 'id')}", flush=True)
+        else:
+            kept += 1
+        if bad:
+            failed += 1
+            streak += 1
+            if streak >= STREAK:
+                stopped = bad[-1]
+                print(f"REPAIR STOPPED — {streak} meetings in a row could not be asked ({stopped}); "
+                      "every row after them is unchanged", flush=True)
+                break
+        else:
+            streak = 0
+    return {"fixed": fixed, "kept": kept, "failed": failed, "stopped": stopped}
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -139,46 +257,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("REPAIR STOPPED — no model key on this job; nothing was changed", flush=True)
         c.close()
         return 1
-    by = {m["id"]: m for m in rows}
-    fixed = 0
-    for t in (todo[:1] if a.probe else todo):
-        m = by[t["id"]]
-        upd = {"id": m["id"]}
-        segs = c.transcript(m["id"])
-        info = {"title": m.get("title") or ""}
-        if "summary" in t["want"]:
-            t0 = time.time()
-            s, o, why = _ask(analyze.summary, segs, info)
-            if s:
-                upd["summary"], upd["summary_origin"] = s, o
-            print(f"  SUMMARY {m['id']} {o} {len(s or '')} chars {time.time() - t0:.1f}s {_usage()}"
-                  + (f" ({why})" if why else ""), flush=True)
-            if a.probe:
-                print(f"    {s[:600]!r}", flush=True)
-        if "draft" in t["want"]:
-            an = json.loads(m.get("analysis_json") or "{}") or {}
-            t0 = time.time()
-            text, o, why = _ask(analyze.draft, segs, info)
-            if text:
-                an["draft"] = {"text": text, "origin": o}
-            else:
-                an.pop("draft", None)
-            upd["analysis_json"] = json.dumps(an)
-            print(f"  DRAFT {m['id']} {o} {len(text or '')} chars {time.time() - t0:.1f}s {_usage()}"
-                  + (f" ({why})" if why else ""), flush=True)
-            if a.probe:
-                print(f"    {text[:900]!r}", flush=True)
-        if a.probe:
-            print("REPAIR PROBE — nothing was written", flush=True)
-            break
-        if len(upd) > 1:
-            c.upsert_meeting(upd)
-            fixed += 1
-            print(f"UPDATED {m['id']} {sorted(k for k in upd if k != 'id')}", flush=True)
-    c.close()
+    # one repair at a time: two overlapping runs could let one's failure
+    # undo what the other just wrote. The lock is the session's; it goes
+    # when this connection does.
+    lock = c._psycopg.connect(c.dsn, autocommit=True)
+    try:
+        if not lock.execute("SELECT pg_try_advisory_lock(hashtext('record.repair'))").fetchone()[0]:
+            print("REPAIR STOPPED — another repair is running; nothing was changed", flush=True)
+            return 1
+        r = repair(c, rows, todo, probe=a.probe)
+    finally:
+        lock.close()
+        c.close()
     if not a.probe:
-        print(f"REPAIR DONE — {fixed} updated, {len(rows) - fixed} kept", flush=True)
-    return 0
+        print(f"REPAIR DONE — {r['fixed']} updated, {r['kept']} unchanged, "
+              f"{r['failed']} could not be asked", flush=True)
+    return 1 if r["failed"] else 0
 
 
 if __name__ == "__main__":

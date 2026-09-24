@@ -54,7 +54,7 @@ _SITE = {"base": "https://publicrecord.studio", "edition": ""}
 # how to read each picture's marks, on the file itself — on a slide, the
 # page's commentary is not there to say it
 LEGEND = {
-    "months": "a bar is the month's mentions · a filled dot, a meeting that said it; a hollow one, a meeting that did not",
+    "months": "a bar is the month's mentions · a filled dot, a meeting that said it; a hollow one, a meeting that did not; past twenty, said/met",
     "tapes": "a row is one night's tape, start to end · a taller bar, more lines said it there",
     "words": "counted in each line that says it and the lines either side, civic stopwords out",
     "votes": "a filled dot passes · a hollow dot fails · a square, any other outcome",
@@ -121,7 +121,9 @@ def link(href: str, filename: str, title: str = "") -> str:
     """The pressed way to the file — an anchor with a download name, content
     in the paper (no button, no script: it works with JavaScript off); its
     name says which picture, where ten on a page read the same."""
-    named = f' aria-label="download “{x(title)}” as .svg"' if title else ""
+    # the name begins with the words the link shows (a voice user says
+    # "click this picture"), then says which picture
+    named = f' aria-label="this picture, as .svg — {x(title)}"' if title else ""
     return (f'<p class="pic-dl"><a href="{x(href)}" download="{x(filename)}"{named}>'
             '↓ this picture, as .svg</a></p>')
 

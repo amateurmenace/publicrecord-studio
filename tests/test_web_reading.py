@@ -73,7 +73,8 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
         saved = {k: os.environ.pop(k, None) for k in (
             "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
             "GOOGLE_API_KEY", "CONTROL_Z_LLM_MODEL")}
-        self.addCleanup(lambda: [os.environ.update({k: v}) for k, v in saved.items() if v is not None])
+        from tests.test_llm_names import _restore_env
+        self.addCleanup(_restore_env, saved)
         with llm._LEDGER_LOCK:
             self._saved = llm._LEDGER[:]
             llm._LEDGER.clear()
@@ -104,6 +105,35 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
                 self.assertEqual(cfg["maxOutputTokens"], want_max)
                 self.assertEqual(cfg.get("thinkingConfig"), want_think)
         self.assertGreaterEqual(self.llm.GEMINI_THINKING_ROOM, 4096)
+
+    def test_a_name_this_file_does_not_know_still_gets_the_room(self):
+        """Google's own aliases (gemini-flash-latest) and any model newer than
+        this file are thinkers: without the room the summary is "At the
+        September 22, 2026," again, every answer is refused, and a repair
+        under that name would remove every draft (a re-review catch). Only a
+        family known not to think goes without."""
+        whole = {"candidates": [{"content": {"parts": [{"text": "Whole."}]}, "finishReason": "STOP"}]}
+        for model, want_max in (("gemini-flash-latest", 400 + self.llm.GEMINI_THINKING_ROOM),
+                                ("gemini-pro-latest", 400 + self.llm.GEMINI_THINKING_ROOM),
+                                ("gemini-4-flash", 400 + self.llm.GEMINI_THINKING_ROOM),
+                                ("gemini-1.5-flash", 400), ("gemini-pro", 400), ("gemma-3-27b-it", 400)):
+            with self.subTest(model):
+                api = self.serve("gemini", [whole], "AIza-x", model=model)
+                self.llm.complete("q", max_tokens=400)
+                cfg = api.reqs[-1]["body"]["generationConfig"]
+                self.assertEqual(cfg["maxOutputTokens"], want_max)
+                # the field a thinker takes is known only for the families named
+                self.assertEqual(cfg.get("thinkingConfig"),
+                                 {"thinkingLevel": "low"} if model.startswith("gemini-3") else None)
+
+    def test_a_blocked_prompt_says_why_and_is_not_a_fragment(self):
+        """Nothing was answered, so nothing may be kept — and the reason
+        reaches the night's log instead of "the API answered with no text"."""
+        self.serve("gemini", [{"promptFeedback": {"blockReason": "SAFETY"}}], "AIza-x", model="gemini-3.6-flash")
+        with self.assertRaises(RuntimeError) as cm:
+            self.llm.complete("q")
+        self.assertNotIsInstance(cm.exception, self.llm.CutOff)
+        self.assertIn("declined the prompt (SAFETY)", str(cm.exception))
 
     def test_only_a_whole_answer_stop_passes(self):
         """A length cut is not the only fragment: a safety or recitation stop,
@@ -149,6 +179,12 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
         out = mt.translate_cues(cues, "es", complete=boom)
         self.assertTrue(all(c.get("fallback") for c in out))
 
+        # a cut that ended on a line break ended on a whole line: it is kept
+        def at_break(prompt, system="", max_tokens=0, **kw):
+            raise self.llm.CutOff("cut", "0|línea 0\n1|línea 1\n2|línea 2\n", "MAX_TOKENS")
+        out = mt.translate_cues(cues, "es", complete=at_break)
+        self.assertEqual([c["text"] for c in out], ["línea 0", "línea 1", "línea 2", "line 3", "line 4"])
+
     def test_a_cut_answer_is_refused_on_every_provider_and_still_counted(self):
         cases = [
             ("gemini", "AIza-x", {"candidates": [{"content": {"parts": [{"text": "At the September 22, 2026,"}]},
@@ -186,8 +222,10 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
     def test_the_vision_door_keeps_the_same_rules(self):
         api = self.serve("gemini", [{"candidates": [{"content": {"parts": [{"text": "A hall"}]},
                                                      "finishReason": "MAX_TOKENS"}]}], "AIza-x", model="gemini-3.6-flash")
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as cm:
             self.llm.complete_vision("what is this", "QUJD", max_tokens=300)
+        # the desk's Narrator shows this sentence: said right
+        self.assertIn("a fragment is not a whole description", str(cm.exception))
         self.assertEqual(api.reqs[-1]["body"]["generationConfig"]["maxOutputTokens"],
                          300 + self.llm.GEMINI_THINKING_ROOM)
 
@@ -203,6 +241,22 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
             text, origin = analyze.summary(segs, {"title": "T"})
             self.assertEqual(origin, "extractive")
             self.assertEqual(analyze.draft(segs, {"title": "T"}), ("", "none"))
+        # the reason, and the exception itself (the repair tells a cut from a failure by it)
+        self.assertIn("cut off", analyze.LAST_FALLBACK["summary"])
+        self.assertIsInstance(analyze.LAST_ERROR["draft"], RuntimeError)
+        # a call with nothing to ask clears the last one's reason, never reports it stale
+        analyze.summary([], {})
+        analyze.draft([], {})
+        self.assertEqual((analyze.LAST_FALLBACK, analyze.LAST_ERROR),
+                         ({"summary": "", "draft": ""}, {"summary": None, "draft": None}))
+
+    def test_the_nights_reading_line_goes_through_the_job(self):
+        """The ingest is the desk's engine too: a print there ignored quiet
+        (the pipeline's --json broke) and could fail a meeting on a closed
+        pipe — the line is the job's message, like every stage's."""
+        src = (REPO / "memory" / "ingest.py").read_text()
+        self.assertNotIn("print(", src)
+        self.assertIn('job.message = (f"the reading — summary {summ_origin}', src)
 
     def test_the_prompts_ask_for_plain_text_and_hour_stamps(self):
         from memory import analyze
@@ -324,6 +378,39 @@ class TestTheRendererReadsTheModelsProse(unittest.TestCase):
         self.assertNotIn("[12:12", out)
         self.assertTrue(out.endswith("…</p>"), out)
 
+    def test_the_lede_cut_keeps_prose_brackets_and_never_ends_on_a_label(self):
+        """Re-review catches: an unclosed bracket of words ("[inaudible") took
+        the whole lede with it; a bullet that is only a bold label, or a bare
+        bullet, counted as words and ended the lede; a summary that was one
+        bold headline pressed as nothing."""
+        from web.charts import receipt_paras
+        long = "The chair [inaudible opened the meeting. " + "and then the board spoke " * 60
+        out = receipt_paras(long, "/app/m/x", limit=900)
+        self.assertTrue(out.startswith("<p>The chair [inaudible opened the meeting."), out[:80])
+        self.assertGreater(len(out), 700)
+        # an unclosed RECEIPT at the cut still goes whole
+        cut = receipt_paras("The board voted " + "x" * 880 + " [12:12, 17", "", limit=900)
+        self.assertNotIn("[12:12", cut)
+        sub = "a" * 298 + "."
+        labels = f"* **What it means:**\n  * {sub}\n* **Who moved it:**\n  * {sub}\n* **What to watch:**\n  * {sub}"
+        out = receipt_paras(labels, "", limit=900)
+        self.assertFalse(re.search(r"<b>(What it means|Who moved it|What to watch):</b></li></ul>$", out), out[-80:])
+        self.assertTrue(out.endswith(f"<li>{sub}</li></ul>"), out[-80:])
+        # a bare bullet renders nothing, so it is no words: the paragraph after it stands
+        self.assertIn("<p>" + "b" * 50, receipt_paras("- `\n" + "b" * 1000, "", limit=900))
+        tail = receipt_paras("The board met [1:00].\n**Who moved it:**\n- `", "", limit=900)
+        self.assertEqual(tail, '<p>The board met <a class="ts" href="#t60">[1:00]</a>.</p>')
+        # a lone label paragraph is a heading, too
+        self.assertNotIn("What to watch", receipt_paras("The board met.\nWhat to watch:", "", limit=900))
+        # one bold headline IS the summary — pressed as its words, receipt linked
+        for head in ("**The Select Board sends the override to the November ballot [1:12:24].**",
+                     "# The Select Board sends the override to the November ballot [1:12:24]."):
+            out = receipt_paras(head, "/app/m/x", limit=900)
+            self.assertTrue(out.startswith("<p>The Select Board sends the override"), out)
+            self.assertIn('href="/app/m/x#t4344"', out)
+        # and nothing but labels says nothing
+        self.assertEqual(receipt_paras("**Who moved it:**\n## What to watch", "", limit=900), "")
+
     def test_spaced_rules_and_bare_markers_say_nothing(self):
         from web.charts import receipt_paras
         self.assertEqual(receipt_paras("* * *\n- - -\n_ _ _\n## \n•  •", ""), "")
@@ -434,6 +521,22 @@ class TestTheModelsWordsAreLabeledWhereTheyAreRead(unittest.TestCase):
         self.assertIn("“Override” returned at Select Board — 2026-09-22 (Select Board · 2026-09-22).", home)
         self.assertIn("“Override” returned. That is 2 appearances on the record.", home)   # the extractive one stands
 
+    def test_a_renamed_thread_keeps_its_history_and_a_forgotten_one_is_gone(self):
+        """The press judged a stored "what changed" by the thread's CURRENT
+        name: a steward's rename replaced every earlier paragraph — its arc
+        and its quotes — with the bare counted line (a re-review catch). The
+        shape decides, not the name."""
+        from web.bake import _EXTRACTIVE_DELTA
+        old_name = ("“Operating override” returned at Select Board — 2026-09-22 (Select Board · 2026-09-22). "
+                    "That is 3 appearances on the record since 2026-06-01. This time: [00:05] the override")
+        self.assertTrue(_EXTRACTIVE_DELTA.match(old_name))
+        self.assertTrue(_EXTRACTIVE_DELTA.match("“A “quoted” name” returned. That is 1 appearance on the record."))
+        for model in ("The September 22, 202", "At the meeting the override returned. That is 3 appearances on the record.",
+                      "“Override” was discussed again.", ""):
+            self.assertFalse(_EXTRACTIVE_DELTA.match(model), model)
+        src = (REPO / "web" / "bake.py").read_text()
+        self.assertIn('name = e.get("issue_name") or ""\n                if not name:\n                    continue', src)
+
     def test_a_receipt_lands_on_the_line_it_falls_in(self):
         node = shutil.which("node")
         if not node:
@@ -442,12 +545,22 @@ class TestTheModelsWordsAreLabeledWhereTheyAreRead(unittest.TestCase):
         fn = re.search(r"  function rowAt\(sec\) \{.+?\n  \}\n", js, re.S).group(0)
         prog = ("const rows = [0, 12.4, 30, 55.9].map(t => ({ id: 't' + Math.floor(t), dataset: { t: String(t) } }));"
                 "const document = { getElementById: id => rows.find(r => r.id === id) || null };"
+                "let END = '62'; const $ = s => s === '.meeting' ? { dataset: { end: END } } : null;"
                 "const $$ = () => rows;" + fn +
-                "console.log(JSON.stringify([12, 13, 29, 30, 31, 999, -5].map(s => { const a = rowAt(s); return a ? [a.row.id, a.exact] : null; })));")
+                "const at = s => { const a = rowAt(s); return a ? [a.row.id, a.exact] : null; };"
+                "const known = [12, 13, 29, 30, 31, 60, 64, 999, -5].map(at);"
+                "END = ''; const unknown = [999].map(at);"
+                "console.log(JSON.stringify([known, unknown]));")
         r = subprocess.run([node, "-e", prog], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads(r.stdout), [["t12", True], ["t12", False], ["t12", False], ["t30", True],
-                                                ["t30", False], ["t55", False], None])
+        known, unknown = json.loads(r.stdout)
+        # a time past the tape's end (a model's [264:28] on a three-hour tape)
+        # names no line — and the player is not primed past the end (a re-review catch)
+        self.assertEqual(known, [["t12", True], ["t12", False], ["t12", False], ["t30", True],
+                                 ["t30", False], ["t55", False], None, None, None])
+        self.assertEqual(unknown, [["t55", False]])          # a page that does not say where it ends: as before
+        emit = (REPO / "web" / "emit.py").read_text()
+        self.assertIn('data-end="{tape_end}"', emit)
 
 
 class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
@@ -503,6 +616,121 @@ class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
         ]
         self.assertEqual(plan(rows, cutoff), [{"id": "a", "want": ["summary", "draft"]}, {"id": "b", "want": ["draft"]}])
         self.assertEqual(plan(rows), [])          # without the cutoff, only true fragments
+
+    # -- the run: only a cut licenses a fallback; a failed call changes nothing
+
+    SEGS = [{"start": 10.0 * i, "end": 10.0 * i + 8, "text": t} for i, t in enumerate([
+        "Good evening, this meeting of the Select Board will come to order.",
+        "The first item tonight is the proposed operating override for the November ballot.",
+        "The town administrator presented the budget gap of four point two million dollars.",
+        "Several residents spoke in favor of placing the override question before the voters.",
+        "The board discussed whether the override should fund the schools or the operating budget.",
+        "A motion was made to place the override on the November ballot and it was seconded.",
+        "The motion carries unanimously and the override question goes to the voters in November.",
+        "The next item is the reserve fund transfer requested by the department of public works.",
+    ])]
+
+    def run_repair(self, rows, todo, complete):
+        import contextlib
+        import io
+        from record import repair
+        from memory import analyze
+        writes, segs = [], self.SEGS
+
+        class Store:
+            def transcript(self, mid):
+                return segs
+
+            def upsert_meeting(self, row):
+                writes.append(row)
+        buf = io.StringIO()
+        with mock.patch.object(repair, "PAUSE", 0), \
+             mock.patch.object(analyze.llm, "enabled", lambda: True), \
+             mock.patch.object(analyze.llm, "complete", complete), \
+             mock.patch.object(analyze.llm, "status", lambda: {"model": "gemini-3.6-flash"}), \
+             contextlib.redirect_stdout(buf):
+            r = repair.repair(Store(), rows, todo)
+        return r, writes, buf.getvalue()
+
+    def rows(self, n=3):
+        an = json.dumps({"brief": [{"t": 10, "text": "kept"}],
+                         "draft": {"text": "What it means: the board", "origin": "ai:gemini-3.6-flash"}})
+        return [{"id": f"m{i}", "title": "T", "summary": "At the September 22, 2026,",
+                 "summary_origin": "ai:gemini-3.6-flash", "analysis_json": an} for i in range(n)]
+
+    def test_a_failed_call_changes_nothing_and_the_run_stops(self):
+        """A quota, a bad key, a request the API refused, a timeout: the old
+        repair wrote the extractive summary over every Gemini summary and
+        removed every draft, said REPAIR DONE and exited 0 — and no re-run
+        could put it back (a re-review catch, the gravest). Now the row stays
+        as stored, two such meetings in a row stop the run, and it fails."""
+        rows = self.rows(3)
+        todo = [{"id": m["id"], "want": ["summary", "draft"]} for m in rows]
+
+        def quota(*a, **k):
+            raise RuntimeError("rate limited by the API (429) — wait a moment and retry")
+        r, writes, out = self.run_repair(rows, todo, quota)
+        self.assertEqual(writes, [])
+        self.assertEqual((r["fixed"], r["kept"], r["failed"]), (0, 2, 2))
+        self.assertIn("429", r["stopped"])
+        self.assertIn("REPAIR STOPPED — 2 meetings in a row could not be asked", out)
+        self.assertNotIn("m2", out)                        # the third was never asked
+        self.assertIn("could not be asked — kept as stored", out)
+        self.assertIn("no call answered", out)             # never the last call's numbers
+
+    def test_a_cut_answer_twice_is_the_extractive_summary_and_no_draft(self):
+        from czcore import llm
+        rows = self.rows(1)
+
+        def cut(*a, **k):
+            raise llm.CutOff("the answer was cut off at its length limit — a fragment is not a whole answer",
+                             "At the", "MAX_TOKENS")
+        r, writes, out = self.run_repair(rows, [{"id": "m0", "want": ["summary", "draft"]}], cut)
+        self.assertEqual((r["fixed"], r["failed"]), (1, 0))
+        w = writes[0]
+        self.assertEqual(w["summary_origin"], "extractive")
+        self.assertTrue(w["summary"].strip())                               # the tape's own sentences
+        an = json.loads(w["analysis_json"])
+        self.assertNotIn("draft", an)
+        self.assertEqual(an["brief"], [{"t": 10, "text": "kept"}])       # the rest of the reading untouched
+        # the row as it stood is in the log, before it changed
+        lines = out.splitlines()
+        b = next(i for i, ln in enumerate(lines) if ln.strip().startswith("BACKUP "))
+        u = next(i for i, ln in enumerate(lines) if ln.startswith("UPDATED "))
+        self.assertLess(b, u)
+        backup = json.loads(lines[b].strip()[len("BACKUP "):])
+        self.assertEqual(backup["summary"], "At the September 22, 2026,")
+        self.assertEqual(backup["draft"]["text"], "What it means: the board")
+
+    def test_a_whole_answer_is_written_and_nothing_else_is(self):
+        rows = self.rows(1)
+        r, writes, out = self.run_repair(rows, [{"id": "m0", "want": ["summary", "draft"]}],
+                                         lambda *a, **k: "The board met [00:10].")
+        self.assertEqual(writes[0]["summary"], "The board met [00:10].")
+        self.assertEqual(writes[0]["summary_origin"], "ai:gemini-3.6-flash")
+        self.assertEqual(json.loads(writes[0]["analysis_json"])["draft"],
+                         {"text": "The board met [00:10].", "origin": "ai:gemini-3.6-flash"})
+        # a meeting with no draft whose ask comes back cut has nothing to change: no write
+        from czcore import llm
+        bare = [{"id": "n0", "title": "T", "summary": "", "summary_origin": "extractive", "analysis_json": "{}"}]
+
+        def cut(*a, **k):
+            raise llm.CutOff("cut", "At", "MAX_TOKENS")
+        r, writes, out = self.run_repair(bare, [{"id": "n0", "want": ["draft"]}], cut)
+        self.assertEqual((writes, r["kept"], r["fixed"]), ([], 1, 0))
+        self.assertNotIn("UPDATED", out)
+
+    def test_an_analysis_it_cannot_read_is_never_planned_nor_written(self):
+        """The planner tolerated bad JSON and planned a draft for it; the run
+        then crashed on the row, and the job's retry crashed on it again — no
+        row after it was ever repaired (a re-review catch)."""
+        from record.repair import plan
+        for bad in ("not json", json.dumps("a string"), json.dumps([1, 2])):
+            rows = [{"id": "x", "summary": "Whole.", "summary_origin": "ai:gpt-4o-mini", "analysis_json": bad,
+                     "updated_at": 0}]
+            self.assertEqual(plan(rows, 100.0), [], bad)
+            r, writes, out = self.run_repair(rows, [{"id": "x", "want": ["draft"]}], lambda *a, **k: "Whole.")
+            self.assertEqual((writes, r["failed"]), ([], 0))
 
 
 if __name__ == "__main__":

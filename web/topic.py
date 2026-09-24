@@ -43,6 +43,7 @@ WINDOW = 12.0            # a hit's clip: its line, twelve seconds on (the tray's
 MERGE_CAP = 90.0         # a run of hits merges into one clip, up to this long
 BINS = 48                # where-on-the-tape slices per meeting
 FULL_CAP = 120           # the full cut's clips: its link stays well under a host's URL limit
+LINK_CAP = 240           # any reel link: past ~8 KB the host answers 414 (app.js REEL_LINK_CAP)
                          # (GitHub Pages' CDN refuses past 8 KB; housing's 320 clips were 7.3 KB)
 
 
@@ -138,11 +139,24 @@ def merge_windows(hits: Sequence[dict], duration: float, window: float = WINDOW,
     return out
 
 
+def spread(items: Sequence, cap: int) -> list:
+    """At most `cap` of the items, spread evenly from the first to the last —
+    a capped cut of a word over time still reaches its latest night. Integer
+    steps, so app.js tpSpread picks the same clips."""
+    n = len(items)
+    if n <= cap:
+        return list(items)
+    if cap <= 1:
+        return list(items[:cap])
+    return [items[(i * (n - 1)) // (cap - 1)] for i in range(cap)]
+
+
 def reel_url(clips: Sequence[dict], base: str = "/app") -> str:
     """The viewer's link, exactly as app.js reelShareURL writes it: v1 while
     the clips are one meeting's (`m=<pid>&c=<start>-<end>,…`), v2 the moment
     they span two (`c=<pid>:<start>-<end>,…`). The node twin test decodes
     these with the reader's own decodeReel."""
+    clips = list(clips)[:LINK_CAP]
     pids = []
     for c in clips:
         if c["pid"] not in pids:
@@ -312,9 +326,9 @@ def aggregate(meetings: Sequence[dict], hits: Sequence[dict], topic: dict,
                  "clip": {"pid": r["pid"], "start": r["hits"][0]["t"],
                           "end": r["clips"][0]["end"] if r["clips"] else r["hits"][0]["t"] + WINDOW}}
                 for r in said]
-    short = [c["clip"] for c in chapters]
     every = [c for r in said for c in r["clips"]]
-    full = every[:FULL_CAP]
+    full = spread(every, FULL_CAP)
+    short = spread([c["clip"] for c in chapters], LINK_CAP)
     return {
         "slug": topic["slug"], "name": topic.get("name") or topic["slug"],
         "long": topic.get("long") or topic.get("name") or topic["slug"],

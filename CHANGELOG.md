@@ -2,6 +2,44 @@
 
 ## unreleased
 
+### The verdict, read on a phone — the model's words whole, the search's numbers the story's, and the desk's last pieces in the paper — 2026-09-24 (v2.1.23)
+
+Read on a phone, the live record was saying things that were not whole.
+Every summary the Gemini lane wrote had stopped mid-sentence ("At the
+September 22, 2026,"), and so had every drafted reading on every meeting:
+Gemini's thinking spends from the same budget as its answer, the calls
+asked for 400 and 700 tokens, and nothing asked why an answer stopped.
+The seam now asks a thinking model to think briefly, gives the thought its
+own room, and refuses any answer that did not end the way a whole answer
+ends — a fragment is never pressed, and the extractive summary stands in
+its place (specs/28). A one-off repair asks again for everything the
+broken budget wrote. The readings' Markdown is read, not shown; their
+receipts are links, said the way the page says a time. The "what changed"
+paragraphs are the tape's own words: a model's was stored with no origin,
+and two were on the front page, unlabeled and cut off.
+
+The front page's "80 mentions" of AI opened a search that said 73; the
+search page now counts a featured word by its story's own rule. Meaning
+search, which had stopped answering inside the reader's bell (13–27 s on
+the old database), answers in about a second on the resized one. On a
+phone: the town question is asked once, and only where scope shapes the
+page; the find box sits over the lines it folds; a shared reel leads with
+its player; the keys sheet is centred; the tab strip names each story and
+wraps two by two.
+
+And the desk's last pieces, in the paper: a second featured word,
+*housing*; every picture the press draws downloads as an .svg that says
+how to read it; the tray's clips drag, by mouse or finger, the arrows
+standing as the keyboard's way; a glossary of forty-seven civic words —
+Select Board to Chapter 40B — each in plain language with its public
+source and the record's own count of it town by town, the definitions
+written with Claude and labeled so; and wherever a step needs the desk,
+the desktop app's download beside it. Six adversarial reviews, every
+finding folded with a test; five re-reviews of the folds, and their 48
+findings folded too — the gravest a repair that would have overwritten
+every model answer on any failed call, now one that changes nothing unless
+the model answered and was refused, and logs each row before it writes.
+
 ### The steward's desk — 2026-09-24 (v2.1.22)
 
 The console grew from four screens into a desk (specs/27): the night as it

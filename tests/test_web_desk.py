@@ -125,8 +125,20 @@ console.log(JSON.stringify([0, 19, 21, 75, 119, 121, 900].map(y => dgSlot(y, R))
         self.assertEqual(o["duplicates"], "A A' B")
         self.assertEqual(o["lostRelease"], {"moves": 0, "raf": 0, "lifted": 0})
         self.assertEqual(o["blur"], {"raf": 0, "lifted": 0})
-        self.assertEqual(o["touch"], {"number": "scrolls", "glyph": "drag"})
+        # a finger or a pen on the number scrolls the page; only the ⠿ lifts a clip
+        # (a pen there lifted the row, then the browser cancelled it — a re-review catch)
+        self.assertEqual(o["touch"], {"number": "scrolls", "glyph": "drag", "penNumber": "scrolls"})
         self.assertEqual(o["fixed"], {"scrolls": 0})
+        # a list hidden mid-drag (the panel collapsed, its mode switched) ends the
+        # drag: every row measured nothing, and a drop landed anywhere ("acdefb")
+        self.assertEqual(o["hidden"], {"moves": 0, "order": "abcd", "raf": 0, "lifted": 0})
+        # a getComputedStyle that answers null neither throws nor leaves the drag stuck
+        self.assertEqual(o["noStyle"], {"first": "bac", "second": "abc", "moves": 2})
+        # a scroller half off the screen scrolls at the screen's edge
+        self.assertGreater(o["offscreen"]["scrolled"], 0)
+        # the last slot's line stays inside the rows of a list that does not scroll
+        self.assertFalse(o["lastSlot"]["hidden"])
+        self.assertLessEqual(o["lastSlot"]["top"], o["lastSlot"]["lowest"] - 3)
 
     def test_both_trays_carry_the_grip_and_keep_their_arrows(self):
         tray = lift(r"  function buildTray\(focus\) \{.+?\n  \}\n")
@@ -142,6 +154,10 @@ console.log(JSON.stringify([0, 19, 21, 75, 119, 121, 900].map(y => dgSlot(y, R))
         self.assertIn('const keepScroll = ($(".cz-rclips", body) || {}).scrollTop || 0;', panel)
         self.assertIn("if (t) t.focus(focus.quiet ? { preventScroll: true } : undefined);", panel)
         css = (REPO / "web" / "static" / "app.web.css").read_text(encoding="utf-8")
+        # a drop (or a removal) lands the meeting tray's focus on the row's
+        # quote, never its first button (◀ start earlier: a Space would trim)
+        self.assertIn('<div class="rt-quote" tabindex="-1">', tray)
+        self.assertIn('focus.act === "row" ? $(".rt-quote", row)', tray)
         # only the glyph refuses the page's scroll: a finger on the number still scrolls
         self.assertIn("[data-grip]{cursor:grab;user-select:none", css)
         self.assertNotIn("[data-grip]{cursor:grab;touch-action:none", css)
@@ -251,7 +267,8 @@ class TestTheGlossary(unittest.TestCase):
         from tests.test_web_topic import TestTopicTwins
         idx = json.loads((self.out / "glossary" / "index.json").read_text())
         free = next(r for r in idx if r["slug"] == "free-cash")
-        self.assertEqual(free, {"slug": "free-cash", "q": "free cash", "phrases": ["free cash"], "towns": ["Otherton", "Testville"]})
+        self.assertEqual(free, {"slug": "free-cash", "q": "free cash", "phrases": ["free cash"], "towns": ["Otherton", "Testville"],
+                                "only": []})
         self.assertFalse(any(r["slug"] == "variance" for r in idx))      # an unsaid word is not indexed
         tw = TestTopicTwins()
         body = "\n".join([
@@ -285,13 +302,19 @@ class TestTheGlossary(unittest.TestCase):
         self.assertIn("never at\n      press time, never in your browser", self.page)
         self.assertFalse(glossary.REVIEWED)
         self.assertIn("No person has yet read them against their sources", self.page)
-        self.assertIn("no model counts\n      them", self.page)
+        self.assertIn("no model counts them", self.page)
+        self.assertIn("the developers used while writing this code", self.page)
+        self.assertIn("over the transcripts of the towns each\n      word belongs to", self.page)
         ai = (self.out / "ai" / "index.html").read_text()
         row = ai[ai.index("<tr><td>the glossary</td>"):]
         row = row[:row.index("</tr>")]
         self.assertIn("Anthropic <code>Claude</code>", row)
         self.assertIn("never at press time", row)
         self.assertNotIn("the desk,", row)                          # the desk means your machine; Claude is not there
+        # the ledger names the glossary's own model — they cannot drift apart
+        self.assertIn(f"(<code>{glossary.MODEL}</code>)", row)
+        self.assertIn(glossary.MODEL, glossary.WRITTEN_WITH)
+        self.assertIn("used while writing this code", row)
 
     def test_every_source_is_a_public_one_it_names(self):
         from web import glossary
@@ -311,9 +334,74 @@ class TestTheGlossary(unittest.TestCase):
         self.assertIn("a fund set up for one named purpose can be spent by a simple majority", says["stabilization-fund"])
         self.assertIn("Boston is the exception", says["zoning"])
         self.assertIn("safe harbors", says["chapter-40b"])
-        self.assertIn("Boston excepted", says["mbta-communities"])
+        # the 177 already leave Boston out, and only part of a district sits near a station
+        self.assertIn("177 cities and towns in and around the MBTA’s service area — Boston, served by the MBTA "
+                      "but outside the Zoning Act, is not one of them", says["mbta-communities"])
+        self.assertIn("in part within half a mile of it", says["mbta-communities"])
         self.assertIn("ride on top of the limit", says["levy"])
+        self.assertIn("the state’s glossary counts exclusions into the limit", says["levy"])
         self.assertNotIn("harms no one", says["variance"])
+        self.assertIn("Putting money in takes a simple majority", says["stabilization-fund"])
+        self.assertIn("strategy for collective bargaining or litigation", says["executive-session"])
+        # where the two differ the source is the authority: the statute is named first
+        src = {e["slug"]: e["sources"] for e in glossary.ENTRIES}
+        for slug in ("levy", "proposition-2-half"):
+            self.assertTrue(src[slug][0][0].startswith("M.G.L. c. 59 § 21C"), slug)
+        # Boston's zoning rests on its Enabling Act, and its sentence cites it
+        for slug in ("zoning", "zoning-board-of-appeals"):
+            self.assertIn(glossary.BOS_EA, src[slug], slug)
+
+    def test_every_phrase_is_trimmed_and_every_query_is_its_own(self):
+        """A phrase with a space at either end would count a match on the
+        joining space (the fast count assumes none) and the reader trims what
+        the press does not; and a glossary query that equals another's, or a
+        featured word's, would send its count link to the other's number."""
+        from web import glossary, topic
+        for e in glossary.ENTRIES:
+            for ph in e["phrases"]:
+                self.assertEqual(ph, " ".join(ph.split()), f"{e['slug']}: {ph!r}")
+        qs = [glossary.q_of(e).strip().lower() for e in glossary.ENTRIES]
+        self.assertEqual(len(qs), len(set(qs)))
+        featured = {str(t.get("q") or t.get("name") or t["slug"]).strip().lower() for t in topic.FEATURED}
+        self.assertFalse(featured & set(qs), featured & set(qs))
+
+    def test_a_count_with_no_town_is_said_not_linked_and_an_undated_night_is_never_first(self):
+        """No search can be pinned to "meetings with no town recorded", so
+        that count is said, not linked (it could never land on its number);
+        and a day that is not a whole date ("2026", "TBD") is undated — it
+        sorts last and is never where a word was first said."""
+        from web import glossary
+        meetings = [
+            {"pid": "nt", "date": "2026-02-02", "town": "", "segments": [{"start": 4, "text": "free cash here"}]},
+            {"pid": "yr", "date": "2026", "town": "Testville", "segments": [{"start": 1, "text": "free cash first?"}]},
+            {"pid": "ok", "date": "2026-03-03", "town": "Testville", "segments": [{"start": 7, "text": "free cash"}]},
+        ]
+        c = glossary.count(meetings)
+        self.assertEqual(c["free-cash"]["towns"]["Testville"]["first"], {"pid": "ok", "date": "2026-03-03", "t": 7.0})
+        html = glossary.body(meetings, "/app", c)
+        e = html[html.index('id="free-cash"'):]
+        e = e[:e.index("</section>")]
+        self.assertIn("meetings with no town recorded: 1 time in 1 meeting", e)
+        self.assertNotIn('href="/app/s?q=free%20cash"', e)             # no town-less search link
+        self.assertIn('href="/app/s?q=free%20cash&amp;town=Testville"', e)
+        self.assertEqual(glossary._day("TBD"), "in an undated meeting")
+        self.assertEqual(glossary._day("2026"), "in an undated meeting")
+        self.assertEqual(glossary._day("2026-03-03"), "on March 3, 2026")
+        # a meeting that said only "no action" is not named "favorable action"
+        n = [{"pid": "na", "date": "2026-01-01", "town": "Brookline", "segments": [{"start": 0, "text": "no action on it"}]}]
+        self.assertEqual(glossary.terms_on(n[0], glossary.count(n)),
+                         [{"slug": "favorable-action", "term": "favorable action / no action", "n": 1}])
+
+    def test_the_search_page_credits_the_glossary_only_where_its_count_applies(self):
+        """A Boston search for Brookline's "advisory committee" counts lines
+        the glossary leaves out on purpose — the page does not credit the
+        glossary's count there (a re-review catch)."""
+        from web import glossary
+        idx = {r["slug"]: r for r in glossary.index(glossary.count([
+            {"pid": "bk", "date": "2026-01-01", "town": "Brookline", "segments": [{"start": 0, "text": "the advisory committee"}]}]))}
+        self.assertEqual(idx["advisory-committee"]["only"], ["Brookline"])
+        story = JS[JS.index("async function sqStory("):JS.index("function sqTray(")]
+        self.assertIn('(!feat.only.length || feat.only.includes(SCOPE.town || "") ? `, the words <a href="${BASE}/glossary/#', story)
 
     def test_a_phrase_finds_the_entry_that_explains_it(self):
         from web import glossary
@@ -322,9 +410,15 @@ class TestTheGlossary(unittest.TestCase):
         self.assertEqual(glossary.entry_for("  free   cash ")["slug"], "free-cash")
         self.assertEqual(glossary.entry_for("levies")["slug"], "levy")
         self.assertEqual(glossary.entry_for("capital improvement plan")["slug"], "capital-improvement-plan")
-        # an acronym stands only as written: a pilot program is not a PILOT
+        # an acronym that spells a word stands only as written: a pilot program is not a PILOT
         self.assertIsNone(glossary.entry_for("pilot"))
         self.assertEqual(glossary.entry_for("PILOT")["slug"], "pilot")
+        # every other acronym is the same word in any case — the analyzer's topics are lowercase
+        for word, slug in (("40b", "chapter-40b"), ("zba", "zoning-board-of-appeals"), ("cip", "capital-improvement-plan"),
+                           ("bpda", "bpda"), ("dese", "dese"), ("metco", "metco"), ("fy27", "fiscal-year"), ("FY27", "fiscal-year"),
+                           ("overlay", "overlay-district"), ("overlays", "overlay-district"),
+                           ("MBTA community", "mbta-communities")):
+            self.assertEqual((glossary.entry_for(word) or {}).get("slug"), slug, word)
         self.assertIsNone(glossary.entry_for("parking"))
         self.assertIsNone(glossary.entry_for(""))
 
@@ -377,12 +471,18 @@ class TestTheDeskIsOneClickAway(unittest.TestCase):
                 self.assertIn(f'href="{self.DMG}"', html, page)
             press = (out / "press" / "index.html").read_text()
             self.assertIn("↓ Get the desktop app — macOS</a>", press)
+            # the reel page says it once, and true of any reel: one meeting's renders at the desk
+            reel = (out / "r" / "index.html").read_text()
+            self.assertIn("A reel of one meeting renders as a video at the desk", reel)
             self.assertIn('every release →</a>', press)                 # the releases page stays one link on
 
     def test_a_single_meeting_reel_offers_the_desk_and_a_reel_across_meetings_does_not(self):
         viewer = JS[JS.index('cites.innerHTML = head + `<div class="reelcitelist">'):]
         viewer = viewer[:viewer.index("</p>`;")]
         self.assertIn('${multi ? "" : deskBtn()}', viewer)
+        # the page's pressed line says the desk renders one meeting's reel; the viewer does not say it twice
+        self.assertNotIn("Rendering it as a video needs the desk", viewer)
+        self.assertIn("rendering one video across meetings is a desk step still to come", viewer)
         tray = lift(r"  function buildTray\(focus\) \{.+?\n  \}\n")
         self.assertIn('${multi ? "" : deskBtn()}', tray)
         panel = lift(r"  function refreshReelSummary\(focus\) \{.+?\n  \}\n")

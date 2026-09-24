@@ -8,12 +8,13 @@ applies (Brookline, Boston, the Commonwealth), where to read the public
 source, and — the record's own contribution — how often the record says
 it, when it first did, and the search that finds every line.
 
-Two halves, labeled apart. The definitions were written at the desk with
-Claude (Anthropic's model), paraphrasing the public source each entry
-names — never at press time, never in a reader's browser; the ledger on
-/app/ai says so, and so does the page. The counts are the press's, whole-
-word over every transcript (web/topic.py's own rule), and no model counts
-them. Corrections annotate, like everything on the record.
+Two halves, labeled apart. The definitions were written with Claude
+(Anthropic's model), through the coding assistant the developers used while
+writing this code, paraphrasing the public source each entry names — never
+at press time, never in a reader's browser; the ledger on /app/ai says so,
+and so does the page. The counts are the press's, whole-word (web/topic.py's
+own rule) over the transcripts of the towns each word belongs to, and no
+model counts them. Corrections annotate, like everything on the record.
 
 No person is defined here — the covenant keeps no person pages; bodies and
 offices only.
@@ -21,8 +22,8 @@ offices only.
 
 from __future__ import annotations
 
+import re
 from typing import Dict, List, Optional, Sequence
-from urllib.parse import quote
 
 from .charts import esc, n_of
 
@@ -35,6 +36,8 @@ BK_HB = ("Brookline — Town Meeting Handbook", "https://www.brooklinema.gov/277
 BK_OV = ("Brookline — the FY 2027–2029 override guide", "https://www.brooklinema.gov/3590/FY2024-26-Override-Central")
 BOS_CC = ("Boston — City Council", "https://www.boston.gov/departments/city-council")
 OML = ("the Attorney General — the Open Meeting Law", "https://www.mass.gov/the-open-meeting-law")
+BOS_EA = ("Boston — the Enabling Act (St. 1956, c. 665)",
+          "https://www.bostonplans.org/getattachment/f44de6aa-8b2b-4cae-b110-0dd502ebc2bd")
 
 
 def law(cite: str, path: str):
@@ -95,7 +98,8 @@ ENTRIES: List[dict] = [
              "Board of Appeal does the same work under the city’s own zoning law.",
      "phrases": ["zoning board of appeals", "zoning board of appeal", "ZBA"],
      "sources": [law("M.G.L. c. 40A § 14", "TitleVII/Chapter40A/Section14"),
-                 law("c. 40B § 21 (comprehensive permits)", "TitleVII/Chapter40B/Section21")]},
+                 law("c. 40B § 21 (comprehensive permits)", "TitleVII/Chapter40B/Section21"),
+                 BOS_EA]},
     {"slug": "bpda", "group": "who", "term": "BPDA", "where": ["Boston"],
      "says": "The Boston Planning & Development Agency, which planned the city’s growth and reviewed its "
              "development. Its staff and most of its work have moved into the City of Boston’s Planning "
@@ -110,6 +114,7 @@ ENTRIES: List[dict] = [
              "Meeting may act only on what its warrant says.",
      "phrases": ["warrant"], "sources": [BK_TM, law("M.G.L. c. 39 § 10", "TitleVII/Chapter39/Section10")]},
     {"slug": "favorable-action", "group": "meeting", "term": "favorable action, no action", "where": ["Brookline"],
+     "short": "favorable action / no action",
      "says": "How a board recommends a warrant article to Town Meeting: favorable action — adopt it, usually in "
              "the words of a motion it offers — or no action. The recommendation is advice; Town Meeting decides "
              "by its own vote.",
@@ -138,9 +143,10 @@ ENTRIES: List[dict] = [
      "phrases": ["public comment", "public comments"], "sources": [BK_SB, OML]},
     {"slug": "executive-session", "group": "meeting", "term": "executive session", "where": ["Massachusetts"],
      "says": "The part of a meeting a public body may hold in private — only for a reason the Open Meeting Law "
-             "lists, among them a person’s reputation and, when an open meeting would hurt the body’s position "
-             "and the chair says so, collective bargaining, litigation and the purchase of real estate — entered "
-             "by a roll-call vote in open session, with the reason stated.",
+             "lists, among them a person’s reputation, negotiations with staff outside a union, and — when an open "
+             "meeting would hurt the body’s position and the chair says so — strategy for collective bargaining "
+             "or litigation and the purchase or lease of real estate — entered by a roll-call vote in open "
+             "session, with the reason stated.",
      "phrases": ["executive session"], "sources": [law("M.G.L. c. 30A § 21", "TitleIII/Chapter30A/Section21")]},
     {"slug": "open-meeting-law", "group": "meeting", "term": "Open Meeting Law", "where": ["Massachusetts"],
      "says": "The state law that requires a public body to meet in the open, to post each meeting forty-eight "
@@ -156,7 +162,7 @@ ENTRIES: List[dict] = [
     {"slug": "fiscal-year", "group": "money", "term": "fiscal year (FY)", "where": ["Massachusetts"],
      "says": "The budget year. Massachusetts cities and towns run theirs from July 1 to June 30 and name it for "
              "the year it ends: FY2027 began on July 1, 2026.",
-     "phrases": ["fiscal year", "FY26", "FY27", "FY28"], "sources": [DLS]},
+     "phrases": ["fiscal year", "FY26", "FY27", "FY28", "FY29", "FY30"], "sources": [DLS]},
     {"slug": "appropriation", "group": "money", "term": "appropriation", "where": ["Massachusetts"],
      "says": "A vote of Town Meeting or a city council that authorizes spending a set amount for a set purpose. "
              "Most public money is spent only as an appropriation allows; grants, gifts and revolving funds have "
@@ -170,13 +176,13 @@ ENTRIES: List[dict] = [
              "override, or tax beyond it — even beyond the ceiling — for one project’s debt with a debt exclusion.",
      "phrases": ["proposition two and a half", "prop two and a half", "proposition 2 and a half",
                  "prop 2 and a half", "proposition 2 1/2", "prop 2 1/2", "proposition 2½", "prop 2½"],
-     "sources": [DLS, law("M.G.L. c. 59 § 21C", "TitleIX/Chapter59/Section21C")]},
+     "sources": [law("M.G.L. c. 59 § 21C", "TitleIX/Chapter59/Section21C"), DLS]},
     {"slug": "levy", "group": "money", "term": "levy, levy limit", "where": ["Massachusetts"],
      "says": "The levy is what a community raises in property taxes in a year. The levy limit is the most "
              "Proposition 2½ lets it raise: last year’s limit, plus 2.5 percent, plus new growth, plus any "
              "override its voters approved. A debt exclusion’s payments ride on top of the limit, only while the "
-             "debt lasts.",
-     "phrases": ["levy"], "sources": [DLS, law("M.G.L. c. 59 § 21C", "TitleIX/Chapter59/Section21C")]},
+             "debt lasts — so the law reads; the state’s glossary counts exclusions into the limit.",
+     "phrases": ["levy"], "sources": [law("M.G.L. c. 59 § 21C", "TitleIX/Chapter59/Section21C"), DLS]},
     {"slug": "new-growth", "group": "money", "term": "new growth", "where": ["Massachusetts"],
      "says": "Tax from property new to the tax rolls — new buildings, additions, renovations — which a community "
              "may add to its levy limit on top of the 2.5 percent. A rise in market values alone is not new growth.",
@@ -199,7 +205,7 @@ ENTRIES: List[dict] = [
      "says": "A community’s savings for the future — an emergency, a lean year, a large capital cost. Creating a "
              "fund or changing its purpose takes a two-thirds vote of Town Meeting or the council. Spending from the "
              "general stabilization fund takes two thirds; a fund set up for one named purpose can be spent by a "
-             "simple majority.",
+             "simple majority. Putting money in takes a simple majority.",
      "phrases": ["stabilization fund", "stabilization funds"],
      "sources": [DLS, law("M.G.L. c. 40 § 5B", "TitleVII/Chapter40/Section5B")]},
     {"slug": "reserve-fund", "group": "money", "term": "reserve fund", "where": ["Massachusetts", "Brookline"],
@@ -248,12 +254,11 @@ ENTRIES: List[dict] = [
              "zoning code rests on a state law of its own, and its Zoning Commission, with the mayor — not the "
              "City Council — adopts changes.",
      "phrases": ["zoning"],
-     "sources": [law("M.G.L. c. 40A (the Zoning Act)", "TitleVII/Chapter40A"),
-                 ("Boston — the Planning Department", "https://www.bostonplans.org/about-us")]},
+     "sources": [law("M.G.L. c. 40A (the Zoning Act)", "TitleVII/Chapter40A"), BOS_EA]},
     {"slug": "overlay-district", "group": "built", "term": "overlay district", "where": ["Massachusetts"],
      "says": "A zone drawn over the existing zoning that adds rules or allows more — denser housing near transit, "
              "a historic area’s protections — without erasing the zoning beneath it.",
-     "phrases": ["overlay district", "overlay districts", "overlay zoning"],
+     "phrases": ["overlay district", "overlay districts", "overlay zoning"], "aka": ["overlay"],
      "sources": [law("M.G.L. c. 40A", "TitleVII/Chapter40A")]},
     {"slug": "special-permit", "group": "built", "term": "special permit", "where": ["Massachusetts"],
      "says": "Permission for a use or a building the zoning allows only case by case, granted by a named board "
@@ -275,10 +280,11 @@ ENTRIES: List[dict] = [
      "sources": [law("M.G.L. c. 40B §§ 20–23", "TitleVII/Chapter40B/Section20"),
                  law("§ 22 (the appeal)", "TitleVII/Chapter40B/Section22")]},
     {"slug": "mbta-communities", "group": "built", "term": "MBTA Communities (Section 3A)", "where": ["Massachusetts"],
-     "says": "The 2021 state law that requires each of the 177 cities and towns in and around the MBTA’s service "
-             "area — Boston excepted, its zoning having a law of its own — to have at least one zoning district of "
-             "reasonable size (at least 15 homes an acre, within half a mile of a station where there is one) "
-             "where multifamily housing open to families is allowed as of right, without a special permit.",
+     "says": "The 2021 state law that requires 177 cities and towns in and around the MBTA’s service area — "
+             "Boston, served by the MBTA but outside the Zoning Act, is not one of them — to have at least one "
+             "zoning district of reasonable size (at least 15 homes an acre, and where a town has a station, in "
+             "part within half a mile of it) where multifamily housing open to families is allowed as of right, "
+             "without a special permit.",
      "phrases": ["MBTA communities", "section 3A"],
      "sources": [("Massachusetts — the MBTA Communities law", "https://www.mass.gov/info-details/multi-family-zoning-requirement-for-mbta-communities"),
                  law("M.G.L. c. 40A § 3A", "TitleVII/Chapter40A/Section3A")]},
@@ -320,8 +326,10 @@ BY_SLUG: Dict[str, dict] = {e["slug"]: e for e in ENTRIES}
 # Has a person read these definitions against their sources? Until one has,
 # the page says so (Our AI Constitution: AI drafts, people decide).
 REVIEWED = False
-# The model that wrote them, named the way every other ledger row names one.
-WRITTEN_WITH = "Claude (Anthropic, claude-opus-5-5)"
+# The model that wrote them, named the way every other ledger row names one
+# (web/emit.py page_ai reads MODEL — the ledger and the page cannot differ).
+MODEL = "claude-opus-5-5"
+WRITTEN_WITH = f"Claude (Anthropic, {MODEL})"
 
 
 def q_of(e: dict) -> str:
@@ -336,16 +344,22 @@ def towns_of(e: dict) -> Optional[set]:
     return None if "Massachusetts" in e["where"] else set(e["where"])
 
 
+# an acronym that spells an ordinary word matches only as written ("PILOT"
+# the payment, never "pilot" the program); every other one is the same word
+# in any case — the analyzer's topic names are lowercase ("zba", "40b")
+_AS_WRITTEN = {"PILOT"}
+
+
 def _names(e: dict) -> set:
-    """The phrases a lede may name an entry by: its counted phrases, and the
-    names in its heading — except an acronym, which stands only as written
-    ("PILOT" the payment, never "pilot" the program)."""
-    names = {p.lower() for p in e["phrases"] if not p.isupper()}
+    """The phrases a lede may name an entry by: its counted phrases, the
+    names in its heading, and any it is also called (`aka`, never counted)
+    — lowercased, but for an acronym that spells a word."""
+    names = {p.lower() for p in e["phrases"] if p not in _AS_WRITTEN}
     for t in e["term"].split(","):
         t = t.split("(")[0].strip()
-        if t and not t.isupper():
+        if t and t not in _AS_WRITTEN:
             names.add(t.lower())
-    return names
+    return names | {a.lower() for a in e.get("aka", ())}
 
 
 def _acronyms(e: dict) -> set:
@@ -363,11 +377,16 @@ def entry_for(phrase: str) -> Optional[dict]:
     k = raw.lower()
     if not k:
         return None
+    # the plural folded both ways: "levies" → levy, "MBTA community" → communities
     keys = [k]
     if k.endswith("ies"):
         keys.append(k[:-3] + "y")
     elif k.endswith("s"):
         keys.append(k[:-1])
+    if k.endswith("y"):
+        keys.append(k[:-1] + "ies")
+    elif not k.endswith("s"):
+        keys.append(k + "s")
     for e in ENTRIES:
         if raw in _acronyms(e):
             return e
@@ -390,29 +409,34 @@ def _lines(m: dict) -> List[tuple]:
             for s in (m.get("segments") or []) if str(s.get("text") or "").strip()]
 
 
-def _night_counts(lines: List[tuple], pats: Sequence) -> tuple:
-    """(mentions, first_t) for one meeting — the story engine's rule
-    (web/topic.py mentions_in: a line read with the next joined on, a match
-    counted for the line it starts in) done in one pass per phrase over the
-    whole night rather than one per line: the night joined by single spaces,
-    each match placed on its line by offset, and a match that runs past the
-    next line dropped (mentions_in never sees a third line). Identical
-    counts; a twin test holds them to the per-line rule."""
-    import bisect
+def _night(lines: List[tuple]) -> tuple:
+    """A meeting's lines lowercased, where each starts, and the whole night
+    joined by single spaces — built once a meeting, read by every entry."""
     texts = [t.lower() for _, t in lines]
     starts, pos = [], 0
     for t in texts:
         starts.append(pos)
         pos += len(t) + 1
-    night = " ".join(texts)
+    return texts, starts, " ".join(texts)
+
+
+def _night_counts(lines: List[tuple], pats: Sequence, night: Optional[tuple] = None) -> tuple:
+    """(mentions, first_t) for one meeting — the story engine's rule
+    (web/topic.py mentions_in: a line read with the next joined on, a match
+    counted for the line it starts in) done in one pass per phrase over the
+    whole night rather than one per line: each match placed on its line by
+    offset, and a match that runs past the next line dropped (mentions_in
+    never sees a third line). A phrase is trimmed (a test holds it), so no
+    match starts on a joining space. Identical counts; a twin test holds
+    them to the per-line rule."""
+    import bisect
+    texts, starts, joined = night or _night(lines)
     n, first_i = 0, None
     for pat, lit in pats:
-        if lit not in night:
+        if lit not in joined:
             continue
-        for mt in pat.finditer(night):
+        for mt in pat.finditer(joined):
             li = bisect.bisect_right(starts, mt.start()) - 1
-            if mt.start() > starts[li] + len(texts[li]):
-                continue                                  # on the joining space: no line's
             last = li + 1 if li + 1 < len(texts) else li
             if mt.end() > starts[last] + len(texts[last]):
                 continue                                  # runs past the next line
@@ -428,17 +452,20 @@ def count(meetings: Sequence[dict]) -> Dict[str, dict]:
     from .topic import phrase_re
     pats = {e["slug"]: [(phrase_re(p), p.lower()) for p in e["phrases"]] for e in ENTRIES}
     out: Dict[str, dict] = {e["slug"]: {"mentions": 0, "meetings": 0, "towns": {}, "by": {}} for e in ENTRIES}
-    dated = sorted(meetings, key=lambda m: (str(m.get("date") or "9999"), str(m.get("pid") or "")))
+    # a day that is not a whole date ("2026", "TBD") is undated, and sorts last:
+    # it can never be where a word was "first" said
+    dated = sorted(meetings, key=lambda m: (_whole_day(m.get("date")) or "9999", str(m.get("pid") or "")))
     for m in dated:
         lines = _lines(m)
         if not lines:
             continue
+        night = _night(lines)
         town = str(m.get("town") or "")
         for e in ENTRIES:
             scope = towns_of(e)
             if scope is not None and town not in scope:
                 continue
-            n, first_t = _night_counts(lines, pats[e["slug"]])
+            n, first_t = _night_counts(lines, pats[e["slug"]], night)
             if not n:
                 continue
             r = out[e["slug"]]
@@ -449,7 +476,7 @@ def count(meetings: Sequence[dict]) -> Dict[str, dict]:
             t["mentions"] += n
             t["meetings"] += 1
             if t["first"] is None:
-                t["first"] = {"pid": m["pid"], "date": str(m.get("date") or ""), "t": first_t}
+                t["first"] = {"pid": m["pid"], "date": _whole_day(m.get("date")), "t": first_t}
     return out
 
 
@@ -458,14 +485,16 @@ def index(counts: Dict[str, dict]) -> List[dict]:
     words the glossary's way: the query each count links to, its phrases,
     the towns it was counted in. Only entries the record says."""
     return [{"slug": e["slug"], "q": q_of(e), "phrases": list(e["phrases"]),
-             "towns": sorted(counts[e["slug"]]["towns"])}
+             "towns": sorted(counts[e["slug"]]["towns"]),
+             "only": sorted(towns_of(e) or ())}          # [] = every town
             for e in ENTRIES if counts[e["slug"]]["mentions"]]
 
 
 def _short(e: dict) -> str:
     """An entry's first name, for a line of names ("warrant", not
-    "warrant, warrant article" — a comma in a list of names reads as two)."""
-    return e["term"].split(",")[0].strip()
+    "warrant, warrant article" — a comma in a list of names reads as two) —
+    or its own short name, where the names are two different words."""
+    return e.get("short") or e["term"].split(",")[0].strip()
 
 
 def terms_on(m: dict, counts: Dict[str, dict], top: int = 6) -> List[dict]:
@@ -477,9 +506,18 @@ def terms_on(m: dict, counts: Dict[str, dict], top: int = 6) -> List[dict]:
     return [{"slug": e["slug"], "term": _short(e), "n": n} for n, e in rows[:top]]
 
 
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def _whole_day(d) -> str:
+    """A meeting's day when it is a whole date (YYYY-MM-DD…), else ""."""
+    d = str(d or "")
+    return d[:10] if _DAY.match(d) else ""
+
+
 def _day(d: str) -> str:
     from .story import day_name
-    return f"on {day_name(d)}" if d else "in an undated meeting"
+    return f"on {day_name(d)}" if _whole_day(d) else "in an undated meeting"
 
 
 def _entry(e: dict, c: dict, base: str) -> str:
@@ -490,9 +528,13 @@ def _entry(e: dict, c: dict, base: str) -> str:
     where = "".join(f'<span class="gl-where">{esc(w)}</span>' for w in e["where"])
     towns = sorted(c["towns"].items(), key=lambda kv: (-kv[1]["mentions"], kv[0]))
     if towns:
+        # every count opens the search that finds it — but meetings with no
+        # town recorded: no search can be pinned to them, so theirs is said
+        def said(t: str, r: dict) -> str:
+            n = n_of(r["mentions"], "time")
+            return f'<a href="{esc(_search(q_of(e), base, t))}">{n}</a>' if t else n
         rec = " · ".join(
-            f'{esc(t or "meetings with no town recorded")}: '
-            f'<a href="{esc(_search(q_of(e), base, t))}">{n_of(r["mentions"], "time")}</a> in '
+            f'{esc(t or "meetings with no town recorded")}: {said(t, r)} in '
             f'{n_of(r["meetings"], "meeting")}, first '
             f'<a href="{base}/m/{esc(r["first"]["pid"])}#t{int(r["first"]["t"] or 0)}">{esc(_day(r["first"]["date"]))}</a>'
             for t, r in towns)
@@ -531,11 +573,12 @@ def body(meetings: Sequence[dict], base: str = "/app", counts: Optional[Dict[str
       each in plain language, with where it applies, the public source to read, and how often the
       record says it, town by town. Every count opens the search that finds it.</p>
     <p class="gl-label">The definitions were written with {esc(WRITTEN_WITH)} — on Anthropic’s
-      servers, through the coding assistant the developers use while this code was written; never at
+      servers, through the coding assistant the developers used while writing this code; never at
       press time, never in your browser. Each names the public source it draws on, and where the
       two differ the source is the authority. {reviewed} A correction is dated beside the entry it
-      changes. The counts are the record’s own, whole-word over every transcript: no model counts
-      them. <a href="{base}/ai">Our AI Constitution</a> keeps the ledger.</p>
+      changes. The counts are the record’s own, whole-word over the transcripts of the towns each
+      word belongs to: no model counts them. <a href="{base}/ai">Our AI Constitution</a> keeps the
+      ledger.</p>
     <nav class="gl-index" aria-label="every word, A to Z"><span class="kicker">A to Z</span> {idx}</nav>
     {"".join(groups)}
   </section>

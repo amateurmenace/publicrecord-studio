@@ -612,18 +612,19 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
     # record's most shareable, and a slide deck wants the picture, not a screenshot
     story_page = f"{base}/topic/{d['slug']}/"
     how_it_talks = f"How {town} talks about {name}"
-    def pic(kind: str, svg: str, what: str) -> str:
-        return pictures.link(pictures.put(f"topic-{pictures.slug(d['slug'])}-{kind}", svg),
-                             pictures.slug(f"{how_it_talks} {what}") + ".svg")
+    def pic(kind: str, draw, title: str, what: str) -> str:
+        # the link names its picture — ten on a page must not read alike
+        return pictures.link(pictures.put(f"topic-{pictures.slug(d['slug'])}-{kind}", draw(title)),
+                             pictures.slug(f"{how_it_talks} {what}") + ".svg", title)
     src = pictures.source(story_page)
-    mpic = pic("months", pictures.months_svg(d["months"], f"{how_it_talks} — mentions, month by month", src),
-               "mentions month by month") if d["months"] else ""
+    mpic = pic("months", lambda t: pictures.months_svg(d["months"], t, src),
+               f"{how_it_talks} — mentions, month by month", "mentions month by month") if d["months"] else ""
     parts.append(f'<section class="fp-part">{kicker("mentions, month by month")}'
                  + charts.month_bars(d["months"], d["meetings"], base=base) + mpic + msay + "</section>")
     tapes = charts.term_tapes(d["meetings"], base=base)
     if tapes:
-        tapes += pic("tapes", pictures.tapes_svg(d["meetings"], f"{how_it_talks} — where it fell, night by night", src),
-                     "where it fell")
+        tapes += pic("tapes", lambda t: pictures.tapes_svg(d["meetings"], t, src),
+                     f"{how_it_talks} — where it fell, night by night", "where it fell")
         parts.append(f'<section class="fp-part">{kicker("where it fell — every night that said it, slice by slice")}' + tapes
                      + say(f'Each row is a tape, start to end; a taller bar is a slice where “{esc(q)}” came up more. '
                            f'On {esc(_day_words(peak["date"]))} the {esc(peak["body"] or "board")} said it '
@@ -632,8 +633,8 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
         w0 = d["cowords"][0]
         parts.append(f'<section class="fp-part">{kicker("the words beside it — what was said in the same breath")}'
                      + charts.coword_bars(d["cowords"], q, base=base, town=town)
-                     + pic("words", pictures.words_svg(d["cowords"], f"{how_it_talks} — the words beside it", src),
-                           "the words beside it")
+                     + pic("words", lambda t: pictures.words_svg(d["cowords"], t, src),
+                           f"{how_it_talks} — the words beside it", "the words beside it")
                      + say(f'Counted in each line that says “{esc(q)}” and the lines either side of it, civic stopwords out: '
                            f'“{esc(w0["word"])}” led with {n_of(int(w0["count"]), "mention")}. Each word opens the record’s search for the two together.') + "</section>")
     # the chapters — the first time it came up, each night; cuttable
@@ -652,8 +653,9 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
                  + say(f'One line per meeting, in order — the moment the word first entered the room, with the line before and after it. '
                        f'Every line opens the tape; the tick beside it cuts the line into your reel. '
                        f'<a href="{search}">All {n_of(d["moments"], "line")} →</a>') + "</section>")
-    # the supercut — and the full cut, capped so its link stays under a host's URL limit
-    full_said = (f'the first {reel["full_n"]} of {n_of(reel.get("full_all", reel["full_n"]), "clip")}'
+    # the supercut — and the full cut, capped so its link stays under a host's
+    # URL limit, its clips spread from the first night to the latest
+    full_said = (f'{reel["full_n"]} of {n_of(reel.get("full_all", reel["full_n"]), "clip")}, first to latest'
                  if reel.get("full_all", reel["full_n"]) > reel["full_n"] else n_of(reel["full_n"], "clip"))
     parts.append(
         f'<section class="fp-part">{kicker("the supercut — every one of those moments, played in order")}'

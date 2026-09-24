@@ -144,7 +144,7 @@ class TestTheDrawersAndTheirTwins(unittest.TestCase):
                                   href=lambda w: f'#t{int(w["t"])}')
         link = pictures.take("m-x-words", cloud, "The meeting in words — X", "/app/m/x", hash_page="/app/m/x")
         self.assertEqual(link, '<p class="pic-dl"><a href="/app/pictures/m-x-words.svg" '
-                               'download="the-meeting-in-words-x.svg" aria-label="download “The meeting in words — X” as .svg">'
+                               'download="the-meeting-in-words-x.svg" aria-label="this picture, as .svg — The meeting in words — X">'
                                '↓ this picture, as .svg</a></p>')
         svg = pictures._PENDING["m-x-words"]
         self.assertIn('href="https://publicrecord.studio/app/m/x#t12"', svg)
@@ -178,6 +178,8 @@ class TestThePressWritesThePictures(unittest.TestCase):
 
     def test_the_topic_pictures_are_files_the_story_links(self):
         home = (self.out / "index.html").read_text()
+        titles = {"months": "mentions, month by month", "tapes": "where it fell, night by night", "words": "the words beside it"}
+        names = []
         for kind, what in (("months", "mentions-month-by-month"), ("tapes", "where-it-fell"), ("words", "the-words-beside-it")):
             f = self.out / "pictures" / f"topic-ai-{kind}.svg"
             self.assertTrue(f.exists(), f"no {f.name}")
@@ -186,8 +188,16 @@ class TestThePressWritesThePictures(unittest.TestCase):
             self.assertIn("How Testville talks about AI", svg)
             self.assertIn(">https://example.org/app/topic/ai/</text>", svg)
             self.assertIn(">counted from the record’s transcripts, no model · the record of", svg)
-            self.assertIn(f'<a href="/app/pictures/topic-ai-{kind}.svg" download="how-testville-talks-about-ai-{what}.svg">'
+            # each link names its picture, its visible words first (WCAG 2.5.3:
+            # a voice user says "click this picture"; ten links must not read alike)
+            self.assertIn(f'<a href="/app/pictures/topic-ai-{kind}.svg" download="how-testville-talks-about-ai-{what}.svg" '
+                          f'aria-label="this picture, as .svg — How Testville talks about AI — {titles[kind]}">'
                           "↓ this picture, as .svg</a>", home)
+            names.append(titles[kind])
+        # no two download links on the front page share a name
+        labels = re.findall(r'<a href="/app/pictures/[^"]+" download="[^"]+"( aria-label="[^"]+")?>', home)
+        self.assertTrue(labels and all(labels), "a picture link without a name")
+        self.assertEqual(len(labels), len(set(labels)))
         page = (self.out / "topic" / "ai" / "index.html").read_text()
         self.assertIn('href="/app/pictures/topic-ai-months.svg"', page)
 

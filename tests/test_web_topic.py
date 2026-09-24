@@ -168,11 +168,13 @@ class TestTopicTwins(unittest.TestCase):
             self.lift(r"const r1 = .+?;"),
             self.lift(r"const encodeClips = .+?;"),
             self.lift(r"const encodeClipsX = .+?;"),
+            self.lift(r"const REEL_LINK_CAP = .+?;"),
             self.lift(r"function shareURL\(pid, clips\) \{.+?\n  \}"),
             self.lift(r"function reelShareURL\(clips\) \{.+?\n  \}"),
             self.lift(r"function decodeReel\(search\) \{.+?\n  \}"),
             self.lift(r"const TP_WINDOW = .+?;"),
             self.lift(r"const TP_FLOOR_LINES = .+?;"),
+            self.lift(r"const tpSpread = .+?\n  \};"),
             self.lift(r"const phraseRe = .+?;\n"),
             self.lift(r"function mentionsIn\(text, after, pats\) \{.+?\n  \}"),
             self.lift(r"const TP_MONTH = .+?;\n"),
@@ -465,19 +467,60 @@ class TestTopicPress(unittest.TestCase):
     def test_the_full_cut_is_capped_under_a_hosts_url_limit_in_both_twins(self):
         """Housing's full cut was 320 clips and a 7,322-character link — GitHub
         Pages' CDN refuses past 8 KB (a review catch). Both twins cap it, and
-        the page says it is the first of how many."""
+        the capped cut is spread from the first night to the latest — "the
+        first 120 of 623" never reached the latest nights of a word over time
+        (a re-review catch). Executed in both, the same clips and links."""
         meetings = [{"pid": f"p{i:03d}", "title": "T", "date": f"2026-{1 + i % 9:02d}-{1 + i % 27:02d}", "body": "Select Board",
                      "town": "Testville", "duration": 5000.0} for i in range(150)]
         hits = [{"pid": m["pid"], "t": 100.0 * k, "text": "housing", "before": "", "after": "", "mentions": 1}
                 for m in meetings for k in (1, 5)]
-        d = topic.aggregate(meetings, hits, {"slug": "h", "name": "housing", "q": "housing", "phrases": ["housing"]})
+        t = {"slug": "h", "name": "housing", "q": "housing", "phrases": ["housing"]}
+        d = topic.aggregate(meetings, hits, t)
         self.assertEqual((d["reel"]["full_n"], d["reel"]["full_all"]), (topic.FULL_CAP, 300))
         self.assertLess(len(d["reel"]["full"]), 6000)
-        js = (REPO / "web" / "static" / "app.js").read_text()
-        self.assertIn(f"TP_FULL_CAP = {topic.FULL_CAP};", js)
-        self.assertIn("full = every.slice(0, TP_FULL_CAP);", js)
+        every = [c for r in d["meetings"] if r["n"] for c in r["clips"]]
+        full = topic.spread(every, topic.FULL_CAP)
+        self.assertEqual((full[0], full[-1]), (every[0], every[-1]))   # first to latest
+        tw = TestTopicTwins()
+        body = "\n".join([
+            tw.PRELUDE, tw.helpers(),
+            f"const meetings = {json.dumps(meetings)}; const hits = {json.dumps(hits)};",
+            f"const d = tpAggregate(meetings, hits, {json.dumps(t)}, '', true);",
+            "console.log(JSON.stringify([d.reel.full, d.reel.full_n, d.reel.full_all, d.reel.short, d.reel.short_n]));",
+        ])
+        r = tw.node(body)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout.strip().splitlines()[-1]),
+                         [d["reel"]["full"], d["reel"]["full_n"], d["reel"]["full_all"], d["reel"]["short"], d["reel"]["short_n"]])
         story = (REPO / "web" / "story.py").read_text()
-        self.assertIn("the first {reel[\"full_n\"]} of", story)
+        self.assertIn("first to latest", story)
+
+    def test_every_reel_link_stays_under_the_hosts_limit(self):
+        """A link past ~8 KB is a dead page (414): the reader's reelShareURL
+        and the press's reel_url hold at most the same number of clips, the
+        spread picks the same clips in both, and the trays say when a link
+        plays fewer than they hold."""
+        clips = [{"pid": f"vid{i % 7:08d}", "start": 10.0 * i, "end": 10.0 * i + 12} for i in range(400)]
+        py = topic.reel_url(clips)
+        self.assertLess(len(py), 8000)
+        items = list(range(1000))
+        want = [topic.spread(items, k) for k in (0, 1, 2, 3, 120, 999, 1000, 1001)]
+        tw = TestTopicTwins()
+        body = "\n".join([
+            tw.PRELUDE, tw.helpers(),
+            f"const clips = {json.dumps(clips)};",
+            "const items = Array.from({ length: 1000 }, (_, i) => i);",
+            "console.log(JSON.stringify([reelShareURL(clips), [0, 1, 2, 3, 120, 999, 1000, 1001].map(k => tpSpread(items, k))]));",
+        ])
+        r = tw.node(body)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+        self.assertEqual(got, [py, want])
+        self.assertEqual(topic.LINK_CAP, int(re.search(r"const REEL_LINK_CAP = (\d+);", TestTopicTwins.JS).group(1)))
+        js = TestTopicTwins.JS
+        self.assertEqual(js.count("a link plays the first ${REEL_LINK_CAP}"), 2)
+        tray = js[js.index("function sqTray("):js.index("async function search()")]
+        self.assertIn("tpSpread(clips, TP_FULL_CAP)", tray)
 
     def test_a_blank_caption_line_is_no_line_as_the_index_reads_it(self):
         """The index skips blank lines; the press now does too, so a phrase a
@@ -486,6 +529,54 @@ class TestTopicPress(unittest.TestCase):
                                       {"start": 5.0, "text": "intelligence cameras"}]}
         hits = topic.find_hits(m, ["artificial intelligence"])
         self.assertEqual([(h["t"], h["after"]) for h in hits], [(0.0, "intelligence cameras")])
+
+    def test_a_phrase_broken_across_captions_is_marked_where_it_starts(self):
+        """A line listed for "select board" because the phrase ran on into
+        the next caption showed nothing marked (17 of 80); its opening words
+        are marked now — only when the next line finishes the phrase (never a
+        lone "artificial" before "turf"). Executed, as the reader runs it."""
+        tw = TestTopicTwins()
+        body = "\n".join([
+            'const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");',
+            tw.lift(r"  function mark\(text, terms, after\) \{.+?\n  \}"),
+            "console.log(JSON.stringify([",
+            "  mark('we asked the Select', ['select board'], 'Board to vote'),",
+            "  mark('we asked the Select', ['select board'], 'committee'),",
+            "  mark('we asked the Select', ['select board']),",
+            "  mark('AI and artificial', ['ai', 'artificial intelligence'], 'turf fields'),",
+            "  mark('AI and artificial', ['ai', 'artificial intelligence'], 'intelligence.'),",
+            "  mark('the Select Board voted', ['select board'], ''),",
+            "  mark('a <b> & c', ['c'], ''),",
+            "]));",
+        ])
+        r = tw.node(body)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), [
+            "we asked the <mark>Select</mark>", "we asked the Select", "we asked the Select",
+            "<mark>AI</mark> and artificial", "<mark>AI</mark> and <mark>artificial</mark>",
+            "the <mark>Select Board</mark> voted", "a &lt;b&gt; &amp; <mark>c</mark>"])
+        static = tw.JS[tw.JS.index("async function staticSearch("):tw.JS.index("function peek(")]
+        self.assertIn("mark(text, marks, segs[id + 1] && segs[id + 1][0] === mi ? segs[id + 1][3] : \"\")", static)
+
+    def test_the_list_counts_untowned_lines_over_its_whole_scope_and_says_counts_in_words(self):
+        """The header's count is the whole scope's, so its "no town recorded"
+        must be too (it was over the 80 shown — the header said nothing while
+        the story beneath said 129); the live list waits on no static file;
+        a picture of a stretch names one only when a start date applied."""
+        js = TestTopicTwins.JS
+        static = js[js.index("async function staticSearch("):js.index("function peek(")]
+        self.assertLess(static.index("const noTown = SCOPE.town"), static.index("hits = hits.slice(0, 80);"))
+        self.assertIn('${tpN(noTown, "line")} from meetings with no town recorded', static)
+        self.assertIn('${tpN(total, "line")} elsewhere on the record.', static)
+        self.assertIn('It holds ${tpN(meta.length, "meeting")}.', static)
+        for bad in ("moment(s)", "meeting(s)"):
+            self.assertNotIn(bad, static)
+        live = js[js.index("async function liveSearch("):js.index("async function sqStoryFor(")]
+        self.assertLess(live.index("sqFeatured(q)"), live.index("await askStudio("))    # asked beside the API, not after
+        self.assertIn("setTimeout(() => res(null), 2500)", live)
+        self.assertIn('${tpN(r.hits.length, "line")}', live)
+        story = js[js.index("async function sqStory("):js.index("function sqTray(")]
+        self.assertIn("const stretch = since ? ", story)
 
     def test_the_list_says_its_scopes_own_count_and_that_it_shows_the_newest(self):
         js = (REPO / "web" / "static" / "app.js").read_text()

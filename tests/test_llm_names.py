@@ -16,6 +16,17 @@ from czcore.captions import parse_video_details
 from highlighter.insight import hotwords
 
 
+def _restore_env(saved: dict) -> None:
+    """Put the environment back exactly: a key a test set that was not there
+    before is removed — a leaked ANTHROPIC_API_KEY sent later tests' fixture
+    transcripts to the real API (401s, and text that never should have left)."""
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
 class TestLLMConfig(unittest.TestCase):
     def setUp(self):
         self.td = tempfile.TemporaryDirectory(prefix="cz-llm-test-")
@@ -28,8 +39,7 @@ class TestLLMConfig(unittest.TestCase):
                  for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL",
                            "OPENAI_API_KEY", "GEMINI_API_KEY",
                            "GOOGLE_API_KEY", "CONTROL_Z_LLM_MODEL")}
-        self.addCleanup(lambda: [os.environ.update({k: v})
-                                 for k, v in saved.items() if v is not None])
+        self.addCleanup(_restore_env, saved)
 
     def test_disabled_by_default(self):
         self.assertFalse(llm.enabled())
@@ -234,8 +244,7 @@ class TestGeminiRoundTrip(unittest.TestCase):
         saved = {k: os.environ.pop(k, None) for k in (
             "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
             "GOOGLE_API_KEY", "CONTROL_Z_LLM_MODEL")}
-        self.addCleanup(lambda: [os.environ.update({k: v})
-                                 for k, v in saved.items() if v is not None])
+        self.addCleanup(_restore_env, saved)
 
         self.reqs = []
         reqs = self.reqs

@@ -1028,8 +1028,8 @@ class TestBakeEdition(unittest.TestCase):
         # honest JS-off degradation: it names the dependency and points home
         self.assertIn("needs JavaScript", stub)
         self.assertIn('href="/app/"', stub)
-        # and it states the one desk-bound step plainly
-        self.assertIn("needs the desk", stub)
+        # and it states the one desk-bound step plainly — true of any reel
+        self.assertIn("A reel of one meeting renders as a video at the desk", stub)
         # the route exists in the reader
         js = (REPO / "web" / "static" / "app.js").read_text()
         self.assertIn(r"/\/app\/r$/.test(path)", js)
@@ -1843,6 +1843,7 @@ class TestReel(unittest.TestCase):
             self.lift(r"const encodeClips = .+?;"),
             self.lift(r"const encodeClipsX = .+?;"),
             self.lift(r"function shareURL\(pid, clips\) \{.+?\n  \}"),
+            self.lift(r"const REEL_LINK_CAP = .+?;"),
             self.lift(r"function reelShareURL\(clips\) \{.+?\n  \}"),
             self.lift(r"const reelPids = .+?;"),
             self.lift(r"function decodeReel\(search\) \{.+?\n  \}"),
@@ -2721,6 +2722,7 @@ class TestPaper(unittest.TestCase):
             self.lift(r"const encodeClips = .+?;"),
             self.lift(r"const encodeClipsX = .+?;"),
             self.lift(r"function shareURL\(pid, clips\) \{.+?\n  \}"),
+            self.lift(r"const REEL_LINK_CAP = .+?;"),
             self.lift(r"function reelShareURL\(clips\) \{.+?\n  \}"),
             self.lift(r"const reelPids = .+?;"),
             self.lift(r"const PAPER_V = .+?;"),

@@ -571,6 +571,9 @@ def page_glossary(meetings, manifest, base, counts=None):
 
 
 def page_meeting(m, manifest, base, terms=None):
+    # where the tape ends — a link past it names no line (rowAt, app.js)
+    tape_end = int(max([float(m.get("duration") or 0)]
+                       + [float(s.get("end") or s.get("start") or 0) for s in m["segments"]]))
     # the transcript as a real document (JS-off complete)
     rows = []
     last_spk = None
@@ -819,7 +822,7 @@ def page_meeting(m, manifest, base, terms=None):
                  + " · ".join(f'<a href="/app/glossary/#{esc(t["slug"])}">{esc(t["term"])}</a>' for t in terms)
                  + ' — <a href="/app/glossary/">the glossary</a> says what they mean</p>')
     body = f"""
-  <article class="meeting" data-pid="{esc(m["pid"])}" data-town="{esc(m["town"])}" data-body="{esc(m["body"])}">
+  <article class="meeting" data-pid="{esc(m["pid"])}" data-town="{esc(m["town"])}" data-body="{esc(m["body"])}" data-end="{tape_end}">
     <div class="mhead">
       <a class="back" href="/app/">← the record</a>
       <h1>{esc(m["title"])}</h1>
@@ -1024,8 +1027,9 @@ def page_reel(manifest, base):
       moments, in what order. Nothing was uploaded, and nothing about you was
       kept.</p>
     <p class="disclose">The tape is embedded from YouTube, never rehosted.
-      Rendering it as a video needs the desk — the reel.json opens in
-      Highlighter, in <a href="{DESK_DMG}" rel="noopener">the desktop app</a>.</p>
+      A reel of one meeting renders as a video at the desk — its reel.json
+      opens in Highlighter, in <a href="{DESK_DMG}" rel="noopener">the desktop
+      app</a>.</p>
   </section>
 """
     return shell("A reel — publicrecord.studio",
@@ -1779,6 +1783,7 @@ def page_ai(manifest, base):
     constitution nobody can audit is a press release. Interactivity is
     native (details/summary receipts, anchors), so the page is complete with
     JavaScript off, like everything else in the paper."""
+    from . import glossary as _glossary     # the glossary row names the glossary's own model
     diagram = """
     <svg class="aidiagram" viewBox="0 0 720 240" role="img"
          aria-label="Where models sit in the record's pipeline: the tape becomes
@@ -1950,11 +1955,11 @@ def page_ai(manifest, base):
           <td>wrote the plain definitions of the civic words the record uses —
             warrant article, free cash, override, docket — drawing on the
             public source each entry names</td>
-          <td>Anthropic <code>Claude</code> (<code>claude-opus-5-5</code>) —
+          <td>Anthropic <code>Claude</code> (<code>{_glossary.MODEL}</code>) —
             labeled on the glossary’s own page, which says whether a person
             has read them yet</td>
           <td>Anthropic’s servers, through the coding assistant the developers
-            use, while this code was written — the text is in the open
+            used while writing this code — the text is in the open
             repository; never at press time, never in your browser. The counts
             beside each word are the press’s, and no model counts them</td>
           <td>the words, their counts and their sources stand; where an entry
@@ -1964,10 +1969,14 @@ def page_ai(manifest, base):
           <td>suggests a plain name for a thread that spans meetings</td>
           <td>the model named in the issue’s own plane —
             <code>name_origin</code> says <code>ai:&lt;model&gt;</code>, or
-            that the keywords named it</td>
-          <td>when a steward rebuilds the threads, and only where a model key
-            is at hand — never at press time. The hosted service carries
-            none, so the record’s names today are the keywords’</td>
+            that the keywords named it. The names on the record today were
+            drafted by OpenAI <code>gpt-4o-mini</code>
+            (<code>ai:gpt-4o-mini</code>), and each issue page says “Named by
+            a model”</td>
+          <td>the desk, when a steward built the threads on their own key, and
+            carried here by the import — never at press time, never in your
+            browser. A rebuild on the hosted service carries no model key and
+            names by keywords</td>
           <td>a keyword-derived name</td></tr>
         <tr><td>transcripts</td>
           <td>speech-to-text, only when a tape arrives with no official

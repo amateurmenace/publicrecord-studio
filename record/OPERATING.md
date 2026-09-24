@@ -406,13 +406,20 @@ gives it room on top of the answer, and refuses any answer that did not end
 the way a whole answer ends — so no new fragment can land. The fragments
 already stored stay until they are asked again. `record/repair.py` does
 that, in the pipeline job's own image and secrets (never from a Mac), once
-the image with the fixed seam is on the job. `--before` is that image's
-deploy time: everything a Gemini lane wrote before it is asked again (a
-fragment that ends on a bracketed receipt looks whole), and a row repaired
-since is newer than the cutoff, so a re-run is safe.
+the image with the fixed seam is on the job. `--before` is the moment the
+last old-image writer stopped: the fixed image's deploy, or — if a
+`record-pipeline` execution that started on the old image was still running
+then (the nightly runs up to an hour, and retries once) — the moment it
+finished, since it keeps writing fragments stamped after the deploy.
+Everything a Gemini lane wrote before `--before` is asked again (a fragment
+that ends on a bracketed receipt looks whole), and a row repaired since is
+newer than the cutoff, so a re-run is safe. Run it outside 03:00–06:30 ET:
+the nightly poll, ingest and embed share the model's quota and the database.
 
 ```bash
-B=2026-09-24T03:00Z     # when the fixed image reached the jobs
+# no execution still on the old image? (none RUNNING, or note when it ends)
+gcloud run jobs executions list --job=record-pipeline --region=us-east1 --limit=3
+B=2026-09-24T03:00Z     # the later of the deploy and that execution's end
 # look first — the plan, nothing changed
 gcloud run jobs execute record-pipeline --region=us-east1 --wait \
   --args=-m,record.repair,--before,$B,--dry-run
@@ -423,18 +430,26 @@ gcloud run jobs execute record-pipeline --region=us-east1 --wait \
 gcloud run jobs execute record-pipeline --region=us-east1 --wait \
   --args=-m,record.repair,--before,$B
 gcloud logging read 'resource.type="cloud_run_job" AND resource.labels.job_name="record-pipeline"' \
-  --limit=120 --freshness=1h --format='value(textPayload)' | grep -E 'REPAIR|PLAN|UPDATED|SUMMARY|DRAFT'
+  --limit=160 --freshness=1h --format='value(textPayload)' | grep -E 'REPAIR|PLAN|UPDATED|SUMMARY|DRAFT|BACKUP'
 ```
 
-Then press and carry the edition (below). A summary the model still cannot
-finish falls back to the extractive one, labeled so; a draft that cannot be
-finished is removed rather than pressed as a fragment, and the next run with
-a later `--before` asks for it again. Each call's line prints the tokens it
-spent (the thought included) and, on a fallback, the seam's reason.
+Then press and carry the edition (below) — once the log shows no call that
+could not be asked. What is written: a whole answer, always. A fallback only
+when the model answered twice and the seam refused both as fragments — the
+summary becomes the extractive one, labeled so, and a draft is removed rather
+than pressed as a fragment. **A call that failed** (a quota, a bad key, a
+request the API refused, a timeout) **changes nothing**: that row stays as
+stored, two such meetings in a row stop the run (`REPAIR STOPPED`), and the
+job exits 1. Each row's old values are printed as a `BACKUP {json}` line
+before it is written, so a run that went wrong can be put back from its own
+log. Each call's line prints the tokens it spent (the thought included) and
+the seam's reason when it fell back. One repair runs at a time (an advisory
+lock). Read the `--probe` lines before the real run: both must say
+`ai:gemini-…` with no reason in brackets.
 
 ### Hand-files at the Pages-repo root
 
-(The press's own output inside `app/` grew in v2.1.22 — `app/pictures/*.svg`,
+(The press's own output inside `app/` grew in v2.1.23 — `app/pictures/*.svg`,
 one file per picture, and `app/glossary/` — and the rsync carries them like
 every other pressed file.)
 

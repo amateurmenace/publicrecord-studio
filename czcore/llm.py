@@ -229,15 +229,25 @@ def _gemini_text(data: dict) -> str:
 # before the answer began. So a thinking model gets room for its thought on
 # top of the caller's `max_tokens`, and is asked to keep the thought short:
 # left to itself, a thinking model's thought has been seen to track whatever
-# limit it is given. A model that does not think is sent neither — an older
-# model with an 8,192-token cap would refuse the larger number outright.
+# limit it is given. Only a family known not to think is sent neither — an
+# older model with an 8,192-token cap would refuse the larger number
+# outright. Any other name (an alias like gemini-flash-latest, a model newer
+# than this file) gets the room: a thinking model without it answers "At the
+# September 22, 2026," again, and a thinker is what every name since 2.5 is.
 GEMINI_THINKING_ROOM = 8192
+_NO_THOUGHT = ("gemini-1.", "gemini-2.0", "gemma")
+
+
+def _thinks(model: str) -> bool:
+    m = str(model or "").lower()
+    return not (m.startswith(_NO_THOUGHT) or m in ("gemini-pro", "gemini-pro-vision"))
 
 
 def _thinking(model: str) -> Optional[dict]:
-    """How much a Gemini model may think before it answers: a low level on
-    the 3.x family, a set budget on 2.5; nothing for a model that does not
-    think (it would refuse the field)."""
+    """How long a Gemini model may think before it answers: a low level on
+    the 3.x family, a set budget on 2.5. Nothing for a name this file does
+    not know — which field it takes is not known either, and a wrong one is
+    refused — so it thinks at its own default, inside the room."""
     m = str(model or "").lower()
     if m.startswith("gemini-3"):
         return {"thinkingLevel": "low"}
@@ -247,10 +257,13 @@ def _thinking(model: str) -> Optional[dict]:
 
 
 def _gemini_config(model: str, max_tokens: int) -> dict:
-    t = _thinking(model)
-    if not t:
+    if not _thinks(model):
         return {"maxOutputTokens": int(max_tokens)}
-    return {"maxOutputTokens": int(max_tokens) + GEMINI_THINKING_ROOM, "thinkingConfig": t}
+    cfg = {"maxOutputTokens": int(max_tokens) + GEMINI_THINKING_ROOM}
+    t = _thinking(model)
+    if t:
+        cfg["thinkingConfig"] = t
+    return cfg
 
 
 class CutOff(RuntimeError):
@@ -287,14 +300,20 @@ def _refuse_a_fragment(data: dict, provider: str, text: str, what: str = "answer
     """Raise CutOff unless the answer ended the way a whole answer ends.
     Only the known-good stops pass — Gemini STOP, OpenAI stop, Anthropic
     end_turn / stop_sequence (or none said at all); a length cut, a safety
-    or recitation stop, a refusal part way are all fragments."""
+    or recitation stop, a refusal part way are all fragments. A prompt
+    Gemini blocked outright is not a fragment — nothing was answered — and
+    says so with its reason (a plain RuntimeError: nothing to keep)."""
     p = provider if provider in ("gemini", "openai") else "anthropic"
+    if p == "gemini" and not data.get("candidates"):
+        why = str((data.get("promptFeedback") or {}).get("blockReason") or "")
+        if why:
+            raise RuntimeError(f"the model declined the prompt ({why}) — no {what} came back")
     stop = _stop_of(data, p)
     if stop in _WHOLE_STOP[p]:
         return
     if stop == _LENGTH_STOP[p]:
-        raise CutOff(f"the {what} was cut off at its length limit — a fragment is not an {what}", text, stop)
-    raise CutOff(f"the model stopped before its {what} ended ({stop}) — a fragment is not an {what}", text, stop)
+        raise CutOff(f"the {what} was cut off at its length limit — a fragment is not a whole {what}", text, stop)
+    raise CutOff(f"the model stopped before its {what} ended ({stop}) — a fragment is not a whole {what}", text, stop)
 
 
 def last_usage() -> Optional[dict]:

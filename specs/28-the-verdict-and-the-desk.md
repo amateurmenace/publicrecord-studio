@@ -1,7 +1,8 @@
-# 27 — The verdict, read on a phone; the desk's last pieces
+# 28 — The verdict, read on a phone; the desk's last pieces
 
-**Status:** v1.0 · **Stage:** BUILT on branch `desk-in-the-paper` (on top of
-v2.1.21 / r44). Targets **v2.1.22 / r45**. **Owner:** Stephen Walter (Weird
+**Status:** v1.0 · **Stage:** BUILT on branch `desk-in-the-paper`, rebased on
+v2.1.22 / r45 (specs/27, the steward's desk, shipped by a parallel session
+the same night). Ships as **v2.1.23 / r46**. **Owner:** Stephen Walter (Weird
 Machine) · **Related:** specs/25 (a word, over time), specs/26 (the meeting,
 cut and found), specs/24 §4 (the reading, drafted), `CLAUDE.md` (the laws),
 `record/OPERATING.md` §5 (deploy).
@@ -30,12 +31,13 @@ it saw. What was wrong, in order of harm:
    the word typed. Same story, two numbers, one link apart. (And "the
    supercut" meant the one-clip-a-night cut on the front page, the every-clip
    cut on the search page.)
-4. **Meaning-search never answers in time.** The live API's neural search
-   takes 13–27 s at `limit=80` (lexical: 2 s); the reader's bell is 6 s, so
-   every live search says "Meaning-search … not answering". The database
-   (`db-f1-micro`, the HNSW index on `emb_neural` that cannot sit in memory)
-   — the same diagnosis as the embed pace. **Stephen's** (spend, or an index
-   change on the production database); not changed here.
+4. **Meaning-search never answered in time.** The live API's neural search
+   took 13–27 s at `limit=80` (lexical: 2 s); the reader's bell is 6 s, so
+   every live search said "Meaning-search … not answering". The database
+   (`db-f1-micro`, the HNSW index on `emb_neural` that could not sit in
+   memory). **Resolved the same night by Stephen's decision**, carried out by
+   the parallel session: `record-pg` resized to `db-g1-small` (02:09–02:14Z).
+   Re-timed after: 0.3–1.3 s at `limit=80`.
 5. **Unclear on a phone:** the town question was asked on every page, even
    after "the whole record" (an answer that stored nothing left no trace),
    and on shared meetings and reels; the find box sat two phone-screens above
@@ -142,32 +144,89 @@ page's live story draws its three with JS twins, byte-equal.
 
 ### 3.4 The glossary (`web/glossary.py`; `gl-`, `mp-terms`)
 
-Forty-seven words the record hears most and explains least, in five groups
-— who decides, how a meeting runs, the money, what gets built, the schools
-— each in plain language, with where it applies, the public source (the
-General Laws, the state's Municipal Finance Glossary, Brookline's and
-Boston's own pages), and the record's own count, linked to the search. The
-definitions were written with Claude at the desk from the sources named;
-the page says so and the ledger on `/app/ai` carries the row. It sits in the
-section line; the front page's lede links its phrase; every meeting page
-names the words it uses that the glossary explains. No person is defined.
+Forty-seven civic words the record uses and seldom explains, in five
+groups — who decides, how a meeting runs, the money, what gets built, the
+schools — each in plain language, with where it applies, the public source
+(the General Laws, the state's Municipal Finance Glossary, Brookline's and
+Boston's own pages, Boston's Enabling Act), and the record's own count, town
+by town, only in the towns a word belongs to, each count linked to the
+search that lands on that number. The definitions were written with Claude
+(`claude-opus-5-5`), through the coding assistant the developers used while
+writing this code, from the sources named — never at press time, never in a
+reader's browser; the page says so, says no person has yet read them against
+their sources, and the ledger on `/app/ai` carries the row (its model name is
+read from `web/glossary.py`, so the two cannot drift). It sits in the section
+line; the front page's lede links its phrase; every meeting page names the
+words it uses that the glossary explains. No person is defined.
+
+### 3.5 The desk, one click away (Stephen, 2026-09-24)
+
+Wherever the record says a step needs the desk — render a reel, cut a kit,
+run a model locally — it hands over the desk: Civic Media Studio's DMG
+(`emit.DESK_DMG`, `app.js DESK_DMG`, held equal by a test), beside every
+reel.json on the reel viewer, the meeting tray and the studio's panel, on
+both kit pages, on the press page (the direct download first, every release
+beside it) and in the constitution's "use AI that stays local". Pressed as
+anchors; a link, not a load.
 
 ## 4. What is Stephen's
 
-- **Ship**: v2.1.22 / r45 (OPERATING §5), then the repair (§2.1), then the
-  press and the carry.
-- **Meaning-search is too slow to answer** (§1.4) — spend (a larger Cloud SQL
-  tier) or an index change on the production database.
+- **Ship**: v2.1.23 / r46 (OPERATING §5), then the repair (§2.1; OPERATING
+  "Repairing a model's cut answers"), then the press and the carry.
 - **Per-clip thumbnails** on the tray — still his call. Measured: the front
   page's meeting cards already load `i.ytimg.com` stills (lazy); YouTube's
   static stills are per video (three auto frames), not per moment, so a
   "per-clip" still is the meeting's own still — no new host, one request per
   meeting.
 - **A `chart·topic` paper block** — a new stored kind; his sign-off first.
-- **The glossary's words** — read them; the sources are the authority, and a
-  correction annotates.
+- **The glossary's words** — read them against their sources, then flip
+  `glossary.REVIEWED` so the page stops saying no person has; a correction is
+  a dated note beside the entry (`notes`).
+- **A labeled model "what changed"** — the delta is extractive now because a
+  model's was stored with no origin; labeling one needs its origin stored
+  beside it (a stored-field decision).
 - A month filter on the search page's list (specs/25 §4) stands.
+- **The co-author trailer.** CLAUDE.md asks every commit to end
+  `Co-Authored-By: Claude`, and the constitution page says the AI-assisted
+  work is "co-authored in the open" — but this session's instructions forbid
+  attribution lines in commits, so none of v2.1.23's carry one (nor the ~30
+  before them). Either the instruction or the page's sentence should change;
+  the commits' bodies say what was written with a model either way.
+- **control-z's `czcore/llm.py`** has neither the thinking room nor the
+  refusal of a cut answer; the desk's Gemini lane cuts the same way until
+  the fix is mirrored there (deliberately — CLAUDE.md's rule).
 
 ## 5. Verification
 
-(filled in after the adversarial review)
+**Reviewed in three rounds.** Six adversarial lenses first (the seam and the
+repair, the renderer and the summaries, the drag, the glossary's facts and
+code, the pictures and the search, the desk links); every finding folded
+with a test (b37f56f). Then five re-reviews of those folds — and the folds
+had regressed again, as the last five features' did: 49 findings, 48 folded
+with tests. The gravest was the repair: on ANY failed call (a quota, a key,
+a rejected request) it would have written the extractive summary over every
+Gemini summary and removed every draft, printed `REPAIR DONE` and exited 0,
+past any re-run's reach. Now only a cut answer licenses a fallback; a failed
+call changes nothing, two in a row stop the run, it exits 1, and each row's
+old values are logged (`BACKUP`) before it is written. The others: the
+ledger's issue-names row said the keywords named the record's threads when
+all 215 carry `ai:gpt-4o-mini` (checked against the live planes); a model
+name the seam did not know (`gemini-flash-latest`) lost the thinking room;
+a renamed thread lost its "what changed" history; a lede lost to an
+unclosed "[inaudible", or ended on a lone label; a receipt past the tape's
+end highlighted its last line; the search list's untowned count was over
+the 80 shown; three reel links could pass the host's 8 KB limit (a 414, a
+dead page) — every link now holds at most 240 clips in both twins, the
+capped cuts spread from the first night to the latest, and the trays say
+when a link plays fewer than they hold; a phrase broken across two captions
+was listed with nothing marked; five glossary entries' wording or sources
+(the MBTA 177, the exclusions' framing, the stabilization fund's deposits,
+executive session's declaration, Boston's Enabling Act); a pen could no
+longer drag from a row's number; a hidden list's drag dropped anywhere; a
+drop focused a trim button. One is Stephen's, not a fold: the reviewers
+note the commits carry no `Co-Authored-By` trailer, which CLAUDE.md asks for
+and the constitution page's "co-authored in the open" implies; this
+session's instructions forbid the trailer, so the question is his (§4).
+
+760 tests (110 PG-backed skip without `RECORD_TEST_PG_DSN`). The deploy's
+own checks are below.

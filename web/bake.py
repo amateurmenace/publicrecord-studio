@@ -485,6 +485,12 @@ def _milestones_for(beads: list, decisions: list, votes: list = None) -> list:
     return out[:8]
 
 
+# the extractive "what changed" (memory/issues.py delta): the thread's name
+# in quotes, "returned", where, then the arc counted — a model's paragraph
+# never had this shape
+_EXTRACTIVE_DELTA = re.compile(r"“.+?” returned.*?\. That is \d+ appearances? on the record", re.S)
+
+
 # --------------------------------------------------------------------------
 # the bake
 # --------------------------------------------------------------------------
@@ -800,13 +806,16 @@ class Bake:
         for e in self.c.list_events(limit=40):
             if e.get("kind") == "resurfacing":
                 pl = e.get("payload") or {}
-                name = e.get("issue_name", "")
+                name = e.get("issue_name") or ""
+                if not name:
+                    continue          # its thread is gone (a steward's forget): so is its return
                 d = str(pl.get("delta") or "")
                 # the tape's own words only (specs/28 §2.1): a stored "what
                 # changed" a model wrote carries no origin to label it with —
                 # the live front page pressed two, cut off — so any delta not
-                # in the extractive shape is replaced by the counted line
-                if not d.startswith(f"“{name}” returned"):
+                # in the extractive shape is replaced by the counted line. The
+                # shape, not the name: a thread renamed since keeps its history
+                if not _EXTRACTIVE_DELTA.match(d):
                     d = (f"“{name}” returned" + (f" at {pl.get('title')}" if pl.get("title") else "")
                          + (f" ({' · '.join(x for x in (pl.get('body'), pl.get('date')) if x)})"
                             if (pl.get("body") or pl.get("date")) else "") + ".")
