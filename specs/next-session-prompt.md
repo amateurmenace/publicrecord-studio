@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, ⟦TIME⟧ — v2.2.3 / r50 IS LIVE: the decisions made (specs/29, after P2)
+## 2026-09-24, 14:04Z — v2.2.3 / r50 IS LIVE: the decisions made (specs/29, after P2)
 
 Stephen handed over the four open decisions ("make the decisions you think
 are best in order to move on and continue building"); this release is the
@@ -154,13 +154,16 @@ answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
   one the pressing lacks, a note alone), the exact seating rule against a
   press's moment (a skipped night, a same-day re-press), the taken page's
   410 words, the codec twin's marker, the share hint's tokens.
-- **Deploy**: r50 (image `sha256:8c632fd9…`, built from 311625f) on the service
-  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.3`
-  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.3` at ⟦TAGAT2⟧. Deploy-day note: the live pressing.json the
-  first r50 press read carried v2.2.2's end-of-press stamp (11:22:24Z);
-  the deploy pressed and carried at once, so no page could lead on its
-  first listing off the old stamp (the store held none eligible anyway).
+- **Deploy**: r50 (image `sha256:909aa58a…`, built from 8ed3cfc) on the service
+  (revision record-api-00042-wp2) and all six jobs; the press at `--version 2.2.3`
+  (execution record-press-xqcml, 14:02Z); Pages 410ae2c (the workflow carried it, run 36009830598); `sw.js` key `cz-record-2.2.3-9eb9be490f17df4c` (no shared suffix: the store's three pages predate the threshold, none listed);
+  tag `v2.2.3` at 8ed3cfc. Deploy-day note: the first r50 press read the live
+  pressing.json's v2.2.2 stamp (11:22:24Z, an end-of-press stamp, the old
+  rule) — the log said so — and the store held three pages, none eligible,
+  so nothing could have led off it; the deploy pressed and carried at once,
+  and the live stamp is 14:02:56Z now, taken before that press's listing.
+  The CDN hands pressing.json back up to ten minutes stale, which can only
+  delay a seating by a night, never bring one early.
 - **Reviewed**: one adversarial pass with two lenses at once (ten
   findings, ten folded: the steward's window that did not exist, the ask
   missing on a title-only page, the kicker denying the labels beneath it,

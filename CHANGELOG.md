@@ -18,8 +18,8 @@ share's own sentence — *a steward took this page down, so the record will
 not hold it again* — and the editor copies the full link in the short one's
 place, as its other refusals do. **The moderation stance**: a reader's page reaches the front page's strip
 only after a previous press has already listed it in the gallery (the
-press reads the last pressing's moment from the live site — the bucket when
-the site cannot be read — and seats a page shared before it and a day old;
+press reads the last pressing's moment from the live site — the bucket only
+when no site is named — and seats a page shared before it and a day old;
 the stamp is taken before the store is listed, so a page shared after one
 morning's press is first listed by the next and cannot lead that same night,
 and a night the press skips, or a carry to the site that fails, seats
