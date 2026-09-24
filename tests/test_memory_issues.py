@@ -196,6 +196,22 @@ class AssignTest(unittest.TestCase):
         self.assertIn("Vision Zero", d)
         self.assertRegex(d, r"\d\d:\d\d")            # a [MM:SS] a reader can check
 
+    def test_delta_is_the_tapes_own_words_even_with_a_key(self):
+        """A model's delta was stored with no origin and pressed unlabeled
+        (specs/28 §2.1) — with a key at hand, the delta stays extractive."""
+        from unittest import mock
+        self._issue("iss:vz", "Vision Zero", ["vision zero"])
+        _meeting(self.c, "m1", VZ, 6, "2026-05-19")
+        issues.assign_meeting(self.c, "m1", emit_events=False)
+
+        def boom(*a, **k):
+            raise AssertionError("the delta asked a model")
+        with mock.patch.object(issues.llm, "enabled", lambda: True), mock.patch.object(issues.llm, "complete", boom):
+            d = issues.delta(self.c, self.c.get_issue("iss:vz"), "m1")
+        self.assertTrue(d.startswith("“Vision Zero” returned"), d)
+        self.assertEqual(issues._ms(4000), "1:06:40")
+        self.assertEqual(issues._ms(59), "00:59")
+
 
 class StewardTest(unittest.TestCase):
     def setUp(self):

@@ -20,6 +20,11 @@ from typing import List, Optional, Tuple
 from czcore import llm
 from highlighter import insight
 
+# why the last model call fell back, in the seam's own sentence — the
+# pipeline prints it beside the origin, so a night that pressed extractive
+# summaries says why (a cut answer, a quota, a bad key) instead of nothing
+LAST_FALLBACK = {"summary": "", "draft": ""}
+
 _SUMMARY_SYS = (
     "You summarize public civic meetings for residents. Be plain, neutral, and "
     "concrete. One short paragraph of plain text — no Markdown, no headings, no "
@@ -60,6 +65,7 @@ def summary(segments: List[dict],
     Never raises for lack of a key — that is the whole point."""
     if not segments:
         return "", "none"
+    LAST_FALLBACK["summary"] = ""
     if llm.enabled():
         try:
             text = llm.complete(_prompt(segments, info), system=_SUMMARY_SYS,
@@ -67,8 +73,9 @@ def summary(segments: List[dict],
             if text.strip():
                 model = llm.status().get("model", "a cloud model")
                 return text.strip(), f"ai:{model}"
-        except Exception:
-            pass  # the extractive path stands alone — fall through to it
+        except Exception as e:
+            # the extractive path stands alone — fall through to it, and say why
+            LAST_FALLBACK["summary"] = str(e)[:200]
     return extractive_summary(segments), "extractive"
 
 
@@ -91,6 +98,7 @@ def draft(segments: List[dict],
     origin 'ai:<model>' when a key is set, ('', 'none') otherwise — never a
     fallback, never raising. It stands beside the counted reading under its
     own label, never instead of it."""
+    LAST_FALLBACK["draft"] = ""
     if not segments or not llm.enabled():
         return "", "none"
     try:
@@ -102,8 +110,8 @@ def draft(segments: List[dict],
         if text.strip():
             model = llm.status().get("model", "a cloud model")
             return text.strip(), f"ai:{model}"
-    except Exception:
-        pass
+    except Exception as e:
+        LAST_FALLBACK["draft"] = str(e)[:200]
     return "", "none"
 
 

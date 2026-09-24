@@ -65,8 +65,15 @@ def kit_from_meeting(m: dict) -> Optional[dict]:
     an = m.get("analysis") or {}
     # The insight shim the copy writer reads: entities as the bake pressed them,
     # and the meeting's extractive summary as the brief. `copy_extractive`
-    # handles a plain-string brief, so the summary drops straight in.
-    insight = {"entities": an.get("entities") or {}, "brief": m.get("summary") or ""}
+    # handles a plain-string brief, so the summary drops straight in — but only
+    # a summary drawn from the tape: a model's summary is not the brief of a kit
+    # whose copy says "no model" (a review catch), so the tape's own sentences
+    # stand in for it
+    brief = m.get("summary") or ""
+    if str(m.get("summary_origin") or "").startswith("ai:"):
+        from memory.analyze import extractive_summary
+        brief = extractive_summary(m.get("segments") or []) if m.get("segments") else ""
+    insight = {"entities": an.get("entities") or {}, "brief": brief}
 
     meta = {
         "title": m.get("title") or "",

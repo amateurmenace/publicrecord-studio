@@ -23,7 +23,7 @@ never assumed.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m unittest discover -s tests -t . -q   # 536 tests; PG-backed ones
+.venv/bin/python -m unittest discover -s tests -t . -q   # 692 tests; PG-backed ones
                                                           # skip without RECORD_TEST_PG_DSN
 ```
 
@@ -69,7 +69,17 @@ without it). **Never rebake the public edition from a local corpus.**
   minting more. Plus `tp-`/`tq-` (the topic story, pressed and
   live), `sq-` (the search page's story + progress), `rp-` (the reel
   viewer's transport) — specs/25; `mp-` (the meeting page's cut, find,
-  words, jump bar), `kb-` (the keys sheet) — specs/26.
+  words, jump bar), `kb-` (the keys sheet) — specs/26; `rd-` (a model's
+  prose, read: its heading lines and lists), `pic-` (a picture's download
+  line), `dg-` (drag to reorder), `gl-` (the glossary) — specs/27.
+- **A model's answer is whole or it is nothing** (specs/27): the seam gives
+  a thinking model its own room (`GEMINI_THINKING_ROOM`) and refuses an
+  answer cut off at its length limit on every provider; a caller's fallback
+  stands instead. A model's prose is rendered by `receipt_paras` and its JS
+  twin `receiptParas` only — escaped first, a node twin holds them equal.
+- **The glossary's definitions are model-written and say so** (`web/glossary.py`,
+  the page's label, the ledger row on `/app/ai`); its counts are the press's.
+  A new entry names a public source it paraphrases; no person is defined.
 
 ## Verifying
 

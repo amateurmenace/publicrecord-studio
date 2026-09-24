@@ -205,6 +205,10 @@ def run(corpus, plan: dict, job, workdir=None) -> dict:
         dtext, dorigin = analyze.draft(segs, info)
         if dtext:
             analysis["draft"] = {"text": dtext, "origin": dorigin}
+        # the night's log says what wrote the words, and why a model did not
+        why = "; ".join(f"{k}: {v}" for k, v in analyze.LAST_FALLBACK.items() if v)
+        print(f"  the reading — summary {summ_origin}, draft {dorigin if dtext else 'none'}"
+              + (f" ({why})" if why else ""), flush=True)
         job.check_cancel()
 
         date = plan.get("date") or insight.meeting_day(

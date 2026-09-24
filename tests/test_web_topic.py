@@ -462,6 +462,56 @@ class TestTopicPress(unittest.TestCase):
         # and the page says which words it counted, pointing at the pressed story
         self.assertIn("the words <a href=\"${BASE}/topic/${encodeURIComponent(feat.slug)}/\">the front page’s story</a> counts", js)
 
+    def test_the_full_cut_is_capped_under_a_hosts_url_limit_in_both_twins(self):
+        """Housing's full cut was 320 clips and a 7,322-character link — GitHub
+        Pages' CDN refuses past 8 KB (a review catch). Both twins cap it, and
+        the page says it is the first of how many."""
+        meetings = [{"pid": f"p{i:03d}", "title": "T", "date": f"2026-{1 + i % 9:02d}-{1 + i % 27:02d}", "body": "Select Board",
+                     "town": "Testville", "duration": 5000.0} for i in range(150)]
+        hits = [{"pid": m["pid"], "t": 100.0 * k, "text": "housing", "before": "", "after": "", "mentions": 1}
+                for m in meetings for k in (1, 5)]
+        d = topic.aggregate(meetings, hits, {"slug": "h", "name": "housing", "q": "housing", "phrases": ["housing"]})
+        self.assertEqual((d["reel"]["full_n"], d["reel"]["full_all"]), (topic.FULL_CAP, 300))
+        self.assertLess(len(d["reel"]["full"]), 6000)
+        js = (REPO / "web" / "static" / "app.js").read_text()
+        self.assertIn(f"TP_FULL_CAP = {topic.FULL_CAP};", js)
+        self.assertIn("full = every.slice(0, TP_FULL_CAP);", js)
+        story = (REPO / "web" / "story.py").read_text()
+        self.assertIn("the first {reel[\"full_n\"]} of", story)
+
+    def test_a_blank_caption_line_is_no_line_as_the_index_reads_it(self):
+        """The index skips blank lines; the press now does too, so a phrase a
+        blank line splits is one line in both (a review catch)."""
+        m = {"pid": "b", "segments": [{"start": 0.0, "text": "we use artificial"}, {"start": 3.0, "text": "  "},
+                                      {"start": 5.0, "text": "intelligence cameras"}]}
+        hits = topic.find_hits(m, ["artificial intelligence"])
+        self.assertEqual([(h["t"], h["after"]) for h in hits], [(0.0, "intelligence cameras")])
+
+    def test_the_list_says_its_scopes_own_count_and_that_it_shows_the_newest(self):
+        js = (REPO / "web" / "static" / "app.js").read_text()
+        static = js[js.index("async function staticSearch("):js.index("function peek(")]
+        self.assertIn('box.innerHTML = `<p class="hint">${tpN(cut, "line")} `', static)
+        self.assertIn('(cut > hits.length ? ` — the newest ${hits.length} below` : "")', static)
+        self.assertIn("const marks = feat ? feat.phrases : terms;", static)   # phrases highlight whole
+        self.assertIn("const [idx, feat] = await Promise.all([sqIndex(), sqFeatured(q)]);", static)
+        story = js[js.index("async function sqStory("):js.index("function sqTray(")]
+        self.assertIn('the ${tpN(hitsAll.length, "line")} themselves', story)
+        banner = js[js.index("function banner(ed) {"):js.index("const inScope = ")]
+        self.assertIn("You chose the whole record", banner)
+
+    def test_the_supercut_is_one_thing_on_both_stories(self):
+        """The front page's numbers called the one-clip-a-night cut "the
+        supercut" (2:08); the search page put the every-clip runtime (12:07)
+        under the same label — one link apart (specs/27 §1.3)."""
+        js = (REPO / "web" / "static" / "app.js").read_text()
+        cell = re.search(r'\[hms\(d\.reel\.(\w+)_runtime\), "the supercut", d\.reel\.(\w+)\]', js)
+        self.assertTrue(cell, "the search story's supercut cell moved")
+        story = (REPO / "web" / "story.py").read_text()
+        pressed = re.search(r'\(hms\(reel\["(\w+)_runtime"\]\), "the supercut", reel\["(\w+)"\]\)', story)
+        self.assertTrue(pressed, "the pressed story's supercut cell moved")
+        self.assertEqual((cell.group(1), cell.group(2)), (pressed.group(1), pressed.group(2)))
+        self.assertEqual(pressed.group(1), "short")
+
     def test_the_search_page_says_what_a_search_can_do(self):
         page = (self.out / "s" / "index.html").read_text()
         self.assertIn('id="sq-guide"', page)

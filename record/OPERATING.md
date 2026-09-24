@@ -397,7 +397,46 @@ allow quietly.
 
 ---
 
+### Repairing a model's cut answers (v2.1.23)
+
+Until v2.1.23 the Gemini lane's thinking spent the whole output budget, and
+every hosted summary and drafted reading was pressed cut off mid-sentence.
+The seam now caps the thought (`thinkingLevel: low` on the 3.x family),
+gives it room on top of the answer, and refuses any answer that did not end
+the way a whole answer ends — so no new fragment can land. The fragments
+already stored stay until they are asked again. `record/repair.py` does
+that, in the pipeline job's own image and secrets (never from a Mac), once
+the image with the fixed seam is on the job. `--before` is that image's
+deploy time: everything a Gemini lane wrote before it is asked again (a
+fragment that ends on a bracketed receipt looks whole), and a row repaired
+since is newer than the cutoff, so a re-run is safe.
+
+```bash
+B=2026-09-24T03:00Z     # when the fixed image reached the jobs
+# look first — the plan, nothing changed
+gcloud run jobs execute record-pipeline --region=us-east1 --wait \
+  --args=-m,record.repair,--before,$B,--dry-run
+# one meeting asked for real and printed, nothing written — read it
+gcloud run jobs execute record-pipeline --region=us-east1 --wait \
+  --args=-m,record.repair,--before,$B,--probe
+# the repair
+gcloud run jobs execute record-pipeline --region=us-east1 --wait \
+  --args=-m,record.repair,--before,$B
+gcloud logging read 'resource.type="cloud_run_job" AND resource.labels.job_name="record-pipeline"' \
+  --limit=120 --freshness=1h --format='value(textPayload)' | grep -E 'REPAIR|PLAN|UPDATED|SUMMARY|DRAFT'
+```
+
+Then press and carry the edition (below). A summary the model still cannot
+finish falls back to the extractive one, labeled so; a draft that cannot be
+finished is removed rather than pressed as a fragment, and the next run with
+a later `--before` asks for it again. Each call's line prints the tokens it
+spent (the thought included) and, on a fallback, the seam's reason.
+
 ### Hand-files at the Pages-repo root
+
+(The press's own output inside `app/` grew in v2.1.22 — `app/pictures/*.svg`,
+one file per picture, and `app/glossary/` — and the rsync carries them like
+every other pressed file.)
 
 The rsync manages only `app/`; three files live at the repo root by hand and
 survive every edition: `CNAME`, the root `index.html`, and

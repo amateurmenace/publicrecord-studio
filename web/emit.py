@@ -25,7 +25,20 @@ from web import tools
 
 REPO = Path(__file__).resolve().parents[1]
 BRAND = REPO / "brand"
-DMG_LATEST = "https://github.com/amateurmenace/control-z/releases/latest"
+DMG_LATEST = "https://github.com/amateurmenace/control-z/releases/latest"   # every release
+# The desktop app itself — Civic Media Studio, the desk that renders a reel,
+# cuts a kit and burns captions. Wherever the record says a step "needs the
+# desk", it hands over the desk (specs/28 §3.5): a direct download, one
+# click. The reader's twin is app.js DESK_DMG; a test holds them equal.
+DESK_VERSION = "2.1.0"
+DESK_DMG = ("https://github.com/amateurmenace/control-z/releases/download/"
+            f"v{DESK_VERSION}/civicmedia-studio-{DESK_VERSION}-macos-arm64.dmg")
+
+
+def desk_button(label: str = "↓ Get the desktop app — macOS", primary: bool = False) -> str:
+    """The desk, as a pressed link — an anchor, content in the paper."""
+    return (f'<a class="btn{" primary" if primary else ""} deskdl" href="{DESK_DMG}" rel="noopener" '
+            f'title="Civic Media Studio {DESK_VERSION} for macOS (Apple silicon)">{esc(label)}</a>')
 COMMUNITYAI = "https://communityai.studio"
 
 # Where a reader goes to read the program that pressed what they are reading.
@@ -621,7 +634,7 @@ def page_meeting(m, manifest, base, terms=None):
             'press a word to find every line that says it</span>'
             + cloud
             + _pictures.take(f'm-{_pictures.key(m["pid"])}-words', cloud, f'The meeting in words — {m["title"]}',
-                             f'/app/m/{m["pid"]}', hash_page=f'/app/m/{m["pid"]}')
+                             f'/app/m/{m["pid"]}', hash_page=f'/app/m/{m["pid"]}', legend=_pictures.LEGEND["cloud"])
             + f'<p class="hint">“{esc(words[0]["word"])}” came up {n_of(int(words[0]["count"]), "time")}. Sized by how often; '
               'civic stopwords out. With JavaScript off, a word opens the tape at its first mention.</p></section>')
     langs = ""
@@ -640,23 +653,28 @@ def page_meeting(m, manifest, base, terms=None):
         # its Markdown read, never shown); an extractive one is the tape's own
         # sentences and reads the same way — plain, every receipt a link
         from . import charts as _charts
-        summ = (f'<section class="card summary" id="summary"><span class="tag">{origin} — '
-                'supplements the official record</span>'
-                + _charts.receipt_paras(m["summary"], "") + '</section>')
+        said = _charts.receipt_paras(m["summary"], "", plain=not (m["summary_origin"] or "").startswith("ai:"))
+        # a summary that renders to nothing (only syntax) presses no labeled box
+        if said:
+            summ = (f'<section class="card summary" id="summary"><span class="tag">{origin} — '
+                    'supplements the official record</span>' + said + '</section>')
     # the reading, drafted (specs/24 §4): a model's three paragraphs — what
     # it meant, who moved it, what to watch — under the model's own name,
     # every receipt a link into the tape below; pressed only when a model
     # wrote them, beside the counted read, never instead of it
     draft = (m.get("analysis") or {}).get("draft") or None
+    drafted = ""
     if draft and draft.get("text"):
         from . import charts as _charts
+        drafted = _charts.receipt_paras(draft["text"], "")
+    if drafted:
         # the jump bar's "the summary" lands here when no summary card stands
         # (the piece is built first: an f-string expression holds no backslash)
-        draft_id = "" if m["summary"] else ' id="summary"'
+        draft_id = "" if summ else ' id="summary"'
         summ += (f'<section class="card summary draft"{draft_id}><span class="tag">the reading, drafted by a '
                  f'model — {esc(draft.get("origin") or "")}, labeled · what it meant, who moved it, '
                  'what to watch · check it against the tape</span>'
-                 + _charts.receipt_paras(draft["text"], "") + '</section>')
+                 + drafted + '</section>')
     # the roll calls — who voted how, read from the record (officials only)
     votes_html = ""
     if m.get("votes"):
@@ -786,7 +804,7 @@ def page_meeting(m, manifest, base, terms=None):
     # on this page (specs/26 §2.4): a jump bar of the sections this meeting
     # actually has — a four-hour tape is a long page, and orientation is
     # pressed prose, not chrome
-    jumps = [("tape", "the tape", True), ("summary", "the summary" if m["summary"] else "the reading", bool(summ)),
+    jumps = [("tape", "the tape", True), ("summary", "the summary" if 'class="card summary" id="summary"' in summ else "the reading", bool(summ)),
              ("cut", "the night, cut", bool(cut_html)), ("moments", "the moments", bool(moments_html)),
              ("votes", "the votes", bool(votes_html)), ("paper", "the town’s paper", bool(docs_html)),
              ("framing", "the framing", bool(framing_html)), ("questions", "the questions", bool(questions_html)),
@@ -1006,7 +1024,8 @@ def page_reel(manifest, base):
       moments, in what order. Nothing was uploaded, and nothing about you was
       kept.</p>
     <p class="disclose">The tape is embedded from YouTube, never rehosted.
-      Rendering it as a video needs the desk.</p>
+      Rendering it as a video needs the desk — the reel.json opens in
+      Highlighter, in <a href="{DESK_DMG}" rel="noopener">the desktop app</a>.</p>
   </section>
 """
     return shell("A reel — publicrecord.studio",
@@ -1232,6 +1251,7 @@ def page_kits_index(kits, manifest, base):
       transcript, no model. Every kit here reads in the browser; <b>cutting the
       video and burning captions happen in Publisher at the desk</b>, and each
       kit downloads as a file that opens there.</p>
+    <div class="presscta">{desk_button()}<span class="hint">Civic Media Studio {DESK_VERSION} — Publisher is in it</span></div>
     {listing}
     <p class="hint">Kits are drafts, not decisions — the analyzer scored the
       moments and the copy is lifted from the record itself. A producer edits
@@ -1312,6 +1332,7 @@ def page_kit(kit, manifest, base):
     <div class="presscta">
       <a class="btn primary" href="{reel_href}">▶ Play these clips as a reel</a>
       <a class="btn" href="{kit_href}" download>⬇ kit.json — open at the desk</a>
+      {desk_button()}
       <a class="btn" href="/app/m/{pid}">Read the whole meeting →</a>
     </div>
 
@@ -1927,19 +1948,26 @@ def page_ai(manifest, base):
             off at its length limit is refused the same way</td></tr>
         <tr><td>the glossary</td>
           <td>wrote the plain definitions of the civic words the record uses —
-            warrant article, free cash, override, docket — paraphrasing the
+            warrant article, free cash, override, docket — drawing on the
             public source each entry names</td>
-          <td>Anthropic <code>Claude</code> — labeled on the glossary’s own
-            page</td>
-          <td>the desk, once, in the open repository — never at press time,
-            never in your browser; the counts beside each word are the
-            press’s, and no model counts them</td>
-          <td>the words, their counts and their sources stand; the source each
-            entry names is the authority, and a correction annotates</td></tr>
+          <td>Anthropic <code>Claude</code> (<code>claude-opus-5-5</code>) —
+            labeled on the glossary’s own page, which says whether a person
+            has read them yet</td>
+          <td>Anthropic’s servers, through the coding assistant the developers
+            use, while this code was written — the text is in the open
+            repository; never at press time, never in your browser. The counts
+            beside each word are the press’s, and no model counts them</td>
+          <td>the words, their counts and their sources stand; where an entry
+            and its source differ the source is the authority, and a
+            correction is dated beside the entry</td></tr>
         <tr><td>issue names &amp; labels</td>
           <td>suggests a plain name for a thread that spans meetings</td>
-          <td>the same Gemini lane, labeled the same way</td>
-          <td>our pipeline, at press time</td>
+          <td>the model named in the issue’s own plane —
+            <code>name_origin</code> says <code>ai:&lt;model&gt;</code>, or
+            that the keywords named it</td>
+          <td>when a steward rebuilds the threads, and only where a model key
+            is at hand — never at press time. The hosted service carries
+            none, so the record’s names today are the keywords’</td>
           <td>a keyword-derived name</td></tr>
         <tr><td>transcripts</td>
           <td>speech-to-text, only when a tape arrives with no official
@@ -1971,6 +1999,7 @@ def page_ai(manifest, base):
       with the network cable out of the wall. That is what “locally-owned AI”
       means here: not a slogan, a download.
       <a href="/app/press">Get the desk from the press →</a></p>
+    <div class="presscta">{desk_button()}<span class="hint">Civic Media Studio {DESK_VERSION} · macOS · Apple silicon</span></div>
 
     <div class="sectionhead"><span class="kicker">understand it deeper</span></div>
     <ul class="ailinks">
@@ -2062,8 +2091,9 @@ def page_press(manifest, base, has_kits=False):
     <div class="sectionhead"><span class="kicker">control-z — the finishing tools</span></div>
     <div class="toollist">{bench}</div>
     <div class="presscta">
-      <a class="btn primary" href="{DMG_LATEST}">Get the desktop app — macOS</a>
-      <span class="hint">macOS 12+ · Apple silicon · signed &amp; notarized</span>
+      {desk_button("↓ Get the desktop app — macOS", primary=True)}
+      <span class="hint">Civic Media Studio {DESK_VERSION} · macOS 12+ · Apple silicon · signed &amp; notarized ·
+        <a href="{DMG_LATEST}">every release →</a></span>
     </div>
     <p class="hint">Civic Media Studio and The Public Record are
       <a href="{COMMUNITYAI}">a Community AI Project</a> — {CREDIT}.</p>
@@ -2359,6 +2389,12 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     (out / "glossary").mkdir(parents=True, exist_ok=True)
     (out / "glossary" / "index.html").write_text(
         page_glossary(meetings, manifest, base, counts=gcounts), encoding="utf-8")
+    # what the search page needs to count an entry's words the glossary's way,
+    # so each count's link lands on its own number (the featured words' rule)
+    import json as _json_mod
+    (out / "glossary" / "index.json").write_text(
+        _json_mod.dumps(_glossary.index(gcounts), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8")
     for m in meetings:
         d = out / "m" / m["pid"]
         d.mkdir(parents=True, exist_ok=True)

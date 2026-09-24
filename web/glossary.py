@@ -29,10 +29,10 @@ from .charts import esc, n_of
 MGL = "https://malegislature.gov/Laws/GeneralLaws/PartI"
 DLS = ("the state’s Municipal Finance Glossary", "https://www.mass.gov/info-details/municipal-finance-glossary")
 BK_TM = ("Brookline — Town Meeting", "https://www.brooklinema.gov/264/Town-Meeting")
-BK_SB = ("Brookline — Select Board", "https://www.brooklinema.gov/343/Board-of-Selectmen")
+BK_SB = ("Brookline — Select Board", "https://www.brooklinema.gov/343/Select-Board")
 BK_AC = ("Brookline — Advisory Committee", "https://www.brooklinema.gov/166/Advisory-Committee")
 BK_HB = ("Brookline — Town Meeting Handbook", "https://www.brooklinema.gov/277/Town-Meeting-Handbook-PDF")
-BK_OV = ("Brookline — the override guide", "https://www.brooklinema.gov/3590/FY2024-26-Override-Central")
+BK_OV = ("Brookline — the FY 2027–2029 override guide", "https://www.brooklinema.gov/3590/FY2024-26-Override-Central")
 BOS_CC = ("Boston — City Council", "https://www.boston.gov/departments/city-council")
 OML = ("the Attorney General — the Open Meeting Law", "https://www.mass.gov/the-open-meeting-law")
 
@@ -61,11 +61,13 @@ ENTRIES: List[dict] = [
              "Town Meeting and writes its warrant, hires the Town Administrator, sets the budget’s guidelines, "
              "appoints most boards, grants licenses and serves as the police commissioners. Many towns once "
              "called it the Board of Selectmen.",
-     "phrases": ["select board", "board of selectmen"], "sources": [BK_SB]},
+     "phrases": ["select board", "selectboard", "board of selectmen"], "sources": [BK_SB]},
     {"slug": "town-meeting", "group": "who", "term": "Town Meeting", "where": ["Brookline", "Massachusetts"],
      "says": "The town’s legislature. Brookline’s is a representative Town Meeting: 255 members elected by "
-             "precinct — fifteen from each of seventeen — who pass the budget and every bylaw. The annual meeting "
-             "comes in late spring and a special one usually in the fall; anyone may watch, only members vote.",
+             "precinct — fifteen from each of seventeen, for three-year terms — joined by members who sit by "
+             "office (the Select Board, the Moderator, the Town Clerk, and any state legislator who lives in town). "
+             "It passes the budget and every bylaw. The annual meeting comes in late spring and a special one "
+             "usually in the fall; anyone may watch, only members vote.",
      "phrases": ["town meeting"], "sources": [BK_TM]},
     {"slug": "town-administrator", "group": "who", "term": "Town Administrator", "where": ["Brookline"],
      "says": "The town’s chief appointed manager, hired by the Select Board to run its departments and its "
@@ -84,12 +86,16 @@ ENTRIES: List[dict] = [
     {"slug": "planning-board", "group": "who", "term": "Planning Board", "where": ["Massachusetts"],
      "says": "The board that plans a community’s growth — its master plan, subdivisions, the design of large "
              "projects — and holds a hearing and reports on every proposed change to the zoning.",
-     "phrases": ["planning board"], "sources": [law("M.G.L. c. 41 § 81A", "TitleVII/Chapter41/Section81A")]},
+     "phrases": ["planning board"],
+     "sources": [law("M.G.L. c. 40A § 5 (zoning changes)", "TitleVII/Chapter40A/Section5"),
+                 law("c. 41 § 81D (the master plan)", "TitleVII/Chapter41/Section81D")]},
     {"slug": "zoning-board-of-appeals", "group": "who", "term": "Zoning Board of Appeals (ZBA)", "where": ["Massachusetts"],
      "says": "The board that hears requests for variances, special permits and Chapter 40B comprehensive permits, "
-             "and appeals of a building official’s zoning decisions — each at a public hearing.",
+             "and appeals of a building official’s zoning decisions — each at a public hearing. Boston’s Zoning "
+             "Board of Appeal does the same work under the city’s own zoning law.",
      "phrases": ["zoning board of appeals", "zoning board of appeal", "ZBA"],
-     "sources": [law("M.G.L. c. 40A § 12", "TitleVII/Chapter40A/Section12")]},
+     "sources": [law("M.G.L. c. 40A § 14", "TitleVII/Chapter40A/Section14"),
+                 law("c. 40B § 21 (comprehensive permits)", "TitleVII/Chapter40B/Section21")]},
     {"slug": "bpda", "group": "who", "term": "BPDA", "where": ["Boston"],
      "says": "The Boston Planning & Development Agency, which planned the city’s growth and reviewed its "
              "development. Its staff and most of its work have moved into the City of Boston’s Planning "
@@ -114,13 +120,13 @@ ENTRIES: List[dict] = [
      "phrases": ["reconsideration", "reconsider"], "sources": [BK_HB]},
     {"slug": "quorum", "group": "meeting", "term": "quorum", "where": ["Massachusetts"],
      "says": "The number of members who must be present before a body may act — under the Open Meeting Law, a "
-             "simple majority, unless another law sets a different number.",
+             "simple majority, unless a law, a charter or a bylaw sets a different number.",
      "phrases": ["quorum"], "sources": [law("M.G.L. c. 30A § 18", "TitleIII/Chapter30A/Section18")]},
     {"slug": "roll-call", "group": "meeting", "term": "roll call", "where": ["Massachusetts"],
      "says": "A vote taken by calling each member by name, so that how each one voted — yes, no, abstain — is on "
              "the record. The record reads the roll calls it can hear on the tape; the official minutes are the "
              "last word.",
-     "phrases": ["roll call", "roll-call"], "sources": [("the record — the votes", "/app/officials")]},
+     "phrases": ["roll call", "roll-call"], "sources": [("the record — the votes", "/app/officials"), OML]},
     {"slug": "public-hearing", "group": "meeting", "term": "public hearing", "where": ["Massachusetts"],
      "says": "A session a board must advertise in advance and open to anyone before it decides certain things — a "
              "zoning change, a permit, a license — so that the people affected can be heard.",
@@ -132,8 +138,9 @@ ENTRIES: List[dict] = [
      "phrases": ["public comment", "public comments"], "sources": [BK_SB, OML]},
     {"slug": "executive-session", "group": "meeting", "term": "executive session", "where": ["Massachusetts"],
      "says": "The part of a meeting a public body may hold in private — only for a reason the Open Meeting Law "
-             "lists, among them collective bargaining, litigation, the purchase of real estate and a person’s "
-             "reputation — entered by a roll-call vote in open session, with the reason stated.",
+             "lists, among them a person’s reputation and, when an open meeting would hurt the body’s position "
+             "and the chair says so, collective bargaining, litigation and the purchase of real estate — entered "
+             "by a roll-call vote in open session, with the reason stated.",
      "phrases": ["executive session"], "sources": [law("M.G.L. c. 30A § 21", "TitleIII/Chapter30A/Section21")]},
     {"slug": "open-meeting-law", "group": "meeting", "term": "Open Meeting Law", "where": ["Massachusetts"],
      "says": "The state law that requires a public body to meet in the open, to post each meeting forty-eight "
@@ -149,24 +156,27 @@ ENTRIES: List[dict] = [
     {"slug": "fiscal-year", "group": "money", "term": "fiscal year (FY)", "where": ["Massachusetts"],
      "says": "The budget year. Massachusetts cities and towns run theirs from July 1 to June 30 and name it for "
              "the year it ends: FY2027 began on July 1, 2026.",
-     "phrases": ["fiscal year"], "sources": [DLS]},
+     "phrases": ["fiscal year", "FY26", "FY27", "FY28"], "sources": [DLS]},
     {"slug": "appropriation", "group": "money", "term": "appropriation", "where": ["Massachusetts"],
      "says": "A vote of Town Meeting or a city council that authorizes spending a set amount for a set purpose. "
-             "Public money is spent only as an appropriation allows.",
-     "phrases": ["appropriation", "appropriations"], "sources": [DLS]},
+             "Most public money is spent only as an appropriation allows; grants, gifts and revolving funds have "
+             "rules of their own.",
+     "phrases": ["appropriation", "appropriations"],
+     "sources": [DLS, law("c. 44 § 53A (grants and gifts)", "TitleVII/Chapter44/Section53A")]},
     {"slug": "proposition-2-half", "group": "money", "term": "Proposition 2½", "where": ["Massachusetts"],
-     "says": "The 1980 state law that caps a community’s property taxes. The total it may levy in a year — its "
-             "levy limit — may grow by 2.5 percent plus new growth, and may never pass 2.5 percent of the full "
-             "value of all its taxable property. Voters can raise the limit with an override, or step past it for "
-             "one project with a debt exclusion.",
+     "says": "The 1980 state law that caps a community’s property taxes. The most it may levy in a year — its "
+             "levy limit — may grow by 2.5 percent plus new growth, and the limit may never pass 2.5 percent of the "
+             "full value of all its taxable property, the levy ceiling. Voters can raise the limit with an "
+             "override, or tax beyond it — even beyond the ceiling — for one project’s debt with a debt exclusion.",
      "phrases": ["proposition two and a half", "prop two and a half", "proposition 2 and a half",
                  "prop 2 and a half", "proposition 2 1/2", "prop 2 1/2", "proposition 2½", "prop 2½"],
      "sources": [DLS, law("M.G.L. c. 59 § 21C", "TitleIX/Chapter59/Section21C")]},
     {"slug": "levy", "group": "money", "term": "levy, levy limit", "where": ["Massachusetts"],
      "says": "The levy is what a community raises in property taxes in a year. The levy limit is the most "
              "Proposition 2½ lets it raise: last year’s limit, plus 2.5 percent, plus new growth, plus any "
-             "override or exclusion its voters approved.",
-     "phrases": ["levy"], "sources": [DLS]},
+             "override its voters approved. A debt exclusion’s payments ride on top of the limit, only while the "
+             "debt lasts.",
+     "phrases": ["levy"], "sources": [DLS, law("M.G.L. c. 59 § 21C", "TitleIX/Chapter59/Section21C")]},
     {"slug": "new-growth", "group": "money", "term": "new growth", "where": ["Massachusetts"],
      "says": "Tax from property new to the tax rolls — new buildings, additions, renovations — which a community "
              "may add to its levy limit on top of the 2.5 percent. A rise in market values alone is not new growth.",
@@ -186,8 +196,10 @@ ENTRIES: List[dict] = [
              "reserves, by a vote of Town Meeting or the council.",
      "phrases": ["free cash"], "sources": [DLS]},
     {"slug": "stabilization-fund", "group": "money", "term": "stabilization fund", "where": ["Massachusetts"],
-     "says": "A community’s savings for the future — an emergency, a lean year, a large capital cost. Money goes "
-             "in and comes out only by a vote of Town Meeting or the council, and spending from it takes two thirds.",
+     "says": "A community’s savings for the future — an emergency, a lean year, a large capital cost. Creating a "
+             "fund or changing its purpose takes a two-thirds vote of Town Meeting or the council. Spending from the "
+             "general stabilization fund takes two thirds; a fund set up for one named purpose can be spent by a "
+             "simple majority.",
      "phrases": ["stabilization fund", "stabilization funds"],
      "sources": [DLS, law("M.G.L. c. 40 § 5B", "TitleVII/Chapter40/Section5B")]},
     {"slug": "reserve-fund", "group": "money", "term": "reserve fund", "where": ["Massachusetts", "Brookline"],
@@ -206,9 +218,9 @@ ENTRIES: List[dict] = [
              "sheet, named for the cherry-colored paper it was once printed on.",
      "phrases": ["state aid", "chapter 70", "cherry sheet"], "sources": [DLS, law("M.G.L. c. 70", "TitleXII/Chapter70")]},
     {"slug": "pilot", "group": "money", "term": "PILOT (payment in lieu of taxes)", "where": ["Massachusetts", "Boston"],
-     "says": "A voluntary payment an institution exempt from property tax — a university, a hospital — makes to "
-             "the city or town it sits in, in place of the taxes it does not owe. Boston asks its large "
-             "nonprofits for one every year.",
+     "says": "Usually a voluntary payment an institution exempt from property tax — a university, a hospital — "
+             "makes to the city or town it sits in, in place of the taxes it does not owe; some are contracts "
+             "instead. Boston asks its large nonprofits for one every year.",
      "phrases": ["payment in lieu of taxes", "payments in lieu of taxes", "PILOT payment", "PILOT payments",
                  "PILOT agreement", "PILOT agreements"],
      "sources": [("Boston — the PILOT program", "https://www.boston.gov/departments/assessing/payment-lieu-tax-pilot-program"), DLS]},
@@ -230,32 +242,43 @@ ENTRIES: List[dict] = [
              "Meeting. A city’s local laws are ordinances, passed by its council.",
      "phrases": ["bylaw", "bylaws", "by-law", "by-laws"], "sources": [BK_TM]},
     {"slug": "zoning", "group": "built", "term": "zoning, zoning bylaw", "where": ["Massachusetts"],
-     "says": "The rules for what may be built where — uses, heights, setbacks, parking — set in a town by its "
-             "zoning bylaw (in Boston, its zoning code) under the state’s Zoning Act. Most changes take a "
-             "two-thirds vote of Town Meeting or the council; some housing changes, a simple majority.",
-     "phrases": ["zoning"], "sources": [law("M.G.L. c. 40A", "TitleVII/Chapter40A")]},
+     "says": "The rules for what may be built where — uses, heights, setbacks, parking. A town sets them in its "
+             "zoning bylaw under the state’s Zoning Act; most changes take a two-thirds vote of Town Meeting (in "
+             "another city, of its council), some housing changes a simple majority. Boston is the exception: its "
+             "zoning code rests on a state law of its own, and its Zoning Commission, with the mayor — not the "
+             "City Council — adopts changes.",
+     "phrases": ["zoning"],
+     "sources": [law("M.G.L. c. 40A (the Zoning Act)", "TitleVII/Chapter40A"),
+                 ("Boston — the Planning Department", "https://www.bostonplans.org/about-us")]},
     {"slug": "overlay-district", "group": "built", "term": "overlay district", "where": ["Massachusetts"],
      "says": "A zone drawn over the existing zoning that adds rules or allows more — denser housing near transit, "
              "a historic area’s protections — without erasing the zoning beneath it.",
-     "phrases": ["overlay"], "sources": [law("M.G.L. c. 40A", "TitleVII/Chapter40A")]},
+     "phrases": ["overlay district", "overlay districts", "overlay zoning"],
+     "sources": [law("M.G.L. c. 40A", "TitleVII/Chapter40A")]},
     {"slug": "special-permit", "group": "built", "term": "special permit", "where": ["Massachusetts"],
      "says": "Permission for a use or a building the zoning allows only case by case, granted by a named board "
              "after a public hearing — often with conditions.",
      "phrases": ["special permit", "special permits"], "sources": [law("M.G.L. c. 40A § 9", "TitleVII/Chapter40A/Section9")]},
     {"slug": "variance", "group": "built", "term": "variance", "where": ["Massachusetts"],
-     "says": "Permission to depart from the zoning’s own terms — a setback, a height — granted only where a lot’s "
-             "shape, soil or topography makes the rule a hardship and the departure harms no one. The law makes "
-             "variances hard to get on purpose.",
+     "says": "Permission to depart from the zoning’s own terms — a setback, a height — granted only where the "
+             "soil, shape or topography of that particular lot, and not the district around it, would make the "
+             "rule a substantial hardship, and only if the relief does no substantial harm to the public good or "
+             "to the bylaw’s purpose. A use the district forbids needs a bylaw that allows use variances at all.",
      "phrases": ["variance", "variances"], "sources": [law("M.G.L. c. 40A § 10", "TitleVII/Chapter40A/Section10")]},
     {"slug": "chapter-40b", "group": "built", "term": "Chapter 40B", "where": ["Massachusetts"],
      "says": "The state law that lets a developer who sets aside a share of new homes as affordable ask the Zoning "
-             "Board of Appeals for one comprehensive permit in place of local zoning — with an appeal to the state "
-             "— in any community where less than 10 percent of the housing counts as affordable.",
-     "phrases": ["40B"], "sources": [law("M.G.L. c. 40B § 20", "TitleVII/Chapter40B/Section20")]},
+             "Board of Appeals for one comprehensive permit in place of the separate local approvals. If the board "
+             "refuses, or sets conditions that make the homes uneconomic, the developer can appeal to the state’s "
+             "Housing Appeals Committee, which can overrule it — unless the community has met the law’s safe "
+             "harbors, chiefly 10 percent of its housing counted as affordable.",
+     "phrases": ["40B"],
+     "sources": [law("M.G.L. c. 40B §§ 20–23", "TitleVII/Chapter40B/Section20"),
+                 law("§ 22 (the appeal)", "TitleVII/Chapter40B/Section22")]},
     {"slug": "mbta-communities", "group": "built", "term": "MBTA Communities (Section 3A)", "where": ["Massachusetts"],
-     "says": "The state law that requires every city and town the MBTA serves to have at least one zoning "
-             "district, near transit where it can be, where multifamily housing is allowed as of right — without "
-             "a special permit.",
+     "says": "The 2021 state law that requires each of the 177 cities and towns in and around the MBTA’s service "
+             "area — Boston excepted, its zoning having a law of its own — to have at least one zoning district of "
+             "reasonable size (at least 15 homes an acre, within half a mile of a station where there is one) "
+             "where multifamily housing open to families is allowed as of right, without a special permit.",
      "phrases": ["MBTA communities", "section 3A"],
      "sources": [("Massachusetts — the MBTA Communities law", "https://www.mass.gov/info-details/multi-family-zoning-requirement-for-mbta-communities"),
                  law("M.G.L. c. 40A § 3A", "TitleVII/Chapter40A/Section3A")]},
@@ -264,12 +287,15 @@ ENTRIES: List[dict] = [
              "governed by its own board of trustees.",
      "phrases": ["housing trust"], "sources": [law("M.G.L. c. 44 § 55C", "TitleVII/Chapter44/Section55C")]},
     {"slug": "article-80", "group": "built", "term": "Article 80", "where": ["Boston"],
-     "says": "The part of Boston’s zoning code that sets how a large development is reviewed — its public "
-             "meetings, the city’s review of its design and impacts, and the vote that approves it.",
+     "says": "The part of Boston’s zoning code that sets how a larger development is reviewed — small projects "
+             "over 20,000 square feet or 15 homes, large ones over 50,000, planned development areas and "
+             "institutions’ master plans: its public meetings, the city’s review of its design and impacts, and "
+             "the vote that approves it.",
      "phrases": ["article 80"], "sources": [("Boston — what is Article 80", "https://www.bostonplans.org/projects/development-review/what-is-article-80")]},
     {"slug": "vision-zero", "group": "built", "term": "Vision Zero", "where": ["Boston", "Brookline"],
-     "says": "A traffic-safety policy with one goal — no one killed or seriously hurt on the streets — pursued "
-             "through lower speeds, safer street design and a study of every crash.",
+     "says": "A traffic-safety policy with one goal — no one killed or seriously hurt on the streets (Boston’s "
+             "target is 2030) — pursued through lower speeds, safer street design and close study of where "
+             "crashes happen.",
      "phrases": ["vision zero"], "sources": [("Boston — Vision Zero", "https://www.boston.gov/departments/transportation/vision-zero")]},
     # -- the schools ----------------------------------------------------------------
     {"slug": "school-committee", "group": "schools", "term": "School Committee", "where": ["Massachusetts"],
@@ -291,60 +317,155 @@ ENTRIES: List[dict] = [
 
 BY_SLUG: Dict[str, dict] = {e["slug"]: e for e in ENTRIES}
 
+# Has a person read these definitions against their sources? Until one has,
+# the page says so (Our AI Constitution: AI drafts, people decide).
+REVIEWED = False
+# The model that wrote them, named the way every other ledger row names one.
+WRITTEN_WITH = "Claude (Anthropic, claude-opus-5-5)"
+
+
+def q_of(e: dict) -> str:
+    """The search an entry's count is a receipt for: its first phrase."""
+    return e["phrases"][0]
+
+
+def towns_of(e: dict) -> Optional[set]:
+    """Where an entry's word means what it says: None (every town) for a
+    Massachusetts word; else only its own towns — a Brookline word said in
+    Boston's council (\"the advisory committee\") is another thing."""
+    return None if "Massachusetts" in e["where"] else set(e["where"])
+
+
+def _names(e: dict) -> set:
+    """The phrases a lede may name an entry by: its counted phrases, and the
+    names in its heading — except an acronym, which stands only as written
+    ("PILOT" the payment, never "pilot" the program)."""
+    names = {p.lower() for p in e["phrases"] if not p.isupper()}
+    for t in e["term"].split(","):
+        t = t.split("(")[0].strip()
+        if t and not t.isupper():
+            names.add(t.lower())
+    return names
+
+
+def _acronyms(e: dict) -> set:
+    """An entry's all-capital names (PILOT, ZBA, DESE), which match only as
+    written."""
+    heads = {t.split("(")[0].strip() for t in e["term"].split(",")}
+    return {x for x in heads | set(e["phrases"]) if x and x.isupper()}
+
 
 def entry_for(phrase: str) -> Optional[dict]:
-    """The entry that explains a phrase the record uses — by one of its
-    counted phrases, or a name in its heading ("warrant article"), a plural
-    folded ("warrant articles"). None when the glossary has no such word."""
-    k = " ".join(str(phrase or "").lower().split())
+    """The entry that explains a phrase the record uses — one of its phrases
+    or heading names, a plural folded ("warrant articles", "levies"); an
+    acronym only as written. None when the glossary has no such word."""
+    raw = " ".join(str(phrase or "").split())
+    k = raw.lower()
     if not k:
         return None
-    for key in (k, k[:-1] if k.endswith("s") else k):
+    keys = [k]
+    if k.endswith("ies"):
+        keys.append(k[:-3] + "y")
+    elif k.endswith("s"):
+        keys.append(k[:-1])
+    for e in ENTRIES:
+        if raw in _acronyms(e):
+            return e
+    for key in keys:
         for e in ENTRIES:
-            names = {p.lower() for p in e["phrases"]}
-            names |= {t.split("(")[0].strip().lower() for t in e["term"].split(",")}
-            if key in names:
+            if key in _names(e):
                 return e
     return None
 
 
-def _search(q: str, base: str) -> str:
-    return f"{base}/s?q={quote(str(q), safe='')}"
+def _search(q: str, base: str, town: str = "") -> str:
+    from .charts import search_url
+    return search_url(q, town, base)
+
+
+def _lines(m: dict) -> List[tuple]:
+    """A meeting's lines as the search index holds them: blank ones skipped
+    (web/bake.py bake_search), so a count here and a count there agree."""
+    return [(float(s.get("start") or 0), str(s.get("text") or ""))
+            for s in (m.get("segments") or []) if str(s.get("text") or "").strip()]
+
+
+def _night_counts(lines: List[tuple], pats: Sequence) -> tuple:
+    """(mentions, first_t) for one meeting — the story engine's rule
+    (web/topic.py mentions_in: a line read with the next joined on, a match
+    counted for the line it starts in) done in one pass per phrase over the
+    whole night rather than one per line: the night joined by single spaces,
+    each match placed on its line by offset, and a match that runs past the
+    next line dropped (mentions_in never sees a third line). Identical
+    counts; a twin test holds them to the per-line rule."""
+    import bisect
+    texts = [t.lower() for _, t in lines]
+    starts, pos = [], 0
+    for t in texts:
+        starts.append(pos)
+        pos += len(t) + 1
+    night = " ".join(texts)
+    n, first_i = 0, None
+    for pat, lit in pats:
+        if lit not in night:
+            continue
+        for mt in pat.finditer(night):
+            li = bisect.bisect_right(starts, mt.start()) - 1
+            if mt.start() > starts[li] + len(texts[li]):
+                continue                                  # on the joining space: no line's
+            last = li + 1 if li + 1 < len(texts) else li
+            if mt.end() > starts[last] + len(texts[last]):
+                continue                                  # runs past the next line
+            n += 1
+            first_i = li if first_i is None else min(first_i, li)
+    return n, (lines[first_i][0] if first_i is not None else None)
 
 
 def count(meetings: Sequence[dict]) -> Dict[str, dict]:
     """How often the record says each entry's words — whole-word, case-blind,
-    a line read with the next joined on (the story engine's own rule) — in
-    how many meetings, and where it first did. Pure over the meetings."""
-    from .topic import mentions_in, phrase_re
-    pats = {e["slug"]: [phrase_re(p) for p in e["phrases"]] for e in ENTRIES}
-    out: Dict[str, dict] = {e["slug"]: {"mentions": 0, "meetings": 0, "first": None, "by": {}} for e in ENTRIES}
+    by the story engine's rule — town by town, only in the towns the word
+    belongs to, with the meetings and where it first came up. Pure."""
+    from .topic import phrase_re
+    pats = {e["slug"]: [(phrase_re(p), p.lower()) for p in e["phrases"]] for e in ENTRIES}
+    out: Dict[str, dict] = {e["slug"]: {"mentions": 0, "meetings": 0, "towns": {}, "by": {}} for e in ENTRIES}
     dated = sorted(meetings, key=lambda m: (str(m.get("date") or "9999"), str(m.get("pid") or "")))
     for m in dated:
-        segs = m.get("segments") or []
-        texts = [str(s.get("text") or "") for s in segs]
-        night = " ".join(texts).lower()
+        lines = _lines(m)
+        if not lines:
+            continue
+        town = str(m.get("town") or "")
         for e in ENTRIES:
-            # the night read whole first: a word it never says costs one
-            # search, not a pass over every line
-            if not any(p.search(night) for p in pats[e["slug"]]):
+            scope = towns_of(e)
+            if scope is not None and town not in scope:
                 continue
-            n, first_t = 0, None
-            ps = pats[e["slug"]]
-            for i, t in enumerate(texts):
-                k = mentions_in(t, texts[i + 1] if i + 1 < len(texts) else "", ps)
-                if k:
-                    n += k
-                    if first_t is None:
-                        first_t = float(segs[i].get("start") or 0)
-            if n:
-                r = out[e["slug"]]
-                r["mentions"] += n
-                r["meetings"] += 1
-                r["by"][m["pid"]] = n
-                if r["first"] is None:
-                    r["first"] = {"pid": m["pid"], "date": str(m.get("date") or ""), "t": first_t}
+            n, first_t = _night_counts(lines, pats[e["slug"]])
+            if not n:
+                continue
+            r = out[e["slug"]]
+            r["mentions"] += n
+            r["meetings"] += 1
+            r["by"][m["pid"]] = n
+            t = r["towns"].setdefault(town, {"mentions": 0, "meetings": 0, "first": None})
+            t["mentions"] += n
+            t["meetings"] += 1
+            if t["first"] is None:
+                t["first"] = {"pid": m["pid"], "date": str(m.get("date") or ""), "t": first_t}
     return out
+
+
+def index(counts: Dict[str, dict]) -> List[dict]:
+    """glossary/index.json — what the search page needs to count an entry's
+    words the glossary's way: the query each count links to, its phrases,
+    the towns it was counted in. Only entries the record says."""
+    return [{"slug": e["slug"], "q": q_of(e), "phrases": list(e["phrases"]),
+             "towns": sorted(counts[e["slug"]]["towns"])}
+            for e in ENTRIES if counts[e["slug"]]["mentions"]]
+
+
+def _short(e: dict) -> str:
+    """An entry's first name, for a line of names ("warrant", not
+    "warrant, warrant article" — a comma in a list of names reads as two)."""
+    return e["term"].split(",")[0].strip()
 
 
 def terms_on(m: dict, counts: Dict[str, dict], top: int = 6) -> List[dict]:
@@ -352,13 +473,13 @@ def terms_on(m: dict, counts: Dict[str, dict], top: int = 6) -> List[dict]:
     that says where they are explained."""
     rows = [(counts[e["slug"]]["by"].get(m["pid"], 0), e) for e in ENTRIES]
     rows = [(n, e) for n, e in rows if n]
-    rows.sort(key=lambda r: (-r[0], r[1]["term"]))
-    return [{"slug": e["slug"], "term": e["term"], "n": n} for n, e in rows[:top]]
+    rows.sort(key=lambda r: (-r[0], r[1]["term"].lower()))
+    return [{"slug": e["slug"], "term": _short(e), "n": n} for n, e in rows[:top]]
 
 
 def _day(d: str) -> str:
     from .story import day_name
-    return day_name(d) if d else "an undated meeting"
+    return f"on {day_name(d)}" if d else "in an undated meeting"
 
 
 def _entry(e: dict, c: dict, base: str) -> str:
@@ -367,16 +488,21 @@ def _entry(e: dict, c: dict, base: str) -> str:
         return f'<a href="{esc(u)}"{rel}>{esc(name)}</a>'
     srcs = " · ".join(src(name, u) for name, u in e["sources"])
     where = "".join(f'<span class="gl-where">{esc(w)}</span>' for w in e["where"])
-    if c["mentions"]:
-        f = c["first"]
-        rec = (f'<a href="{esc(_search(e["phrases"][0], base))}">{n_of(c["mentions"], "time")}</a> in '
-               f'{n_of(c["meetings"], "meeting")} — first on '
-               f'<a href="{base}/m/{esc(f["pid"])}#t{int(f["t"] or 0)}">{esc(_day(f["date"]))}</a>')
+    towns = sorted(c["towns"].items(), key=lambda kv: (-kv[1]["mentions"], kv[0]))
+    if towns:
+        rec = " · ".join(
+            f'{esc(t or "meetings with no town recorded")}: '
+            f'<a href="{esc(_search(q_of(e), base, t))}">{n_of(r["mentions"], "time")}</a> in '
+            f'{n_of(r["meetings"], "meeting")}, first '
+            f'<a href="{base}/m/{esc(r["first"]["pid"])}#t{int(r["first"]["t"] or 0)}">{esc(_day(r["first"]["date"]))}</a>'
+            for t, r in towns)
     else:
         rec = "not yet — the record has not heard it said"
+    notes = "".join(f'<p class="gl-note"><span class="kicker">corrected {esc(d)}</span> {esc(t)}</p>'
+                    for d, t in e.get("notes") or [])
     return (f'<section class="gl-entry" id="{esc(e["slug"])}">'
             f'<h3 class="gl-term">{esc(e["term"])}</h3><p class="gl-wheres">{where}</p>'
-            f'<p class="gl-says">{esc(e["says"])}</p>'
+            f'<p class="gl-says">{esc(e["says"])}</p>{notes}'
             f'<p class="gl-src"><span class="kicker">read the source</span> {srcs}</p>'
             f'<p class="gl-rec"><span class="kicker">on the record</span> {rec}</p></section>')
 
@@ -384,28 +510,33 @@ def _entry(e: dict, c: dict, base: str) -> str:
 def body(meetings: Sequence[dict], base: str = "/app", counts: Optional[Dict[str, dict]] = None) -> str:
     counts = counts if counts is not None else count(meetings)
     az = sorted(ENTRIES, key=lambda e: e["term"].lower())
-    index = " ".join(f'<a href="#{esc(e["slug"])}">{esc(e["term"])}</a>' for e in az)
+    idx = " ".join(f'<a href="#{esc(e["slug"])}">{esc(e["term"])}</a>' for e in az)
     groups = []
     for key, title in GROUPS:
         es = [e for e in ENTRIES if e["group"] == key]
-        groups.append(f'<section class="gl-group" id="gl-{key}"><div class="sectionhead"><span class="kicker">{esc(title)}</span></div>'
+        groups.append(f'<section class="gl-group" id="gl-{key}"><h2 class="gl-gtitle">{esc(title)}</h2>'
                       + "".join(_entry(e, counts[e["slug"]], base) for e in es) + "</section>")
     said = sum(1 for e in ENTRIES if counts[e["slug"]]["mentions"])
+    reviewed = ("A person has read every entry against its source."
+                if REVIEWED else
+                "No person has yet read them against their sources — until one has, read each "
+                "entry as a first draft and its source as the definition.")
     return f"""
   <section class="glpage">
     <a class="back" href="{base}/">← the record</a>
     <h1>The words the record uses</h1>
-    <p class="presslede">A meeting says “warrant article” and “free cash” a hundred times and never
-      stops to say what they mean. These are the words the record hears most often and explains
-      least — {n_of(len(ENTRIES), "entry", "entries")}, {said} of them said on this edition’s tapes —
+    <p class="presslede">A meeting says “warrant article” and “free cash” dozens of times and never
+      stops to say what they mean. These are words the record uses and seldom explains —
+      {n_of(len(ENTRIES), "entry", "entries")}, {said} of them said on this edition’s tapes —
       each in plain language, with where it applies, the public source to read, and how often the
-      record says it. Every count opens the search for it.</p>
-    <p class="gl-label">The definitions were written with Claude, Anthropic’s model, at the desk —
-      not at press time and not in your browser — from the public source each entry names. If one
-      reads wrong, the source is the authority, and a correction annotates the entry. The counts
-      are the record’s own, whole-word over every transcript: no model counts them.
-      <a href="{base}/ai">Our AI Constitution</a> keeps the ledger.</p>
-    <nav class="gl-index" aria-label="every word, A to Z"><span class="kicker">A to Z</span> {index}</nav>
+      record says it, town by town. Every count opens the search that finds it.</p>
+    <p class="gl-label">The definitions were written with {esc(WRITTEN_WITH)} — on Anthropic’s
+      servers, through the coding assistant the developers use while this code was written; never at
+      press time, never in your browser. Each names the public source it draws on, and where the
+      two differ the source is the authority. {reviewed} A correction is dated beside the entry it
+      changes. The counts are the record’s own, whole-word over every transcript: no model counts
+      them. <a href="{base}/ai">Our AI Constitution</a> keeps the ledger.</p>
+    <nav class="gl-index" aria-label="every word, A to Z"><span class="kicker">A to Z</span> {idx}</nav>
     {"".join(groups)}
   </section>
 """

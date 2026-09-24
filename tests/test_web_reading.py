@@ -83,20 +83,71 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
                 llm._LEDGER[:] = self._saved
         self.addCleanup(_restore)
 
-    def serve(self, provider, bodies, key):
+    def serve(self, provider, bodies, key, model="m-test"):
         api = _FakeAPI(bodies)
         self.addCleanup(api.close)
         (Path(self.td.name) / "llm.json").write_text(json.dumps({
-            "api_key": key, "provider": provider, "model": "m-test", "base_url": api.base}))
+            "api_key": key, "provider": provider, "model": model, "base_url": api.base}))
         return api
 
-    def test_gemini_asks_for_the_answer_plus_the_thought(self):
-        api = self.serve("gemini", [{"candidates": [{"content": {"parts": [{"text": "A whole answer."}]},
-                                                     "finishReason": "STOP"}]}], "AIza-x")
-        self.assertEqual(self.llm.complete("q", max_tokens=400), "A whole answer.")
-        got = api.reqs[-1]["body"]["generationConfig"]["maxOutputTokens"]
-        self.assertEqual(got, 400 + self.llm.GEMINI_THINKING_ROOM)
+    def test_gemini_asks_for_the_answer_plus_a_short_thought(self):
+        whole = {"candidates": [{"content": {"parts": [{"text": "A whole answer."}]}, "finishReason": "STOP"}]}
+        cases = [("gemini-3.6-flash", 400 + self.llm.GEMINI_THINKING_ROOM, {"thinkingLevel": "low"}),
+                 ("gemini-2.5-flash", 400 + self.llm.GEMINI_THINKING_ROOM, {"thinkingBudget": 1024}),
+                 # a model that does not think is sent neither: an 8,192-cap model refuses the bigger number
+                 ("gemini-2.0-flash", 400, None), ("gemma-3-27b", 400, None)]
+        for model, want_max, want_think in cases:
+            with self.subTest(model):
+                api = self.serve("gemini", [whole], "AIza-x", model=model)
+                self.assertEqual(self.llm.complete("q", max_tokens=400), "A whole answer.")
+                cfg = api.reqs[-1]["body"]["generationConfig"]
+                self.assertEqual(cfg["maxOutputTokens"], want_max)
+                self.assertEqual(cfg.get("thinkingConfig"), want_think)
         self.assertGreaterEqual(self.llm.GEMINI_THINKING_ROOM, 4096)
+
+    def test_only_a_whole_answer_stop_passes(self):
+        """A length cut is not the only fragment: a safety or recitation stop,
+        a filter, a refusal part way all end an answer early (a review catch)."""
+        cases = [("gemini", "AIza-x", {"candidates": [{"content": {"parts": [{"text": "At the"}]}, "finishReason": r}]}, r)
+                 for r in ("SAFETY", "RECITATION", "OTHER", "PROHIBITED_CONTENT", "SPII", "LANGUAGE", "BLOCKLIST")]
+        cases += [("openai", "sk-x", {"choices": [{"message": {"content": "During"}, "finish_reason": "content_filter"}]}, "content_filter"),
+                  ("anthropic", "sk-ant-x", {"content": [{"type": "text", "text": "The"}], "stop_reason": "refusal"}, "refusal"),
+                  ("anthropic", "sk-ant-x", {"content": [{"type": "text", "text": "The"}],
+                                             "stop_reason": "model_context_window_exceeded"}, "model_context_window_exceeded")]
+        for prov, key, body, reason in cases:
+            with self.subTest(f"{prov} {reason}"):
+                self.serve(prov, [body], key, model="gemini-3.6-flash" if prov == "gemini" else "m")
+                with self.assertRaises(self.llm.CutOff) as cm:
+                    self.llm.complete("q")
+                self.assertEqual(cm.exception.reason, reason)
+                self.assertIn(reason, str(cm.exception))
+        # the whole-answer stops pass, said or unsaid
+        for prov, key, body in [("gemini", "AIza-x", {"candidates": [{"content": {"parts": [{"text": "Whole."}]}}]}),
+                                ("openai", "sk-x", {"choices": [{"message": {"content": "Whole."}, "finish_reason": "stop"}]}),
+                                ("anthropic", "sk-ant-x", {"content": [{"type": "text", "text": "Whole."}], "stop_reason": "end_turn"}),
+                                ("anthropic", "sk-ant-x", {"content": [{"type": "text", "text": "Whole."}], "stop_reason": "stop_sequence"})]:
+            with self.subTest(f"{prov} whole"):
+                self.serve(prov, [body], key)
+                self.assertEqual(self.llm.complete("q"), "Whole.")
+
+    def test_a_cut_translation_keeps_its_whole_lines(self):
+        """A chunk cut at its limit used to lose all forty lines to the
+        source language (or keep the half line as a caption); the whole lines
+        before the cut are kept, the half line and the rest fall back."""
+        from czcore import mt
+        cues = [{"start": float(i), "end": float(i) + 1, "text": f"line {i}"} for i in range(5)]
+
+        def cut(prompt, system="", max_tokens=0, **kw):
+            raise self.llm.CutOff("the answer was cut off at its length limit — a fragment is not an answer",
+                                  "0|línea 0\n1|línea 1\n2|línea 2\n3|lín", "MAX_TOKENS")
+        out = mt.translate_cues(cues, "es", complete=cut)
+        self.assertEqual([c["text"] for c in out], ["línea 0", "línea 1", "línea 2", "line 3", "line 4"])
+        self.assertEqual([bool(c.get("fallback")) for c in out], [False, False, False, True, True])
+
+        def boom(prompt, system="", max_tokens=0, **kw):
+            raise RuntimeError("rate limited by the API (429) — wait a moment and retry")
+        out = mt.translate_cues(cues, "es", complete=boom)
+        self.assertTrue(all(c.get("fallback") for c in out))
 
     def test_a_cut_answer_is_refused_on_every_provider_and_still_counted(self):
         cases = [
@@ -134,7 +185,7 @@ class TestTheSeamGivesTheThoughtRoom(unittest.TestCase):
 
     def test_the_vision_door_keeps_the_same_rules(self):
         api = self.serve("gemini", [{"candidates": [{"content": {"parts": [{"text": "A hall"}]},
-                                                     "finishReason": "MAX_TOKENS"}]}], "AIza-x")
+                                                     "finishReason": "MAX_TOKENS"}]}], "AIza-x", model="gemini-3.6-flash")
         with self.assertRaises(RuntimeError):
             self.llm.complete_vision("what is this", "QUJD", max_tokens=300)
         self.assertEqual(api.reqs[-1]["body"]["generationConfig"]["maxOutputTokens"],
@@ -200,6 +251,11 @@ FIXTURES = [
     "ſtray long s: whaſ it meanſ: stays plain.",
     "```\nfenced words\n```\n**\n* **\n- `x`",
     "* one\n* two\n```\n* three",
+    "**The Select Board sends the $4.2M operating override to the November 4 ballot xx🗳**",
+    "x **" + "💰" * 101 + "** y",
+    "**" + "😀" * 41 + "**",
+    "* * *\n- - -\n_ _ _\n## \n•  •",
+    "a" + " " * 3000 + "x" + "\t" * 2000,
 ]
 
 
@@ -247,9 +303,46 @@ class TestTheRendererReadsTheModelsProse(unittest.TestCase):
         out = self.rp(FIXTURES[7])
         self.assertEqual(out, "<p>A <i>quiet</i> aside, a stray * star, code ticks, and 3 * 4 = 12.</p>")
         self.assertEqual(self.rp(FIXTURES[15]), "")
-        self.assertEqual(self.rp(FIXTURES[-2]), '<p>fenced words</p><ul class="rd-list"><li>x</li></ul>')
+        fence = next(f for f in FIXTURES if f.startswith("```\nfenced words"))
+        self.assertEqual(self.rp(fence), '<p>fenced words</p><ul class="rd-list"><li>x</li></ul>')
         # a fence line between bullets says nothing, so the list is not broken by it
-        self.assertEqual(self.rp(FIXTURES[-1]), '<ul class="rd-list"><li>one</li><li>two</li><li>three</li></ul>')
+        split = next(f for f in FIXTURES if f.startswith("* one\n* two"))
+        self.assertEqual(self.rp(split), '<ul class="rd-list"><li>one</li><li>two</li><li>three</li></ul>')
+
+    def test_a_limited_lede_is_never_only_a_heading_nor_cut_mid_receipt(self):
+        from web.charts import receipt_paras
+        para = "The board voted on the override " + "and the budget " * 60 + "[1:00:00]."
+        out = receipt_paras("**What it means**  \n" + para, "", limit=900)
+        self.assertIn('<p class="rd-h">What it means</p><p>The board voted', out)   # the heading does not spend the cut
+        self.assertTrue(out.endswith("…</p>"), out)
+        self.assertEqual(receipt_paras("```\n" + para + "\n```", "", limit=900)[:12], "<p>The board")
+        # a lede never ends on a heading
+        self.assertNotIn("rd-h", receipt_paras("First line.\n**Next heading**\n" + para, "", limit=400))
+        # a cut inside a receipt group drops the group whole
+        text = "The board took up items " + "x " * 180 + "[12:12, 17:13] and more words after the receipt group"
+        out = receipt_paras(text, "", limit=390)
+        self.assertNotIn("[12:12", out)
+        self.assertTrue(out.endswith("…</p>"), out)
+
+    def test_spaced_rules_and_bare_markers_say_nothing(self):
+        from web.charts import receipt_paras
+        self.assertEqual(receipt_paras("* * *\n- - -\n_ _ _\n## \n•  •", ""), "")
+
+    def test_a_long_run_of_spaces_is_trimmed_in_linear_time(self):
+        import time
+        from web.charts import receipt_paras
+        t0 = time.time()
+        out = receipt_paras("a" + " " * 200000 + "x" + " \t" * 100000, "")
+        self.assertLess(time.time() - t0, 1.0)
+        self.assertTrue(out.startswith("<p>a") and out.endswith("x</p>"))
+
+    def test_the_tapes_own_sentences_are_never_read_as_markdown(self):
+        """An extractive summary is the tape's words verbatim: "- " is a dash,
+        "*" a star, "# 1" a number — only its receipts are linked."""
+        from web.charts import receipt_paras
+        out = receipt_paras("- we start. f*** that # 1 priority *really* [1:05]", "", plain=True)
+        self.assertEqual(out, '<p>- we start. f*** that # 1 priority *really* <a class="ts" href="#t65">[1:05]</a></p>')
+        self.assertEqual(receipt_paras("## heading line", "", plain=True), "<p>## heading line</p>")
 
     def test_the_old_contract_holds(self):
         out = self.rp(FIXTURES[1])
@@ -288,6 +381,128 @@ class TestTheRendererReadsTheModelsProse(unittest.TestCase):
         got = json.loads(r.stdout)
         for (t, b), js_out in zip(cases, got):
             self.assertEqual(js_out, receipt_paras(t, b), f"the twins differ on {t!r}")
+
+
+
+class TestTheModelsWordsAreLabeledWhereTheyAreRead(unittest.TestCase):
+    """The folds' own receipts: a kit whose copy says "no model" never takes a
+    model's summary as its brief; a stored "what changed" a model wrote is
+    never pressed unlabeled; a receipt that names no line's first second
+    still lands on the line it falls in."""
+
+    def test_a_kit_takes_the_tapes_sentences_not_a_models_summary(self):
+        from web.kit import kit_from_meeting
+        segs = [{"start": float(i * 10), "end": float(i * 10 + 9), "text": t, "speaker": ""} for i, t in enumerate(
+            ["We open the meeting on the override.", "The board votes to put the override on the ballot.",
+             "Public comment follows on the budget.", "The motion carries unanimously.", "We adjourn."])]
+        moments = [{"t": 10.0, "start": 10.0, "end": 20.0, "quote": "The board votes", "score": 0.9, "kind": "vote"}]
+        base = {"pid": "k1", "title": "Select Board — 2026-03-10", "date": "2026-03-10", "video_id": "k1", "url": "u",
+                "town": "Testville", "body": "Select Board", "segments": segs, "moments": moments, "analysis": {},
+                "duration": 60.0}
+        ai = kit_from_meeting({**base, "summary": "**What it means** A model wrote this.", "summary_origin": "ai:gemini-3.6-flash"})
+        ex = kit_from_meeting({**base, "summary": "The tape's own words.", "summary_origin": "extractive"})
+        self.assertIsNotNone(ai)
+        blob = json.dumps(ai)
+        self.assertNotIn("A model wrote this", blob)
+        self.assertNotIn("**", blob)
+        self.assertIn("no model", blob)
+        self.assertIn("The tape's own words", json.dumps(ex))
+
+    def test_a_stored_model_delta_is_pressed_as_the_counted_line(self):
+        from memory.store import Corpus
+        from web import bake
+        with tempfile.TemporaryDirectory() as d:
+            db = Path(d) / "c.db"
+            c = Corpus(str(db))
+            c.replace_segments("m1", [{"start": 0.0, "end": 5.0, "speaker": "", "text": "the override"}])
+            c.upsert_meeting({"id": "m1", "title": "Select Board — 2026-09-22", "date": "2026-09-22", "town": "T",
+                              "body": "Select Board", "source_kind": "youtube", "video_id": "m1", "url": "u",
+                              "url_canon": "youtube:m1", "duration": 5.0, "n_segments": 1, "status": "live",
+                              "summary": "", "analysis_json": "{}"})
+            c.upsert_issue({"id": "issue:t:override", "town": "T", "name": "Override", "status": "active",
+                            "keywords": ["override"], "aliases": [], "related": []})
+            c.add_event("resurfacing", issue_id="issue:t:override", meeting_id="m1",
+                        payload={"delta": "The September 22, 202", "title": "Select Board — 2026-09-22",
+                                 "date": "2026-09-22", "body": "Select Board"})
+            c.add_event("resurfacing", issue_id="issue:t:override", meeting_id="m1",
+                        payload={"delta": "“Override” returned. That is 2 appearances on the record.",
+                                 "title": "Select Board — 2026-09-22", "date": "2026-09-22", "body": "Select Board"})
+            out = Path(d) / "app"
+            bake.bake(str(db), str(out), "9.9.9", "https://example.org")
+            home = (out / "index.html").read_text()
+        self.assertNotIn("The September 22, 202<", home)
+        self.assertIn("“Override” returned at Select Board — 2026-09-22 (Select Board · 2026-09-22).", home)
+        self.assertIn("“Override” returned. That is 2 appearances on the record.", home)   # the extractive one stands
+
+    def test_a_receipt_lands_on_the_line_it_falls_in(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node not available")
+        js = (REPO / "web" / "static" / "app.js").read_text(encoding="utf-8")
+        fn = re.search(r"  function rowAt\(sec\) \{.+?\n  \}\n", js, re.S).group(0)
+        prog = ("const rows = [0, 12.4, 30, 55.9].map(t => ({ id: 't' + Math.floor(t), dataset: { t: String(t) } }));"
+                "const document = { getElementById: id => rows.find(r => r.id === id) || null };"
+                "const $$ = () => rows;" + fn +
+                "console.log(JSON.stringify([12, 13, 29, 30, 31, 999, -5].map(s => { const a = rowAt(s); return a ? [a.row.id, a.exact] : null; })));")
+        r = subprocess.run([node, "-e", prog], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), [["t12", True], ["t12", False], ["t12", False], ["t30", True],
+                                                ["t30", False], ["t55", False], None])
+
+
+class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
+    """record/repair.py — the one-off that asks again for what the old budget
+    cut: it must touch fragments and nothing else, and be safe to re-run."""
+
+    def test_a_fragment_is_cut_and_a_whole_answer_is_not(self):
+        from record.repair import is_cut
+        for t in ("At the September 22, 2026,", "During the", "vote on", "[13:"):
+            self.assertTrue(is_cut(t), t)
+        for t in ("The board voted.", "Was it passed?", "… [264:28][279:55].", "facing the town [279:55]",
+                  "(G.)", "“Adjourned.”", "", "   "):
+            self.assertFalse(is_cut(t), t)
+
+    def test_the_plan_names_only_what_the_old_budget_cut(self):
+        from record.repair import plan
+        rows = [
+            {"id": "a", "summary": "At the September 22, 2026,", "summary_origin": "ai:gemini-3.6-flash",
+             "analysis_json": json.dumps({"draft": {"text": "**What it means**\nThe board focused on", "origin": "ai:gemini-3.6-flash"}})},
+            # an older model's whole summary, and a draft that is whole: kept
+            {"id": "b", "summary": "The board met [1:00:00].", "summary_origin": "ai:gpt-4o-mini",
+             "analysis_json": json.dumps({"draft": {"text": "What it means: a plan [1:00].", "origin": "ai:gemini-3.6-flash"}})},
+            # a cut extractive summary is the tape's own words, never asked of a model here
+            {"id": "c", "summary": "and then the", "summary_origin": "extractive", "analysis_json": "{}"},
+            # whole prose that still shows Markdown is asked again; a cut desk-model summary is not Gemini's to redo
+            {"id": "d", "summary": "Fine.", "summary_origin": "ai:gemini-3.6-flash",
+             "analysis_json": json.dumps({"draft": {"text": "**Who moved it:** the chair.", "origin": "ai:gemini-3.6-flash"}})},
+            {"id": "e", "summary": "The board", "summary_origin": "ai:gpt-4o-mini", "analysis_json": "not json"},
+        ]
+        self.assertEqual(plan(rows), [{"id": "a", "want": ["summary", "draft"]}, {"id": "d", "want": ["draft"]}])
+        # after a repair the same rows plan nothing: safe to re-run
+        fixed = [{**rows[0], "summary": "The board met.", "analysis_json": json.dumps(
+            {"draft": {"text": "What it means: whole.", "origin": "ai:gemini-3.6-flash"}})}]
+        self.assertEqual(plan(fixed), [])
+
+    def test_before_the_fix_everything_the_budget_wrote_is_asked_again(self):
+        """A fragment that happens to end on a bracketed receipt looks whole
+        ("…the override [1:12:24]") — so everything a Gemini lane wrote before
+        the fixed image is asked again, and a live meeting with no draft is
+        filled; a row repaired since is newer than the cutoff and left alone."""
+        from record.repair import plan, _when
+        cutoff = _when("2026-09-24T03:00Z")
+        self.assertEqual(cutoff, _when(str(cutoff)))
+        looks_whole = json.dumps({"draft": {"text": "What it means: the board took up the override [1:12:24]",
+                                            "origin": "ai:gemini-3.6-flash"}})
+        rows = [
+            {"id": "a", "summary": "The board met [279:55].", "summary_origin": "ai:gemini-3.6-flash",
+             "analysis_json": looks_whole, "updated_at": cutoff - 3600},
+            {"id": "b", "summary": "Whole.", "summary_origin": "ai:gpt-4o-mini", "analysis_json": "{}",
+             "updated_at": cutoff - 3600},
+            {"id": "c", "summary": "Whole.", "summary_origin": "ai:gemini-3.6-flash", "analysis_json": looks_whole,
+             "updated_at": cutoff + 60},
+        ]
+        self.assertEqual(plan(rows, cutoff), [{"id": "a", "want": ["summary", "draft"]}, {"id": "b", "want": ["draft"]}])
+        self.assertEqual(plan(rows), [])          # without the cutoff, only true fragments
 
 
 if __name__ == "__main__":

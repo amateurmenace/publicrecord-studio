@@ -42,6 +42,8 @@ FLOOR_MEETINGS = 2       # meetings those lines span
 WINDOW = 12.0            # a hit's clip: its line, twelve seconds on (the tray's own rule)
 MERGE_CAP = 90.0         # a run of hits merges into one clip, up to this long
 BINS = 48                # where-on-the-tape slices per meeting
+FULL_CAP = 120           # the full cut's clips: its link stays well under a host's URL limit
+                         # (GitHub Pages' CDN refuses past 8 KB; housing's 320 clips were 7.3 KB)
 
 
 # --------------------------------------------------------------------------
@@ -75,7 +77,9 @@ def find_hits(m: dict, phrases: Sequence[str]) -> List[dict]:
     line, one line of context either side, and how many times it was said in
     that line. Lines in tape order."""
     pats = [phrase_re(p) for p in phrases if str(p or "").strip()]
-    segs = m.get("segments") or []
+    # the lines the search index holds: a blank caption line is no line, so
+    # "…use artificial" / "" / "intelligence cameras" reads as the index reads it
+    segs = [s for s in (m.get("segments") or []) if str(s.get("text") or "").strip()]
     out = []
     for i, s in enumerate(segs):
         after = str(segs[i + 1].get("text") or "") if i + 1 < len(segs) else ""
@@ -309,7 +313,8 @@ def aggregate(meetings: Sequence[dict], hits: Sequence[dict], topic: dict,
                           "end": r["clips"][0]["end"] if r["clips"] else r["hits"][0]["t"] + WINDOW}}
                 for r in said]
     short = [c["clip"] for c in chapters]
-    full = [c for r in said for c in r["clips"]]
+    every = [c for r in said for c in r["clips"]]
+    full = every[:FULL_CAP]
     return {
         "slug": topic["slug"], "name": topic.get("name") or topic["slug"],
         "long": topic.get("long") or topic.get("name") or topic["slug"],
@@ -329,7 +334,8 @@ def aggregate(meetings: Sequence[dict], hits: Sequence[dict], topic: dict,
         "cowords": cowords(all_hits, phrases),
         "chapters": chapters,
         "reel": {"short": reel_url(short), "short_n": len(short), "short_runtime": runtime(short),
-                 "full": reel_url(full), "full_n": len(full), "full_runtime": runtime(full)},
+                 "full": reel_url(full), "full_n": len(full), "full_all": len(every),
+                 "full_runtime": runtime(full)},
     }
 
 

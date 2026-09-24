@@ -36,13 +36,15 @@ class TestTheDrawersAndTheirTwins(unittest.TestCase):
                       {"month": "2026-07", "meetings": [3], "mentions": {"a": 1}, "said": True},
                       {"month": "2026-08", "meetings": "0x10", "mentions": "1_000", "said": " 2 "},
                       {"month": "2026-09", "meetings": "Infinity", "mentions": 1e300, "said": "-3"},
-                      {"month": 202610}, {"month": ["2026-11"]}]
+                      {"month": 202610}, {"month": ["2026-11"]},
+                      {"month": "2026-12", "meetings": 25, "said": 40, "mentions": 3}]
     ROWS = [
         {"pid": "a", "date": "2026-03-24", "body": "Select Board", "n": 27, "bins": [0] * 40 + [1, 3, 0, 27] + [0] * 4},
         {"pid": "b", "date": "", "body": "A body with a very long name indeed that runs on", "n": 1, "bins": [1] + [0] * 47},
         {"pid": "c", "date": "2026-04-14", "body": "Zoning 🏠 Board of Appeal and more", "n": 2, "bins": "not a list"},
         {"pid": "d", "date": "2026-05-12", "body": "Silent", "n": 0, "bins": [0] * 48},
         {"pid": "e", "date": 20260601, "body": ["x"], "n": "3", "bins": [True, "2", None, -1, 5.9]},
+        {"pid": "f", "date": "2026-06-02", "body": "Ctrl\x1bBody\x0c 🏠 \ud800", "n": 1, "bins": [1]},
         None, "row",
     ]
     WORDS = [{"word": "use", "count": 16}, {"word": "  policy\t", "count": "9"}, {"word": "", "count": 5},
@@ -73,12 +75,13 @@ class TestTheDrawersAndTheirTwins(unittest.TestCase):
         js = (REPO / "web" / "static" / "app.js").read_text(encoding="utf-8")
         esc = re.search(r"  const esc = s => .+?\n.+?\n", js).group(0)
         mon = re.search(r"  const TP_MON = .+?;\n", js).group(0)
-        block = re.search(r"  const TP_PIC = .+?\n  function tpWordsSvg\(words, title, source\) \{.+?\n  \}\n", js, re.S)
+        block = re.search(r"  const TP_PIC = .+?\n  function tpWordsSvg\(words, title, source, legend = TP_LEGEND\.words\) \{.+?\n  \}\n", js, re.S)
+        tpn = re.search(r"  const tpN = .+?;\n", js).group(0)
         self.assertTrue(block, "the picture twins moved — re-point the test")
-        title, source = "How <Town> & co talk about “AI”", 'https://x.test/app/s?q=AI&town="T" · CC BY-SA 4.0'
+        title, source = "How <Town> & co talk\x07 about “AI” 🗳", 'https://x.test/app/s?q=AI&town="T" · CC BY-SA 4.0\x0b'
         cases = [("months", self.MONTHS), ("months", self.GARBAGE_MONTHS), ("months", []),
                  ("tapes", self.ROWS), ("tapes", []), ("words", self.WORDS), ("words", [])]
-        prog = (esc + mon + block.group(0)
+        prog = (esc + mon + tpn + block.group(0)
                 + "const C = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
                   "const f = { months: tpMonthsSvg, tapes: tpTapesSvg, words: tpWordsSvg };"
                   "console.log(JSON.stringify(C.cases.map(([k, d]) => f[k](d, C.title, C.source))));")
@@ -104,6 +107,27 @@ class TestTheDrawersAndTheirTwins(unittest.TestCase):
         self.assertEqual(json.loads(r.stdout), [pictures.slug(n) for n in names])
         self.assertEqual(pictures.slug(names[0]), "the-records-roll-calls-meeting-by-meeting")
 
+    def test_a_file_parses_whatever_its_text_held_and_says_how_to_read_it(self):
+        """A control character in a caption or a title made a file nothing
+        could open (a review catch); past twenty meetings a month's dots were
+        a silent twenty; the files carried no key and no <title>."""
+        from web import pictures
+        svg = pictures.months_svg([{"month": "2026-03", "meetings": 30, "said": 25, "mentions": 51}],
+                                  "How \x1bTown\x0c talks \ud800about it", "https://x/app/ · counted\x08 · CC BY-SA 4.0")
+        ET.fromstring(svg.split("\n", 1)[1].encode("utf-8"))
+        self.assertIn(">25/30</text>", svg)
+        self.assertNotIn("<circle", svg)
+        self.assertIn("<title>How Town talks about it</title>", svg)
+        self.assertIn(">" + pictures.LEGEND["months"].replace("'", "'") + "</text>", svg)
+        # the page is as wide as its longest line
+        long_title = "How Brookline talks about affordable housing in the whole record — mentions, month by month"
+        w = int(re.search(r'width="(\d+)"', pictures.months_svg([], long_title, "a · b")).group(1))
+        self.assertGreaterEqual(w, 32 + len(long_title) * 8)
+        # the legends are the JS twin's, word for word
+        js = (REPO / "web" / "static" / "app.js").read_text(encoding="utf-8")
+        for k in ("months", "tapes", "words"):
+            self.assertIn(f'{k}: "{pictures.LEGEND[k]}"', js)
+
     def test_a_meetings_file_keeps_its_ids_case(self):
         """YouTube ids are case-sensitive: lowercased, two tapes could share a
         file and one meeting's picture would overwrite another's."""
@@ -120,7 +144,8 @@ class TestTheDrawersAndTheirTwins(unittest.TestCase):
                                   href=lambda w: f'#t{int(w["t"])}')
         link = pictures.take("m-x-words", cloud, "The meeting in words — X", "/app/m/x", hash_page="/app/m/x")
         self.assertEqual(link, '<p class="pic-dl"><a href="/app/pictures/m-x-words.svg" '
-                               'download="the-meeting-in-words-x.svg">↓ this picture, as .svg</a></p>')
+                               'download="the-meeting-in-words-x.svg" aria-label="download “The meeting in words — X” as .svg">'
+                               '↓ this picture, as .svg</a></p>')
         svg = pictures._PENDING["m-x-words"]
         self.assertIn('href="https://publicrecord.studio/app/m/x#t12"', svg)
         self.assertNotIn('href="#', svg)

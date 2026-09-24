@@ -75,7 +75,8 @@ COPY highlighter/ /app/highlighter/
 # build and fail only when the press runs. `web.bake` does NOT pull `web.kit`
 # transitively (bake_kits imports it lazily), so name it explicitly.
 RUN python -c "import record.app, record.store, record.press, record.pipeline, \
-    record.connectors.youtube, memory.ingest, web.bake, web.emit, web.kit"
+    record.connectors.youtube, memory.ingest, web.bake, web.emit, web.kit, \
+    web.pictures, web.glossary, record.repair"
 
 EXPOSE 8330
 CMD ["uvicorn", "record.app:app", "--host", "0.0.0.0", "--port", "8330"]

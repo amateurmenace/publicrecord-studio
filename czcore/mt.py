@@ -262,16 +262,19 @@ def translate_cues(cues: List[dict], code: str,
             raw = complete(prompt=numbered,
                            system=_system_for(code, block),
                            max_tokens=3600)
-            for ln in raw.splitlines():
-                if "|" not in ln:
-                    continue
-                k, txt = ln.split("|", 1)
-                try:
-                    got[int(k.strip())] = txt.strip()
-                except ValueError:
-                    pass
-        except RuntimeError:
-            got = {}   # the whole chunk fell — every line says so below
+        except RuntimeError as e:
+            # a cut answer's last line may be half a line; the lines before it
+            # are whole and are kept — the rest say they fell, below
+            partial = getattr(e, "partial", "") or ""
+            raw = "\n".join(str(partial).splitlines()[:-1])
+        for ln in raw.splitlines():
+            if "|" not in ln:
+                continue
+            k, txt = ln.split("|", 1)
+            try:
+                got[int(k.strip())] = txt.strip()
+            except ValueError:
+                pass
         for k, c in enumerate(chunk):
             txt = got.get(k, "").strip()
             cue = {"start": c["start"], "end": c["end"],

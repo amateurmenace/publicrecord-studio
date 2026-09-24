@@ -253,7 +253,8 @@ def over_time(meetings: Sequence[dict], issues: Sequence[dict], stats: dict,
                     f'<div class="vteasers">{teaser}</div></div>' if teaser else "")
     vpic = charts.votes_over_time(votes, base)
     parts.append(f'<section class="fp-part">{kicker("votes over time — every roll call, meeting by meeting")}'
-                 + vpic + pictures.take("record-votes", vpic, "The record’s roll calls, meeting by meeting", f"{base}/")
+                 + vpic + pictures.take("record-votes", vpic, "The record’s roll calls, meeting by meeting", f"{base}/",
+                                legend=pictures.LEGEND["votes"])
                  + vsay + teaser_block + "</section>")
     # the long view
     months = [x["month"] for x in cov]
@@ -299,13 +300,14 @@ def over_time(meetings: Sequence[dict], issues: Sequence[dict], stats: dict,
                    + '. Sized by how often, placed by rank; every word opens the search for it.')
     wpic = charts.word_cloud(words, base=base)
     parts.append(f'<section class="fp-part">{kicker("the record in words — what was said most")}'
-                 + wpic + pictures.take("record-words", wpic, "The record in words — what was said most", f"{base}/")
+                 + wpic + pictures.take("record-words", wpic, "The record in words — what was said most", f"{base}/",
+                                legend=pictures.LEGEND["cloud"])
                  + wsay + "</section>")
     # what changed
     resurf = stats.get("resurfacings") or []
     rrows = "".join(
         f'<a class="rsrow" href="{base}/i/{esc(r["slug"])}"><b>{esc(r["name"])}</b>'
-        f'<span class="rsdelta">{esc(str(r.get("delta") or "")[:220])}</span></a>' for r in resurf[:6]) \
+        f'<span class="rsdelta">{esc(cut_words(str(r.get("delta") or ""), 220))}</span></a>' for r in resurf[:6]) \
         or '<p class="hint">No thread has resurfaced yet — follow an issue and the record will keep watch.</p>'
     parts.append(f'<section class="fp-part">{kicker("what changed, last time — threads that resurfaced")}'
                  f'<div class="rsrows">{rrows}</div></section>')
@@ -359,13 +361,17 @@ def latest(m: dict, base: str = "/app") -> str:
               else "a summary drawn from the tape")
     # whole lines up to 900 characters, receipts linked: a cut at a fixed
     # character count ended the lede mid-receipt and mid-word
-    summary = (f'<div class="fp-lede fp-summ">{charts.receipt_paras(str(m.get("summary") or ""), href, limit=900)}</div>'
-               f'<p class="decksrc">{origin} — supplements the official record</p>' if m.get("summary") else "")
+    said = charts.receipt_paras(str(m.get("summary") or ""), href, limit=900,
+                                plain=not str(m.get("summary_origin") or "").startswith("ai:"))
+    summary = (f'<div class="fp-lede fp-summ">{said}</div>'
+               f'<p class="decksrc">{origin} — supplements the official record</p>' if said else "")
     # the reading, drafted (specs/24 §4) — a model's paragraphs under the
     # model's own name, receipts linked, beside the counted commentary
     d = an.get("draft") or {}
-    if isinstance(d, dict) and str(d.get("text") or "").strip() and str(d.get("origin") or "").startswith("ai:"):
-        summary += (f'<div class="fp-draft">{charts.receipt_paras(d["text"], href)}</div>'
+    drafted = (charts.receipt_paras(d["text"], href) if isinstance(d, dict) and str(d.get("text") or "").strip()
+               and str(d.get("origin") or "").startswith("ai:") else "")
+    if drafted:        # a draft that renders to nothing presses no labeled box
+        summary += (f'<div class="fp-draft">{drafted}</div>'
                     f'<p class="decksrc">the reading, drafted by a model — {esc(d["origin"])}, labeled — '
                     'check it against the tape; the counted lines below stand on their own</p>')
     told = []
@@ -411,7 +417,8 @@ def latest(m: dict, base: str = "/app") -> str:
     spic = charts.meeting_shape(m.get("moments") or [], dur, pid, base=base)
     parts.append(f'<section class="fp-part">{kicker("the shape of the meeting")}'
                  + spic + pictures.take(f"m-{pictures.key(pid)}-shape", spic,
-                                        f"The shape of the meeting — {m.get('title') or pid}", f"{base}/m/{pid}")
+                                        f"The shape of the meeting — {m.get('title') or pid}", f"{base}/m/{pid}",
+                                        legend=pictures.LEGEND["shape"])
                  + shape_say + "</section>")
     if top:
         pulls = "".join(
@@ -442,7 +449,8 @@ def latest(m: dict, base: str = "/app") -> str:
                                  each="each opens the tape at its first mention")
         parts.append(f'<section class="fp-part">{kicker("the meeting in words — what was said most")}'
                      + mpic + pictures.take(f"m-{pictures.key(pid)}-words", mpic,
-                                            f"The meeting in words — {m.get('title') or pid}", f"{base}/m/{pid}")
+                                            f"The meeting in words — {m.get('title') or pid}", f"{base}/m/{pid}",
+                                            legend=pictures.LEGEND["cloud"])
                      + say(f'“{esc(w0["word"])}” came up {n_of(int(w0["count"]), "time")}. Every word opens the tape at its first mention.') + "</section>")
     topics = _real_topics(an.get("topics"))
     sparks = charts.sparklines(segs, [t["name"] for t in topics[:6]], dur, pid, base=base) if segs and topics else ""
@@ -644,13 +652,15 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
                  + say(f'One line per meeting, in order — the moment the word first entered the room, with the line before and after it. '
                        f'Every line opens the tape; the tick beside it cuts the line into your reel. '
                        f'<a href="{search}">All {n_of(d["moments"], "line")} →</a>') + "</section>")
-    # the supercut
+    # the supercut — and the full cut, capped so its link stays under a host's URL limit
+    full_said = (f'the first {reel["full_n"]} of {n_of(reel.get("full_all", reel["full_n"]), "clip")}'
+                 if reel.get("full_all", reel["full_n"]) > reel["full_n"] else n_of(reel["full_n"], "clip"))
     parts.append(
         f'<section class="fp-part">{kicker("the supercut — every one of those moments, played in order")}'
         f'<div class="tp-cut">'
         f'<a class="btn primary tp-play" href="{esc(reel["short"])}">▶ play the supercut</a>'
         f'<span class="tp-cutmeta">{n_of(reel["short_n"], "clip")}, one per night · {hms(reel["short_runtime"])}</span>'
-        f'<a class="btn tp-full" href="{esc(reel["full"])}">the full cut — {n_of(reel["full_n"], "clip")} · {hms(reel["full_runtime"])}</a>'
+        f'<a class="btn tp-full" href="{esc(reel["full"])}">the full cut — {full_said} · {hms(reel["full_runtime"])}</a>'
         f'</div>'
         + say('A reel plays the tape clip to clip, in this browser, and the whole reel lives in its link — copy the address and it is shared; '
               'open it and press <b>make this reel yours</b> to re-cut it. Nothing is uploaded, nothing about you is kept.')

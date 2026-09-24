@@ -424,8 +424,8 @@ def sparklines(segments: Sequence[dict], terms: Sequence[str], duration: float, 
 _RD_BULLET = re.compile(r"^[*•-][ \t]+(.+)$")
 _RD_HASH = re.compile(r"^#{1,6}[ \t]+(.+)$")
 _RD_BOLDLINE = re.compile(r"^\*\*([^*]{1,80}?):?\*\*:?$")
-_RD_RULE = re.compile(r"^[-*_•]+$")          # a rule, or a bare marker: no content
-_RD_TRIM = re.compile(r"^[ \t\u00a0\ufeff]+|[ \t\u00a0\ufeff]+$")
+_RD_RULE = re.compile(r"^(?:[-*_•#][ \t]*)+$")  # a rule, spaced or not, or a bare marker ("##"): no content
+_RD_WS = " \t\u00a0\ufeff"   # what a line is trimmed of, in both twins — named, so they agree
 _RD_BOLD = re.compile(r"\*\*([^*]{1,200}?)\*\*")
 _RD_ITAL = re.compile(r"\*([^* \t\u00a0](?:[^*]{0,200}?[^* \t\u00a0])?)\*")
 _RD_STAR = re.compile(r"( ?)\*+( ?)")
@@ -479,8 +479,12 @@ def _rd_group(m, href_base: str) -> str:
     return "".join(parts)
 
 
-def _rd_inline(s: str, href_base: str) -> str:
+def _rd_inline(s: str, href_base: str, plain: bool = False) -> str:
     t = _rd_esc(s)
+    if plain:
+        # the tape's own sentences (an extractive summary): escaped and their
+        # receipts linked — never read as Markdown ("- " is a dash, "*" a star)
+        return _RD_GROUP.sub(lambda m: _rd_group(m, href_base), t)
     t = _RD_BOLD.sub(r"<b>\1</b>", t)
     t = _RD_ITAL.sub(r"<i>\1</i>", t)
     # what is left of the syntax goes; an asterisk with a space either side
@@ -494,7 +498,17 @@ def _rd_inline(s: str, href_base: str) -> str:
     return t
 
 
-def receipt_paras(text: str, href_base: str, limit: int = 0) -> str:
+def _rd_cut(ln: str, n: int) -> str:
+    """A line cut at a word — and never inside a receipt group: an unclosed
+    "[12:12, 17…" at the cut is dropped whole, not left half-linked."""
+    c = cut_words(ln, n)
+    if c.endswith("…") and c != ln:
+        body = re.sub(r"\s*\[[^\]]*$", "", c[:-1])
+        c = body.rstrip(",;:—- ") + "…"
+    return c
+
+
+def receipt_paras(text: str, href_base: str, limit: int = 0, plain: bool = False) -> str:
     """A model's paragraphs with their receipts turned into links: every
     [MM:SS] or [H:MM:SS] the draft carries opens the tape there
     (`href_base` is the meeting page, or "" for the page itself). A heading
@@ -503,15 +517,29 @@ def receipt_paras(text: str, href_base: str, limit: int = 0) -> str:
     to that many characters of source (the first line cut at a word), so a
     front page never ends a draft mid-receipt."""
     src = re.sub(r"\r\n|[\r\u2028\u2029]", "\n", str(text or ""))
-    lines = [_RD_TRIM.sub("", ln) for ln in src.split("\n")]
-    lines = [ln for ln in lines if ln and not _RD_RULE.match(ln)]
+    lines = [ln.strip(_RD_WS) for ln in src.split("\n")]
+    lines = [ln for ln in lines if ln and (plain or not _RD_RULE.match(ln))]
     if limit:
-        kept, used = [], 0
+        # whole lines up to the limit; the first line with words in it always
+        # stands (cut to the room left) — a heading or a line of bare syntax
+        # never spends the cut, and the lede never ends on a heading
+        def head_or_bare(ln: str) -> bool:
+            return (not plain and bool(_RD_HASH.match(ln) or _RD_BOLDLINE.match(ln))) \
+                or not _rd_inline(ln, "", plain).strip(_RD_WS)
+        kept, used, words = [], 0, False
         for ln in lines:
-            if kept and used + len(ln) > limit:
-                break
-            kept.append(ln if kept or len(ln) <= limit else cut_words(ln, limit))
-            used += len(ln)
+            room = limit - used
+            if len(ln) <= room:
+                kept.append(ln)
+                used += len(ln)
+                words = words or not head_or_bare(ln)
+                continue
+            if not words and not head_or_bare(ln):
+                kept.append(_rd_cut(ln, max(room, 200)))
+                words = True
+            break
+        while kept and head_or_bare(kept[-1]):
+            kept.pop()
         lines = kept
     out: List[str] = []
     items: List[str] = []
@@ -521,15 +549,15 @@ def receipt_paras(text: str, href_base: str, limit: int = 0) -> str:
             out.append('<ul class="rd-list">' + "".join(f"<li>{x}</li>" for x in items) + "</ul>")
             items.clear()
     for ln in lines:
-        b = _RD_BULLET.match(ln)
+        b = None if plain else _RD_BULLET.match(ln)
         if b:
             x = _rd_inline(b.group(1), href_base)
-            if x:
+            if x.strip(_RD_WS):
                 items.append(x)
             continue
-        h = _RD_HASH.match(ln) or _RD_BOLDLINE.match(ln)
-        x = _rd_inline(h.group(1) if h else ln, href_base)
-        if not x:
+        h = None if plain else (_RD_HASH.match(ln) or _RD_BOLDLINE.match(ln))
+        x = _rd_inline(h.group(1) if h else ln, href_base, plain)
+        if not x.strip(_RD_WS):
             continue       # a line that was only syntax (a fence, a bare **) says nothing
         flush()
         out.append(f'<p class="rd-h">{x}</p>' if h else f"<p>{x}</p>")

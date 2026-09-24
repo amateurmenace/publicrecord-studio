@@ -627,40 +627,23 @@ def _queue_candidates(corpus, meeting_id: str, town: str, segs: List[dict],
 
 # ---- resurfacing delta: "what changed since last time" --------------------
 
-_DELTA_SYS = (
-    "You write one short paragraph for a resident following a civic issue, "
-    "summarizing what a new meeting added to it versus its earlier appearances. "
-    "Be concrete and neutral; use the [MM:SS] timestamps so a reader can check "
-    "you. Never invent a vote or a position, and never characterize anyone's "
-    "stance. This supplements the official record; it does not replace it."
-)
-
-
 def delta(corpus, issue: dict, meeting_id: str) -> str:
-    """A one-paragraph 'what changed since last time' for a resurfacing.
-    Generative with a key, extractive otherwise — the fallback names the meeting,
-    the arc so far, and quotes the new segments verbatim."""
+    """A one-paragraph 'what changed since last time' for a resurfacing, in
+    the tape's own words: it names the meeting, the arc so far, and quotes
+    the new segments verbatim.
+
+    A model once drafted it when a key was at hand — and the paragraph was
+    stored in the event with no origin, so the front page pressed a model's
+    words unlabeled (and, under v2.1.21's budget, cut off: "The September 22,
+    202"). Every AI-made line is labeled where it is read (Our AI
+    Constitution, article 2); a labeled model delta needs its origin stored
+    beside it, and until that is designed the delta is extractive
+    (specs/28 §2.1)."""
     m = corpus.get_meeting(meeting_id) or {}
     beads = _issue_beads(corpus, issue["id"], meeting_id)
     prior = [n for n in corpus.issue_appearances(issue["id"])
              if n["meeting_id"] != meeting_id]
     where = " · ".join(x for x in (m.get("body"), m.get("date")) if x)
-    if llm.enabled():
-        try:
-            lines = [f"[{_ms(b['t'])}] {(b.get('speaker') + ': ') if b.get('speaker') else ''}"
-                     f"{b['text']}" for b in beads[:30]]
-            body = (f"Issue: {issue['name']}\n"
-                    f"Earlier appearances: {len(prior)} "
-                    f"meeting(s) since {issue.get('first_seen') or 'the start'}.\n"
-                    f"New meeting: {m.get('title','')} ({where}).\n\n"
-                    "New passages:\n" + "\n".join(lines) +
-                    "\n\nWrite the 'what changed' paragraph.")
-            txt = llm.complete(body, system=_DELTA_SYS, max_tokens=300)
-            if txt.strip():
-                return txt.strip()
-        except Exception:
-            pass
-    # extractive fallback
     head = (f"“{issue['name']}” returned"
             + (f" at {m.get('title','')}" if m.get("title") else "")
             + (f" ({where})" if where else "") + ". ")
@@ -680,8 +663,11 @@ def _issue_beads(corpus, issue_id: str, meeting_id: str) -> List[dict]:
 
 
 def _ms(t: float) -> str:
+    """A time as the page says it: [MM:SS] under the hour, [H:MM:SS] past it
+    — never [264:28] (memory/analyze._stamp, the same rule)."""
     t = max(0, int(t or 0))
-    return f"{t // 60:02d}:{t % 60:02d}"
+    h, m, sec = t // 3600, (t % 3600) // 60, t % 60
+    return f"{h}:{m:02d}:{sec:02d}" if h else f"{m:02d}:{sec:02d}"
 
 
 # ---- the "still watching" digest (local covenant for the spec's email) ----

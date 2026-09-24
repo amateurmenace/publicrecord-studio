@@ -800,10 +800,20 @@ class Bake:
         for e in self.c.list_events(limit=40):
             if e.get("kind") == "resurfacing":
                 pl = e.get("payload") or {}
+                name = e.get("issue_name", "")
+                d = str(pl.get("delta") or "")
+                # the tape's own words only (specs/28 §2.1): a stored "what
+                # changed" a model wrote carries no origin to label it with —
+                # the live front page pressed two, cut off — so any delta not
+                # in the extractive shape is replaced by the counted line
+                if not d.startswith(f"“{name}” returned"):
+                    d = (f"“{name}” returned" + (f" at {pl.get('title')}" if pl.get("title") else "")
+                         + (f" ({' · '.join(x for x in (pl.get('body'), pl.get('date')) if x)})"
+                            if (pl.get("body") or pl.get("date")) else "") + ".")
                 resurf.append({
                     "slug": islug(e.get("issue_id") or ""),
-                    "name": e.get("issue_name", ""),
-                    "delta": pl.get("delta", ""),
+                    "name": name,
+                    "delta": d,
                     "date": pl.get("date", ""), "title": pl.get("title", ""),
                     "pid": pid(e.get("meeting_id") or "")})
         # counts derive from the LIVE meetings the edition actually ships —

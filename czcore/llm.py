@@ -226,28 +226,75 @@ def _gemini_text(data: dict) -> str:
 # 400-token summary on gemini-3.6-flash came back as "At the September 22,
 # 2026," — v2.1.21 pressed every hosted summary and every drafted reading on
 # the record cut off mid-sentence, because the thought had spent the budget
-# before the answer began. The caller's `max_tokens` stays the answer's
-# length; the thought gets room of its own on top of it.
+# before the answer began. So a thinking model gets room for its thought on
+# top of the caller's `max_tokens`, and is asked to keep the thought short:
+# left to itself, a thinking model's thought has been seen to track whatever
+# limit it is given. A model that does not think is sent neither — an older
+# model with an 8,192-token cap would refuse the larger number outright.
 GEMINI_THINKING_ROOM = 8192
 
 
-def _gemini_budget(max_tokens: int) -> int:
-    return int(max_tokens) + GEMINI_THINKING_ROOM
+def _thinking(model: str) -> Optional[dict]:
+    """How much a Gemini model may think before it answers: a low level on
+    the 3.x family, a set budget on 2.5; nothing for a model that does not
+    think (it would refuse the field)."""
+    m = str(model or "").lower()
+    if m.startswith("gemini-3"):
+        return {"thinkingLevel": "low"}
+    if m.startswith("gemini-2.5"):
+        return {"thinkingBudget": 1024}
+    return None
 
 
-def _cut_off(data: dict, provider: str) -> bool:
-    """Did the answer stop at its length limit rather than at its end? Each
-    provider says so in its own words — Gemini's `finishReason`, OpenAI's
-    `finish_reason`, Anthropic's `stop_reason`. A cut answer is a fragment,
-    and a fragment is never an answer: the caller's own fallback (the
-    extractive summary, no draft at all) is the honest thing to show."""
+def _gemini_config(model: str, max_tokens: int) -> dict:
+    t = _thinking(model)
+    if not t:
+        return {"maxOutputTokens": int(max_tokens)}
+    return {"maxOutputTokens": int(max_tokens) + GEMINI_THINKING_ROOM, "thinkingConfig": t}
+
+
+class CutOff(RuntimeError):
+    """An answer that stopped before its end — at its length limit, or
+    stopped part way by the provider (a safety or recitation stop).
+    `partial` is what arrived and `reason` the provider's word for why. A
+    caller that can keep whole pieces of a partial (a translation's whole
+    lines) may; one that cannot (a summary, a draft) must not."""
+
+    def __init__(self, msg: str, partial: str = "", reason: str = ""):
+        super().__init__(msg)
+        self.partial = partial
+        self.reason = reason
+
+
+# the stops that mean "the answer ended": anything else is a fragment
+_WHOLE_STOP = {"gemini": {"STOP", ""}, "openai": {"stop", ""},
+               "anthropic": {"end_turn", "stop_sequence", ""}}
+_LENGTH_STOP = {"gemini": "MAX_TOKENS", "openai": "length", "anthropic": "max_tokens"}
+
+
+def _stop_of(data: dict, provider: str) -> str:
+    """The provider's own word for why the answer stopped."""
     if provider == "gemini":
         c = (data.get("candidates") or [{}])[0] or {}
-        return str(c.get("finishReason") or "") == "MAX_TOKENS"
+        return str(c.get("finishReason") or "")
     if provider == "openai":
         c = (data.get("choices") or [{}])[0] or {}
-        return str(c.get("finish_reason") or "") == "length"
-    return str(data.get("stop_reason") or "") == "max_tokens"
+        return str(c.get("finish_reason") or "")
+    return str(data.get("stop_reason") or "")
+
+
+def _refuse_a_fragment(data: dict, provider: str, text: str, what: str = "answer") -> None:
+    """Raise CutOff unless the answer ended the way a whole answer ends.
+    Only the known-good stops pass — Gemini STOP, OpenAI stop, Anthropic
+    end_turn / stop_sequence (or none said at all); a length cut, a safety
+    or recitation stop, a refusal part way are all fragments."""
+    p = provider if provider in ("gemini", "openai") else "anthropic"
+    stop = _stop_of(data, p)
+    if stop in _WHOLE_STOP[p]:
+        return
+    if stop == _LENGTH_STOP[p]:
+        raise CutOff(f"the {what} was cut off at its length limit — a fragment is not an {what}", text, stop)
+    raise CutOff(f"the model stopped before its {what} ended ({stop}) — a fragment is not an {what}", text, stop)
 
 
 def last_usage() -> Optional[dict]:
@@ -307,7 +354,7 @@ def complete(prompt: str, system: str = "", max_tokens: int = 1200,
         # into logs, and the covenant keeps keys out of sight.
         payload = {"contents": [{"role": "user",
                                  "parts": [{"text": prompt}]}],
-                   "generationConfig": {"maxOutputTokens": _gemini_budget(max_tokens)}}
+                   "generationConfig": _gemini_config(c["model"], max_tokens)}
         if system:
             payload["systemInstruction"] = {"parts": [{"text": system}]}
         req = urllib.request.Request(
@@ -364,9 +411,7 @@ def complete(prompt: str, system: str = "", max_tokens: int = 1200,
     # either refusal below
     tin, tout = _usage_from(data, c.get("provider") or "", len(prompt))
     _record(c["model"], c.get("provider") or "", tin, tout, tool=tool)
-    if _cut_off(data, c.get("provider") or ""):
-        raise RuntimeError("the answer was cut off at its length limit — a "
-                           "fragment is not an answer")
+    _refuse_a_fragment(data, c.get("provider") or "", text)
     if not text.strip():
         raise RuntimeError("the API answered with no text")
     return text
@@ -400,7 +445,7 @@ def complete_vision(prompt: str, jpeg_b64: str, system: str = "",
         payload = {"contents": [{"role": "user", "parts": [
             {"inline_data": {"mime_type": "image/jpeg", "data": jpeg_b64}},
             {"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": _gemini_budget(max_tokens)}}
+            "generationConfig": _gemini_config(c["model"], max_tokens)}
         if system:
             payload["systemInstruction"] = {"parts": [{"text": system}]}
         req = urllib.request.Request(
@@ -442,9 +487,7 @@ def complete_vision(prompt: str, jpeg_b64: str, system: str = "",
     tin, tout = _usage_from(data, c.get("provider") or "", len(prompt) + 1500)
     _record(c["model"], c.get("provider") or "", tin, tout,
             tool=tool, kind="vision")
-    if _cut_off(data, c.get("provider") or ""):
-        raise RuntimeError("the description was cut off at its length limit "
-                           "— a fragment is not a description")
+    _refuse_a_fragment(data, c.get("provider") or "", str(text), what="description")
     if not str(text).strip():
         raise RuntimeError("the model answered with no text")
     return str(text)
