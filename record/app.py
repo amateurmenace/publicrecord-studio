@@ -274,6 +274,12 @@ def create_app(corpus=None, papers=None) -> FastAPI:
 
     # -- public: the shared-paper store (specs/21 §6.2) --------------------
 
+    # the read path's one sentence for an address the store does not hold —
+    # never shared, a lost character, or taken down; the share says the same
+    # when a taken page is offered again (its words are Stephen's, so no new ones)
+    NO_PAPER = ("no paper at this address — it may never have been shared, "
+                "the id may have lost a character, or it was taken down")
+
     @app.post("/api/papers")
     async def paper_put(request: Request):
         """Store a curated paper at the hash of its own canonical bytes.
@@ -318,6 +324,12 @@ def create_app(corpus=None, papers=None) -> FastAPI:
         pid = paperlib.paper_id(canon)
         try:
             ps.put_new(pid, canon.encode("utf-8"))
+        except paperlib.PaperTaken:
+            # a steward took this page down (record/OPERATING.md §5): the store
+            # will not hold it again, and a share must not answer 200 with a
+            # link that only says so when followed — 410, the read path's own
+            # sentence, and the reader's full link still carries the page
+            return JSONResponse({"error": NO_PAPER}, status_code=410)
         except Exception as exc:
             return JSONResponse(
                 {"error": f"the share store is unreachable ({exc.__class__.__name__})"
@@ -345,10 +357,7 @@ def create_app(corpus=None, papers=None) -> FastAPI:
                 {"error": f"the share store is unreachable ({exc.__class__.__name__})"},
                 status_code=503)
         if data is None:
-            return JSONResponse(
-                {"error": "no paper at this address — it may never have been "
-                          "shared, the id may have lost a character, or it "
-                          "was taken down"}, status_code=404)
+            return JSONResponse({"error": NO_PAPER}, status_code=404)
         return Response(content=data, media_type="application/json",
                         headers={"Cache-Control":
                                  "public, max-age=31536000, immutable"})

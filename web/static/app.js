@@ -8233,7 +8233,9 @@
       let n = 0;
       cards.forEach(c => {
         const towns = String(c.dataset.towns || "").split(" ").filter(Boolean);
-        const on = k === "all" || (k === "by" && c.dataset.by === v) || (k === "town" && towns.includes(v))
+        // a card that names no town is the whole record's (the roll calls, a
+        // bare year), so every town's filter keeps it
+        const on = k === "all" || (k === "by" && c.dataset.by === v) || (k === "town" && (!towns.length || towns.includes(v)))
           || (k === "week" && c.dataset.week === "1") || (k === "kind" && c.dataset.kind === v);
         c.hidden = !on; if (on) n++;
       });
@@ -8250,10 +8252,12 @@
     const fromHash = () => { const a = links.find(x => x.getAttribute("href") === location.hash); if (a) apply(a.dataset.filter); return !!a; };
     window.addEventListener("hashchange", fromHash);
     if (!fromHash()) {
-      // the reader's own town, chosen on a page before this one, narrows the
-      // grid first — their own opinion, with Everything one press away
+      // the reader's own town, chosen on a page before this one (stored) or
+      // named in the link, narrows the grid first — their own opinion, with
+      // Everything one press away; never the one town an edition happens to
+      // hold ("only"), which nobody chose
       edition().then(ed => { const sc = resolve(ed);
-        if (!location.hash && sc.town) { const a = links.find(x => x.dataset.filter === "town:" + bsSlug(sc.town)); if (a) apply(a.dataset.filter); } });
+        if (!location.hash && sc.town && (sc.from === "stored" || sc.from === "link")) { const a = links.find(x => x.dataset.filter === "town:" + bsSlug(sc.town)); if (a) apply(a.dataset.filter); } });
     }
   }
   /* a lens label isolates its band; the same label again shows all eight */

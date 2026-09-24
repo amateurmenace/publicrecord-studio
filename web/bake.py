@@ -1289,9 +1289,10 @@ class Bake:
         manifest = {
             "schema": SCHEMA_VERSION, "version": self.version,
             "corpus_hash": h.hexdigest()[:16], "edition_date": edition_date,
-            "shared_hash": self.shared_hash,
             "counts": stats["counts"],
         }
+        if self.shared_hash:
+            manifest["shared_hash"] = self.shared_hash   # the listed pages' digest, when a store was listed
         # Only when there is one, so a desk pressing's manifest is byte-for-byte
         # what it was before this key existed. The reader does not read it here
         # (the meta tag in `<head>` is what it uses); this is for the operator
@@ -1315,8 +1316,12 @@ class Bake:
                                       today=self.today or _dt.date.today())
         # the listed set, digested: the service worker's cache key carries it,
         # so a page taken down (or newly listed) on a quiet week still reaches
-        # returning readers (a review catch: the key knew the corpus alone)
-        self.shared_hash = hashlib.sha256(",".join(c["id"] for c in cards).encode()).hexdigest()[:8] if cards else ""
+        # returning readers (a review catch: the key knew the corpus alone) —
+        # and each card's day-relative bits with it, so the night the strip
+        # seats a page, or a card leaves this week, changes the key too (a
+        # skeptic's catch: gallery.age_bits, the gate's shared_digest alike)
+        self.shared_hash = (hashlib.sha256(",".join(f"{c['id']}:{int(bool(c['week']))}{int(bool(c['seasoned']))}" for c in cards).encode())
+                            .hexdigest()[:8] if cards else "")
         if self.shared:
             print(f"  front pages: {len(cards)} of {len(self.shared)} shared page(s) listed")
             # the steward's morning glance is the review step — the newest, by title

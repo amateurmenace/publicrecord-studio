@@ -35,7 +35,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import re
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from . import charts
 from .charts import esc, n_of, still_src
@@ -188,6 +188,20 @@ def when_words(created, today: _dt.date) -> str:
     return f"{d.strftime('%B')} {d.day}" + ("" if d.year == today.year else f", {d.year}")
 
 
+def age_bits(d: Optional[_dt.date], today: _dt.date) -> Tuple[bool, bool]:
+    """A card's two day-relative facts — (this week, a day old at least) —
+    the only things about a listed page that change with nobody touching
+    the store. The press's gate and the worker's key both fold them in
+    (record/press.py shared_digest, web/bake.py shared_hash), so the night
+    the strip may seat a page, or a card leaves this week, is a night that
+    presses and reaches returning readers (a skeptic's catch: the strip
+    moved behind a gate and a key that never saw a day pass)."""
+    if not d:
+        return False, False
+    age = (today - d).days
+    return 0 <= age < WEEK_DAYS, age >= 1
+
+
 def _town_of_slug(slug: str) -> str:
     """The town an issue id names (issue:<town>:<rest> → issue_<town>_<rest>),
     for a plane that carries none — a hyphenated town id reads as its words."""
@@ -247,14 +261,14 @@ def card_of(paper: dict, pid: str, created, meetings_by_pid: Dict[str, dict], is
     if held_slugs:
         made.append(n_of(len(held_slugs), "issue"))
     d = _day(created)
+    week, seasoned = age_bits(d, today)
     return {"id": pid, "href": f"{base}/p?p={pid}", "title": title[:200], "kind": kind_of(blocks),
             "made": " · ".join(made), "what": what_of(blocks), "when": when_words(created, today),
             "towns": towns, "town": towns[0] if len(towns) == 1 else "", "still": still, "by": "readers",
             "day": d.isoformat() if d else "",
-            "week": bool(d and 0 <= (today - d).days < WEEK_DAYS),
-            # a day old at least: the strip seats a page only after a night's
-            # press has already listed it in the gallery
-            "seasoned": bool(d and (today - d).days >= 1)}
+            # this week, and a day old at least (the strip seats a page only
+            # after a night's press has already listed it in the gallery)
+            "week": week, "seasoned": seasoned}
 
 
 def readers_cards(shared: Optional[Sequence[dict]], meetings: Sequence[dict], issues: Sequence[dict], stills,
@@ -309,9 +323,14 @@ def own_cards(featured: Sequence[dict], meetings: Sequence[dict], stills, base: 
     for f in (featured or []):
         pid = str(f.get("pid") or "")
         m = by_pid.get(pid)
-        town = str(f.get("town") or (m.get("town") if m else "") or "")
         blocks = f.get("blocks") or []
-        pids = pids_of(blocks)
+        pids, slugs = pids_of(blocks), slugs_of(blocks)
+        # the page's town: named by the featured link, else its meeting's,
+        # else read off its issue's slug (the record's issue pages are one
+        # town's each); a page with none is the whole record's, and every
+        # town's filter keeps it (data-towns="" — app.js bsGallery)
+        town = str(f.get("town") or (m.get("town") if m else "")
+                   or next((_town_of_slug(s) for s in slugs if _town_of_slug(s)), ""))
         out.append({"id": "", "href": f"{base}/p?{f['qs']}", "title": str(f.get("title") or ""), "kind": kind_of(blocks),
                     "made": n_of(len(pids), "meeting") if pids else "",
                     "what": str(f.get("sub") or ""), "when": "", "towns": [town] if town else [], "town": town,

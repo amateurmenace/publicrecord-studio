@@ -178,15 +178,19 @@ class TestCards(unittest.TestCase):
         self.assertEqual(len(s.list_all(limit=1)), 1)
         # taken down stays down: the same bytes do not come back
         s.taken.add("a" * 16); del s._d["a" * 16]
-        s.put_new("a" * 16, b"x")
+        from record.papers import PaperTaken
+        with self.assertRaises(PaperTaken):
+            s.put_new("a" * 16, b"x")
         self.assertIsNone(s.get("a" * 16))
+        # minted on the clock's own day, so a memory store's pages are listable
+        self.assertGreaterEqual(rows[0]["created"][:10], gallery.LISTED_SINCE.isoformat())
 
     def test_the_bucket_store_lists_newest_first_capped_and_refuses_a_taken_page(self):
         """GcsPapers against a fake client: only p/<id>.json objects count, the
         newest LIST_MAX are downloaded (the cap comes before the downloads),
         one unreadable object is one missing row, and put_new writes nothing
         when the page sits under taken/."""
-        from record.papers import GcsPapers, LIST_MAX
+        from record.papers import GcsPapers, LIST_MAX, PaperTaken
 
         class Blob:
             def __init__(self, name, when, data=b"{}", fail=False):
@@ -200,7 +204,7 @@ class TestCards(unittest.TestCase):
         t0 = dt.datetime(2026, 9, 20, tzinfo=dt.timezone.utc)
         blobs = [Blob(f"p/{i:016x}.json", t0 + dt.timedelta(minutes=i)) for i in range(LIST_MAX + 5)]
         blobs += [Blob("p/not-an-id.json", t0 + dt.timedelta(days=9)), Blob("p/readme.txt", t0 + dt.timedelta(days=9)),
-                  Blob("taken/" + "9" * 16 + ".json", t0 + dt.timedelta(days=9)), Blob("p/" + "8" * 16 + ".json", None, fail=True)]
+                  Blob("taken/" + "9" * 16 + ".json", t0 + dt.timedelta(days=9)), Blob("p/" + "8" * 16 + ".json", t0 + dt.timedelta(days=10), fail=True)]   # the newest of all, and unreadable
         class Client:
             def list_blobs(self, name, prefix=""):
                 return [b for b in blobs if b.name.startswith(prefix)]
@@ -215,14 +219,14 @@ class TestCards(unittest.TestCase):
         store = GcsPapers("fake")
         store._bucket = Bucket()
         rows = store.list_all()
-        self.assertEqual(len(rows), LIST_MAX - 1 + 0 if False else LIST_MAX)   # the cap, minus nothing: the failing blob was past it? no — it sorts last
+        self.assertEqual(len(rows), LIST_MAX - 1)                               # the cut is LIST_MAX; the unreadable one is one missing row
         ids = [r["id"] for r in rows]
-        self.assertEqual(ids[0], f"{LIST_MAX + 4:016x}")                      # newest first
-        self.assertNotIn("not-an-id", ids); self.assertNotIn("9" * 16, ids)
-        self.assertEqual(sum(b.downloads for b in blobs), LIST_MAX)             # downloads only past the cut, none for the rest
-        self.assertEqual(len(rows), LIST_MAX)
-        store.put_new("9" * 16, b"{}")
-        self.assertEqual(writes, [])                                            # taken down stays down
+        self.assertEqual(ids[0], f"{LIST_MAX + 4:016x}")                      # newest first, the unreadable newest absent
+        self.assertNotIn("not-an-id", ids); self.assertNotIn("9" * 16, ids); self.assertNotIn("8" * 16, ids)
+        self.assertEqual(sum(b.downloads for b in blobs), LIST_MAX)             # downloads only inside the cut, none for the rest
+        with self.assertRaises(PaperTaken):
+            store.put_new("9" * 16, b"{}")
+        self.assertEqual(writes, [])                                            # taken down stays down, and said so
         store.put_new("7" * 16, b"{}")
         self.assertEqual(writes, ["p/" + "7" * 16 + ".json"])
 
@@ -294,9 +298,9 @@ class TestGalleryPress(unittest.TestCase):
                 self.assertEqual((root / "a" / rel).read_bytes(), (root / "b" / rel).read_bytes(), rel)
         self.assertEqual(shared_digest(None), "")
         self.assertEqual(shared_digest([]), "")
-        d1 = shared_digest(SHARED); d2 = shared_digest(list(reversed(SHARED)))
+        d1 = shared_digest(SHARED, TODAY); d2 = shared_digest(list(reversed(SHARED)), TODAY)
         self.assertTrue(d1.startswith("|s") and d1 == d2)                    # order-blind
-        self.assertNotEqual(d1, shared_digest(SHARED[:-1]))                  # a page gone is a change
+        self.assertNotEqual(d1, shared_digest(SHARED[:-1], TODAY))           # a page gone is a change
         # needs_press reads the store's digest off the recorded fingerprint
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "pressing.json"
@@ -305,12 +309,42 @@ class TestGalleryPress(unittest.TestCase):
             db = Path(tmp) / "c.db"; TestBakeEdition._seed(db)
             c = Corpus(str(db))
             try:
-                p.write_text(json.dumps({"fingerprint": corpus_fingerprint(c) + shared_digest(SHARED)}))
-                self.assertFalse(needs_press(c, str(p), shared=SHARED))
-                self.assertTrue(needs_press(c, str(p), shared=SHARED[:-1]))
-                self.assertTrue(needs_press(c, str(p)))
+                p.write_text(json.dumps({"fingerprint": corpus_fingerprint(c) + shared_digest(SHARED, TODAY)}))
+                self.assertFalse(needs_press(c, str(p), shared=SHARED, today=TODAY))
+                self.assertTrue(needs_press(c, str(p), shared=SHARED[:-1], today=TODAY))
+                self.assertTrue(needs_press(c, str(p), shared=SHARED, today=TODAY + dt.timedelta(days=1)))   # a page turns a day old
+                self.assertTrue(needs_press(c, str(p), today=TODAY))
             finally:
                 c.close()
+
+    def test_a_day_passing_moves_the_gate_and_the_key(self):
+        """The strip seats a page once it is a day old and a card leaves this
+        week after seven — bits that change with nobody touching the store —
+        so the pressing's fingerprint and the worker's key carry them: the
+        night they flip presses and reaches returning readers, and a quiet
+        night after that is quiet again (a skeptic's catch)."""
+        from web import bake
+        from record.press import shared_digest
+        day = dt.timedelta(days=1)
+        self.assertEqual(gallery.age_bits(TODAY, TODAY), (True, False))
+        self.assertEqual(gallery.age_bits(TODAY - day, TODAY), (True, True))
+        self.assertEqual(gallery.age_bits(TODAY - 7 * day, TODAY), (False, True))
+        self.assertEqual(gallery.age_bits(TODAY + day, TODAY), (False, False))
+        self.assertEqual(gallery.age_bits(None, TODAY), (False, False))
+        self.assertNotEqual(shared_digest(SHARED, TODAY), shared_digest(SHARED, TODAY + day))   # a page shared TODAY turns a day old
+        old = [{"id": "c" * 16, "created": "2026-09-01T00:00:00+00:00", "data": b"{}"}]
+        self.assertEqual(shared_digest(old, TODAY), shared_digest(old, TODAY + day))            # nothing would change: quiet
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); db = root / "corpus.db"
+            TestBakeEdition._seed(db)
+            bake.bake(str(db), str(root / "a"), "1.0.0", "https://x.org", shared=SHARED, today=TODAY)
+            bake.bake(str(db), str(root / "b"), "1.0.0", "https://x.org", shared=SHARED, today=TODAY + day)
+            key = lambda d: re.search(r"cz-record-[\w.-]+", (root / d / "sw.js").read_text()).group(0)
+            self.assertNotEqual(key("a"), key("b"))                                                   # the worker's key moves with the day
+            self.assertNotEqual((root / "a" / "index.html").read_bytes(), (root / "b" / "index.html").read_bytes())   # the strip seats the newer page
+            self.assertIn("shared_hash", json.loads((root / "a" / "manifest.json").read_text()))       # a press with a store carries the digest
+            bake.bake(str(db), str(root / "c"), "1.0.0", "https://x.org", today=TODAY)
+            self.assertNotIn("shared_hash", json.loads((root / "c" / "manifest.json").read_text()))   # a desk manifest is what it was
 
     def test_the_share_hint_says_what_a_short_link_does(self):
         for token in ("⚡ short link — on the front pages after tonight’s press",

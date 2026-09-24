@@ -419,6 +419,23 @@ if __name__ == "__main__":
     unittest.main()
 
 
+    def test_a_taken_page_offered_again_is_refused_at_the_door(self):
+        """A steward's takedown (record/OPERATING.md §5) moves the object
+        under taken/; the same bytes POSTed again are not stored and the
+        share is told so — 410 with the read path's own sentence — never a
+        200 whose link answers 404 (a skeptic's catch on the P2 folds)."""
+        r = self.client.post("/api/papers", json=portable())
+        self.assertEqual(r.status_code, 200)
+        pid = r.json()["id"]
+        self.mem.taken.add(pid); del self.mem._d[pid]
+        again = self.client.post("/api/papers", json=portable())
+        self.assertEqual(again.status_code, 410)
+        self.assertIn("taken down", again.json()["error"])
+        gone = self.client.get(f"/api/papers/{pid}")
+        self.assertEqual(gone.status_code, 404)
+        self.assertEqual(gone.json()["error"], again.json()["error"])     # one sentence, the read path's
+        self.assertIsNone(self.mem.get(pid))
+
 class TestTwoPathsKinds(unittest.TestCase):
     """specs/24: the two paths' kinds are refs and enums like every kind
     before them — a numbers chart names a meeting or an issue (one), a

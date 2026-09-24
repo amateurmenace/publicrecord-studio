@@ -585,7 +585,8 @@ next scheduled run: `gh workflow run "nightly edition"` (returning readers
 get the new pages when the worker's key changes, which the press makes it
 do). The page's short link answers with the reader's existing sentence — *no
 paper answers at this address … or the paper was taken down* — and the
-store refuses the same bytes again (`put_new` looks under `taken/` first),
+store refuses the same bytes again (`put_new` looks under `taken/` first, and
+the share answers 410 with the read path's own sentence — no link that 404s),
 so a re-share cannot undo the move. The record keeps the bytes under
 `taken/` for its own account and serves them to no one; the words a reader
 sees are the ones already pressed, and changing them — like a reader-facing

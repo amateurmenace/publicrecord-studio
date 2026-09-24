@@ -32,6 +32,17 @@ the card, the short link answers with the reader's existing sentence, and
 no new words were written for it. The editor says what the short link now
 does, in the panel, the share row and the desk's covenant line.
 
+Reviewed through two lenses and two skeptics before it shipped; the
+skeptics' catches were the folds' own. The strip seats a page once it is a
+day old and a card leaves *this week* after seven — facts that change with
+nobody touching the store — so the pressing's gate and the worker's cache
+key now carry each listed page's day-relative bits, and the night they
+flip is a night that presses and reaches returning readers. The gallery
+narrows on a town the reader chose, never the one town an edition happens
+to hold, and a page that names no town is every town's. A taken page
+offered again is refused at the door — 410, the read path's own sentence —
+instead of answered with a link that says so only when followed.
+
 ### Writing in the same style — the studio as the board, six more blocks, five more templates — 2026-09-24 (v2.2.1)
 
 The reading half of the broadsheet shipped as v2.2.0; this release is the

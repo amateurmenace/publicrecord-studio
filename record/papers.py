@@ -111,6 +111,12 @@ class PaperError(ValueError):
     """A document the store refuses — the message is the 422 body."""
 
 
+class PaperTaken(PaperError):
+    """A page a steward took down (record/OPERATING.md §5, `taken/`): the
+    store will not hold the same bytes again, and says so instead of
+    answering a link that only says so when followed."""
+
+
 def _t(x, what):
     """A clip time: a real JSON number, finite, >= 0, snapped to the
     tenth-second grid, whole seconds collapsed to int so 12 and 12.0 hash
@@ -395,14 +401,17 @@ class MemPapers:
         self._d = {}
         self._when = {}
         self.taken = set()   # ids a steward took down — the bucket's taken/ prefix
+        # creation times the tests can reason about — newest last, a second
+        # apart, on the clock's own day (the press lists nothing minted
+        # before its threshold, so a store of yesteryear would list nothing)
+        self._t0 = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
 
     def put_new(self, pid: str, data: bytes) -> None:
         if pid in self.taken:
-            return          # taken down stays down: the same bytes do not come back
+            raise PaperTaken(pid)   # taken down stays down: the same bytes do not come back
         if pid not in self._d:
             self._d[pid] = data
-            # a creation time the tests can reason about, newest last
-            self._when[pid] = f"2026-01-01T00:00:{len(self._when) % 60:02d}+00:00"
+            self._when[pid] = (self._t0 + _dt.timedelta(seconds=len(self._when))).isoformat()
 
     def get(self, pid: str):
         return self._d.get(pid)
@@ -435,10 +444,11 @@ class GcsPapers:
     def put_new(self, pid: str, data: bytes) -> None:
         from google.api_core.exceptions import PreconditionFailed
         # a page a steward took down (moved to taken/) stays down: the same
-        # bytes POSTed again write nothing, and the short link keeps saying
-        # the store holds nothing there (a review catch: one move must be one)
+        # bytes POSTed again write nothing, and the share is refused outright
+        # rather than answered with a link that 404s (a review catch: one
+        # move must be one; a skeptic's: a refusal must be said at the door)
         if self._b().blob(f"taken/{pid}.json").exists():
-            return
+            raise PaperTaken(pid)
         blob = self._b().blob(f"p/{pid}.json")
         try:
             blob.upload_from_string(data, content_type="application/json",
