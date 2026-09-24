@@ -1,6 +1,7 @@
 # Session prompt — publicrecord-studio: after v2.1.20, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
+(`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
 (on a new machine: `gh repo clone amateurmenace/publicrecord-studio`, then
 `python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt` —
 system python may be 3.14, too new). `CLAUDE.md` carries the laws;
@@ -10,8 +11,10 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 
 ## Where things stand
 
-- **BUILT, on branch `topic-story` (not merged, not deployed): a word, over
-  time** (`specs/25-a-word-over-time.md`) — Stephen's UX verdict of
+- **LIVE: v2.1.21 / r44** (2026-09-24; PR #1 merged as 3e06db7; tag
+  `v2.1.21` at 049eba5, the commit the image was built from; the service
+  and all four jobs on r44; the press at `--version 2.1.21`). **A word,
+  over time** (`specs/25-a-word-over-time.md`) — Stephen's UX verdict of
   2026-09-23 answered: the front page leads with *How Brookline talks about
   AI* (a counted story pressed from the transcripts by `web/topic.py` +
   `web/story.py::topic` + three new pictures in `web/charts.py`, with a
@@ -32,10 +35,11 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   find in this meeting (folds the transcript, sparkline, ▶ the mentions as
   a reel, ✂ tray), the word cloud on every meeting page, a jump bar, the
   `?` keys sheet, the bodies filter under the stories — reviewed the same
-  way (eleven findings folded, five more on re-review). 629 tests. **Next:
-  rebase on main, deploy as v2.1.21 / r44** (v2.1.20 / r43 is
-  the embed-budget deploy; OPERATING §5 — press `--version 2.1.21`; the version bump is the cache
-  key; parity-check the ten files, now including `web/topic.py`).
+  way (eleven findings folded, five more on re-review). 658 tests. The
+  parity list is now eleven files (`web/topic.py` and `web/cuts.py` joined
+  it). **Next** (Stephen's, below): a second featured word; the follow-ons
+  specs/25 §4 and specs/26 §4 name; read the live front page's three tabs
+  and the search for "AI" on a phone, and say what is still unclear.
 - **LIVE: v2.1.20 / r43** — tag `v2.1.20` at the deployed commit. v2.1.20:
   the first night with every switch on landed one meeting and sat silent for
   an hour — the embedding endpoint had slowed to a batch a minute, one
@@ -120,9 +124,10 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 7. Still his alone: stored free text beyond title + notes, re-pointing
    sources, spend over $100/mo, paper-as-homepage (declined), brand questions,
    deleting anything, a `record` template for the over-time story.
-8. **Ship `topic-story`** (specs/25 §4): rebase on main, press `--version
-   2.1.21`, r44 (every job moved), the Pages sync, the tag. Then read the live front page's three tabs
-   and the search for "AI" on a phone.
+8. ~~Ship `topic-story`~~ shipped (v2.1.21 / r44, 2026-09-24). Read the
+   live front page's three tabs, the search for "AI", a meeting page's find
+   box and night cut, and `?` — on a phone — and say what is still unclear;
+   that verdict is the next session's brief.
 9. **A second featured word** — one line in `web/topic.py::FEATURED` (a
    name, a search, its phrases); the front page grows a fourth tab. And a
    `chart·topic` paper block (a new stored kind — his sign-off first).
@@ -179,8 +184,8 @@ the next image tag and press version, and move every job.
 3. Any change: review (lenses → skeptics → fold → re-review the fixes,
    executed twins over token pins), deploy by OPERATING §5 — **one image tag
    per deploy, every job moved, press `--version` bumped**, parity-check the
-   ten files (`web/static/app.js`, `web/static/app.web.css`, `web/emit.py`,
-   `web/bake.py`, `web/story.py`, `web/charts.py`, `web/topic.py`,
+   eleven files (`web/static/app.js`, `web/static/app.web.css`, `web/emit.py`,
+   `web/bake.py`, `web/story.py`, `web/charts.py`, `web/topic.py`, `web/cuts.py`,
    `record/papers.py`, `record/press.py`, `record/connectors/youtube.py`),
    Pages sync with the gunzip loop, verify `sw.js`, tag, push.
 
