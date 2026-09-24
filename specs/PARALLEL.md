@@ -157,6 +157,16 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- {STAMP} — **v2.2.1 / r48 is LIVE: writing in the same style** (specs/29
+  P1; tag `v2.2.1` at {TAG}, the commit the image was built from; the
+  service and all six jobs on r48; the press at `--version 2.2.1`). The
+  studio as the board (the block shelf, rust frames, the writing desk),
+  six ref-only kinds (lead · week · threads · strip · names · search) and
+  `v=5` links, five new templates and the issue template redrawn to board
+  6, a shared page's head/foot/door, the search page's `m=` scope — and
+  every `v=4` link the press had pressed reads again (`PAPER_VS` had
+  stopped at "3" since specs/24). Reviewed through four lenses and two
+  skeptics. Next: P2, the gallery (2.2.2).
 - 2026-09-24 05:28Z — **v2.2.0 / r47 is LIVE: the civic broadsheet**
   (specs/29 P0; tag `v2.2.0` at 2e0e907, the commit the image was built from; the
   service and all six jobs on r47 — `record-migrate` and `record-seed`

@@ -3803,10 +3803,11 @@
       const before = out.blocks.length;
       const dot = part.indexOf(".");
       // a dotless part is a bare broadsheet block (w k h p s) or nothing;
-      // the dotted spelling of the same (w. s.) reads as well
-      if (dot < 1) { if (/^[wkhps]$/.test(part)) decodePart(part, "", out); continue; }
-      const kind = part.slice(0, dot), rest = part.slice(dot + 1);
-      decodePart(kind, rest, out);
+      // the dotted spelling of the same (w. s.) reads as well — and either
+      // way the part is indexed below, so an l= pair keeps its block (a
+      // skeptic's catch: a `continue` here moved a layout onto the week)
+      if (dot < 1) { if (/^[wkhps]$/.test(part)) decodePart(part, "", out); }
+      else decodePart(part.slice(0, dot), part.slice(dot + 1), out);
       if (out.blocks.length > before) at.push(pi);
     }
     // layouts (C1): a pair that names no decoded block, or an unknown
@@ -5463,7 +5464,7 @@
       <span class="kicker" id="pb-search-k${(aux.searchN = (aux.searchN || 0) + 1)}">search inside this front page’s meetings</span>
       <span class="pb-searchrow"><input name="q" type="search" autocomplete="off" aria-labelledby="pb-search-k${aux.searchN}" placeholder="${n ? `a word said in ${n === 1 ? "this meeting" : `these ${bsNumberWords(n)} meetings`}` : "a word said on the record"}">
         ${n ? `<input type="hidden" name="m" value="${esc(pids.join(","))}"><input type="hidden" name="town" value="">` : ""}<button type="submit" class="btn">Find</button></span>
-      <span class="pb-chartsrc">${n ? (all.length > n ? `the first ${n} of ${nOf(all.length, "meeting", "meetings")} this page cites` : `${nOf(n, "meeting", "meetings")} this page cites`) : "the whole record"} · searched from the edition’s own index; when the record’s server answers, it sees the words you typed and nothing about you</span>
+      <span class="pb-chartsrc">${n ? (all.length > n ? `the first ${n} of ${nOf(all.length, "meeting", "meetings")} this page cites` : `${nOf(n, "meeting", "meetings")} this page cites`) : "the whole record"} · searched from the edition’s own index, in your browser — a page’s scope never reaches the record’s server</span>
     </form>`;
   }
   /* ---- the chart blocks (specs/21 P2) --------------------------------------
@@ -6260,7 +6261,7 @@
   function focusAsk(i) {
     const el = $("#paperbody"); if (!el) return;
     const tas = $$(".cz-ednote", el);
-    if (!tas.length) { addNoteToPaper(); return; }
+    if (!tas.length) { addNoteToPaper(readPaper().blocks.length); toast("a paragraph added — press the question again to make it the prompt"); return; }
     const ta = tas.find(t => !t.value.trim()) || tas[tas.length - 1];
     const asks = ED_ASKS.length ? ED_ASKS : DESK_PROMPTS;
     if (asks[i]) ta.placeholder = `${asks[i]} — your own words`;
@@ -6270,7 +6271,7 @@
     const el = $("#paperbody"); if (!el) return;
     const tas = $$(".cz-ednote", el);
     const ta = tas.find(t => +t.dataset.i === DESK_NOTE) || tas.find(t => !t.value.trim()) || tas[tas.length - 1];
-    if (!ta) { addNoteToPaper(); toast("a paragraph added — press the fact again to cite it there"); return; }
+    if (!ta) { addNoteToPaper(readPaper().blocks.length); toast("a paragraph added — press the fact again to cite it there"); return; }
     const text = btn.dataset.czfact || "", s = ta.selectionStart, e = ta.selectionEnd;
     const before = ta.value.slice(0, s), after = ta.value.slice(e);
     const ins = (before && !/\s$/.test(before) ? " " : "") + text + (after && !/^\s/.test(after) ? " " : "");
@@ -6312,7 +6313,7 @@
     const keep = captureEdFocus(el);
     if (!$(".cz-edteach", el)) {
       el.classList.add("cz-editing");
-      el.innerHTML = edHead(doc) + `<p class="hint cz-edwait">opening the editor…</p>`;
+      el.innerHTML = edHead(doc, { noBoard: true }) + `<p class="hint cz-edwait">opening the editor…</p>`;
       restoreEdFocus(el, keep);
     }
     const st = await getJSON(`${BASE}/stats.json`) || {};
@@ -6395,9 +6396,10 @@
       <p class="cz-edcount" role="status"></p>
       <div class="cz-tplhits"></div></div>`;
     const q = $(".cz-tplq", box);
-    let gen = 0;   // every keystroke is a generation; only the newest paints
+    // every keystroke — and every Start on this box — is a generation; only
+    // the newest paints (the counter lives on the box, not the call)
     const paint = async () => {
-      const my = ++gen;
+      const my = box._gen = (box._gen || 0) + 1;
       const terms = lexTerms(q ? q.value : "");
       let items = [];
       if (T.pick === "meeting" || T.pick === "issue") {
@@ -6417,7 +6419,7 @@
           items.push({ ref: `${ts[i]}|${ts[j]}`, title: `${ts[i]} and ${ts[j]}`, meta: "side by side" });
       }
       const hits = $(".cz-tplhits", box), count = $(".cz-edcount", box);
-      if (!hits || my !== gen) return;
+      if (!hits || my !== box._gen) return;
       const none = T.pick === "towns" ? "this pressing holds one town — two towns side by side needs two" : terms.length ? "nothing on the record matches" : "the record holds nothing to pick yet";
       hits.innerHTML = items.length
         ? items.map(it => `<button type="button" class="cz-tplhit" data-czed="tplgo" data-tpl="${t}" data-ref="${esc(it.ref)}" data-name="${esc(it.title)}">
@@ -7653,6 +7655,15 @@
       if (story) story.innerHTML = ""; if (guide) guide.hidden = false; sqProgress(null); return; }
     if (guide) guide.hidden = true;
     sqProgress(0, "opening the record’s index…");
+    // a front page's scope (m=) is read from the edition's own index, which
+    // counts every line exactly — the Studio's first eighty across a town,
+    // filtered after, could say "nothing" over lines it never returned. Said
+    // as a choice, never as a Studio that failed to answer (a skeptic's catch).
+    if (SCOPE.pids.length) {
+      saySearchIsStatic("This search reads inside a front page’s own meetings, so it is counted from "
+        + "the edition’s index in your browser — every line, exactly. Nothing was sent anywhere.");
+      return staticSearch(q, terms, box);
+    }
     if (API && !API_DOWN) {
       const live = await liveSearch(q, terms, box);
       if (live) return;
@@ -7680,10 +7691,6 @@
     const p = new URLSearchParams({ q, space: "neural", limit: "80" });
     if (SCOPE.town) p.set("town", SCOPE.town);
     if (SCOPE.body) p.set("body", SCOPE.body);
-    // a front page's scope (m=) is read from the edition's own index, which
-    // counts every line exactly — the Studio's first eighty across a town,
-    // filtered after, could say "nothing" over lines it never returned
-    if (SCOPE.pids.length) return false;
     const r = await askStudio(`/api/search?${p}`);
     if (!r || !Array.isArray(r.hits)) return false;
 

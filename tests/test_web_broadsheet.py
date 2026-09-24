@@ -641,7 +641,7 @@ class TestBroadsheetWriting(unittest.TestCase):
                       'return inScope(m.town || "", m.body || "") && inPids(m.pid || "");',
                       # under a page's scope the live path steps aside: the
                       # index counts every line, the Studio's first eighty do not
-                      'if (SCOPE.pids.length) return false;',
+                      "if (SCOPE.pids.length) {\n      saySearchIsStatic(",
                       'inScope(m.town || "", m.body || "") && inPids(m.pid)).map(',
                       "search the whole record</a>", '<input type="hidden" name="m" value="${esc(pids.join(","))}"><input type="hidden" name="town" value="">'):
             self.assertIn(token, JS, f"{token!r} missing — the front page's search scope drifted")

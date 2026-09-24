@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.0, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.1, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,118 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## {STAMP} — v2.2.1 / r48 IS LIVE: writing in the same style (specs/29 P1)
+
+The writing half of the broadsheet: the studio as the board (board 8), the
+templates board (board 7), a shared page as board 6. The CHANGELOG entry
+says what shipped; the shape, for whoever touches it next:
+
+- **The store** (`record/papers.py`): six ref-only kinds — `lead` (`pid`),
+  `week` / `threads` / `strip` / `names` (each with an optional `town`
+  slug; `names` may carry a `who` slug instead), `search` (bare). A block
+  that names both a town and a who, an unknown key, or a ref that is not
+  slug-shaped is refused, never corrected. `BS_KINDS` / `BS_SCOPED` are the
+  enums; the reader's constants must equal them (a test holds it, and the
+  store is fed the reader's own portable forms in the same test).
+- **The codec** (`app.js` PART 1): `l.<pid>` · `w.` `k.` `h.` `p.` (bare,
+  `t:<town>`, and for names `w:<who>`; a bare part keeps its dot) · `s.`;
+  a page carrying one is `v=5`. `PAPER_VS` is `["1".."5"]` — it had stopped
+  at "3" since specs/24, so every `v=4` link the press pressed (two of the
+  three *record's own front page* cards) read as *shared from a newer
+  version* on the live site until this release; a test now executes
+  `paperV` over every kind and asserts membership. The slugs are the
+  press's own (`bsSlug` ≡ `web.bake.nslug`, `bsWho` ≡ `web.bake.who_slug`;
+  `analytics.json` names now carry `slug`; a node twin holds them equal).
+  The draft remembers its template (`tpl`, local only — `readPaper()`
+  returns it, no traveling form carries it).
+- **The renders** (PART 2): `renderLead` (the still, a counted lede in the
+  press's words — `bsHoursProse` ≡ `story.hours_prose` — the three moments
+  that decided it), `renderWeek` (the front page's week rule: seven days to
+  the latest meeting, else the latest five), `renderThreads` (the six
+  widest recurring topics minus `charts.ARTIFACTS`), `renderStrip` (a lens
+  bar per meeting, date order, the analyzer's colours inline),
+  `renderNames` (two columns, or one name by `who`), `renderSearchBox` (a
+  real form to `/app/s` with a hidden `m=` of the page's pids). Scoped
+  blocks resolve their town against `towns.json` via `bsScopeOf`: a town
+  the pressing lacks is *not in this pressing*; a towns plane that did not
+  load, or an index that did not, shows every town and says so. The reach
+  chart is `bsTimeline` now (the search page's dots). `PB` is the paper's
+  palette (≡ `charts` constants; a test holds it); the old deep green and
+  slate are gone from every paper chart. The read page's head/foot/door
+  are `bsMadeFrom` + the `#edit&copy=<qs>` door (the copy asks before it
+  replaces a draft with blocks).
+- **The editor** (PART 3): `edHead` (the template line with the board in a
+  `<details>`, the Fraunces headline field, *stored: …*, Preview / Share and
+  the share row), `edShelf` + `shelfAdd` (a press adds at the end; a drag —
+  `ED_SHELF` — lands where it drops; lead / over time / a quote / in numbers
+  open the inline add narrowed by `slot.dataset.pick`), `edRow` (the pill
+  via `pillLabel`, which names link-borne blocks from `PAPER_PLANES` and
+  `PAPER_TOWNS`; a town select on scoped blocks → `setBlockTown`), `edDesk`
+  (facts → `citeFact` into `DESK_NOTE`, the paragraph the caret was last
+  in; *a draft, if you want one* offers the lead meeting's
+  `analysis.draft` as a `reading` block under its model's name, *Show the
+  receipts* renders it with `receiptParas`; *the template asks* →
+  `focusAsk`), the templates board (`tplBoard` / `tplStart` / `tplPicker` /
+  `tplGo` — one picker per board, found from the pressed card, never by a
+  shared id) and `bsEditorPage` (the editor rails the sidebar the first
+  time it paints after each entry into EDIT — painted state; › expands).
+  The capped lists (twenty decisions, twenty-four questions, ten moments of
+  pushback — `web/bake.py`) read as `20+` in the desk's facts and the
+  numbers chart (`bsCapN`), never as counts.
+- **The templates** (`TEMPLATES`, `applyPaperTemplate`): meeting (lead
+  first), issue (board 6 — the story as lead, the timeline, the paragraph,
+  a reel of the latest three beads, the framing of the night that said it
+  most, the search box), vote (the ledger first, the line at each vote),
+  person / place (`names` by `who`, the latest three mentions as quotes),
+  towns (strip · threads · names, twice, as halves; the pressing's own two
+  when it holds two), year (strip as lead · threads · votes · names ·
+  search), rolls, blank. `draws` says what the record can draw — where the
+  board promised what the planes lack (who moved a vote, when a person
+  spoke) the card says what is there. *Said alongside it* (board 6) is NOT
+  built: the issue plane carries no co-words; it wants the topic story's
+  machinery or a pressed field.
+- **The search page**: `resolve` → `resolveTown` + `scopePids(p.get("m"))`;
+  `SCOPE.pids` filters `sqHits` (read off SCOPE itself, so the twins run),
+  `staticSearch`, `liveSearch`; the submit keeps `m=`; `#sq-scoped` says the
+  scope with the way out; the widen button clears it.
+- **Tests**: {N_TESTS}. New: the six kinds round-trip and degrade; the
+  store accepts the reader's forms; every version paperV mints is readable;
+  the five templates under dark planes and with two towns; the slug and
+  palette twins; the search scope (`scopePids`, the pins). The resolver's
+  twin lifts `resolveTown` and `scopePids` with `resolve`.
+- **Deploy**: r48 on the service ({REV}) and all six jobs; the press at
+  `--version 2.2.1` ({PRESS}); Pages {PAGES}; `sw.js` key `{SWKEY}`; tag
+  `v2.2.1` at {TAG}.
+- **Reviewed**: {REVIEW}.
+- **Notes for P2 and after**: the read page's kicker says *shared as a link
+  · the writer is not named* for the record's own pressed pages too — the
+  featured links carry no press marker; the gallery (P2) should seat the
+  record's own pages under *pressed nightly* and could mark the link
+  (`by=press`, never a block). The front page in studio mode with the
+  sidebar open overflows by ~9px at 1024 (P0's money rows); the stamp's
+  sentence now hides under 1200px beside an open sidebar. The desk's
+  receipts render a fragment as a fragment when a meeting's draft is one
+  (the live drafts are whole since v2.1.23).
+- **Board amendments to confirm with Stephen** (the boards are the spec;
+  these depart from them because the planes do not hold what the board
+  promised or the covenant forbids it): the template cards' `draws` copy
+  (vote: "who moved it" → "the tally of every roll call … the words around
+  the first four"; person: "when they spoke, how much, on what — and the
+  questions they asked" → "when they were named, how often, in which
+  meetings — and the words around the latest three"; issue: no "lens
+  shift" / "said-alongside"; towns: "the same threads, the same names" for
+  "the same months, the same counts"; year: no "loudest lenses" as a
+  separate picture — the strip carries them); the desk's *Draft three
+  paragraphs* (a model call from the browser — the covenant's make path
+  touches no server) became *Add the drafted reading* from the pressed
+  plane; the two acts (Preview / Share) sit under the title row, not in the
+  pressed top bar; the reel's pill says clips, not moments.
+- **Still Stephen's / next**: P2 — the gallery (board 9): the press lists
+  shared pages from the store and presses cards (title, made-from counts,
+  the first still) beside the record's own; the gallery page with its
+  filters; takedown stays the steward's (its words are Stephen's to
+  decide); the front page's strip reads from it. Version 2.2.2.
 
 ## 2026-09-24, 05:28Z — v2.2.0 / r47 IS LIVE: the civic broadsheet (specs/29 P0)
 

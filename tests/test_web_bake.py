@@ -3242,6 +3242,12 @@ class TestPaper(unittest.TestCase):
             "const d = decodePaper('?' + qs);",
             "if (JSON.stringify(d.blocks) !== JSON.stringify(port.blocks)) fail('round trip: ' + JSON.stringify(d.blocks));",
             "if (decodePaper('?v=5&b=w.,k.,h.,p.,s.').blocks.map(b => b.kind).join() !== 'week,threads,strip,names,search') fail('the dotted spelling of a bare part still reads');",
+            # a bare part is indexed like any other: an l= pair keeps its block
+            "const lay = decodePaper('?v=5&b=w,m.vid1,l.x&l=1:half,0:lead').blocks;",
+            "if (lay[0].layout !== 'lead' || lay[1].layout !== 'half' || lay[2].layout) fail('layouts stay with their blocks past a bare part: ' + JSON.stringify(lay));",
+            "const yr = { title: 'y', blocks: [{kind:'strip',layout:'lead'},{kind:'threads'},{kind:'chart',chart:'votes'},{kind:'names'},{kind:'search'},{kind:'note',text:'n'}] };",
+            "const yb = decodePaper('?' + encodePaperQS(yr)).blocks;",
+            "if (yb[0].layout !== 'lead' || yb.some((b, i) => i && b.layout)) fail('the year page keeps its lead: ' + JSON.stringify(yb));",
             "for (const bad of ['l.', 'l.bad%20id', 'l.%E0', 's.x', 'w.x', 'w.t:', 'w.t:a%20b', 'w.t:Boston', 'w.w:p-x', 'k.q:x', 'h.t%3A', 'p.w:', 'p.w:boston', 'p.z:x', 'constructor.x', 'constructor', 'x', 'p.%E0']) {",
             "  const dd = decodePaper('?v=5&b=' + bad + ',m.vid1');",
             "  if (dd.blocks.length !== 1 || dd.blocks[0].kind !== 'story') fail('a mangled part must drop alone: ' + bad + ' → ' + JSON.stringify(dd.blocks));",

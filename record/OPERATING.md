@@ -160,6 +160,16 @@ done
 # record-press also needs its --args bumped to the new --version (below)
 ```
 
+**When to deploy: outside 03:00–06:00 ET.** The night's jobs run then
+(the poll at 03:00, the pipeline at 03:30, the nightly edition at 04:30,
+the embed drain at 05:45 — the schedule table further down this section); a job updated while one of
+its executions is running finishes that execution on the old image and
+starts the next on the new one, and a press moved mid-night can carry an
+edition pressed by one version under a service worker key minted by
+another. Sessions working in parallel settled on this window on
+2026-09-24; say which image tag and press version you are taking before
+you build (`ListAgents` / specs/PARALLEL.md).
+
 Six jobs, not four: `record-migrate` and `record-seed` are run by hand, not
 by a schedule, and were left on an old image by two deploys running (found
 on 2026-09-24 at r45 while everything nightly was on r47) — a hand-run
