@@ -52,6 +52,11 @@ without it). **Never rebake the public edition from a local corpus.**
 - **The SW-staleness law**: every deploy bumps the press `--version` or
   returning readers get cached JS. It bites local preview loops too —
   unregister the SW between same-version presses.
+- **A search is a story, counted** (specs/25): `web/topic.py` and its JS
+  twin `tpAggregate` must answer alike (a node twin test holds it); the
+  pressed topic story is content (no button, no `cz-`), its reel links are
+  the viewer's own grammar, and the front page leads with it only above
+  the floor (three lines, two meetings).
 - **Our AI Constitution is a promise with a page**
   (`/app/ai` · publicrecord.studio/constitution): when the use of AI
   changes, `web/emit.py::page_ai`'s ledger changes **in the same commit**.
@@ -61,7 +66,10 @@ without it). **Never rebake the public edition from a local corpus.**
   fallback or the ring silently dies; counted nouns go through `n_of()`.
 - CSS namespaces already minted: `cz-*` (studio), `pb-` (papers), `rt-`
   (tray), `pf-` (featured), `.featline`, `cz-tpl*` — grep the sheet before
-  minting more.
+  minting more. Plus `tp-`/`tq-` (the topic story, pressed and
+  live), `sq-` (the search page's story + progress), `rp-` (the reel
+  viewer's transport) — specs/25; `mp-` (the meeting page's cut, find,
+  words, jump bar), `kb-` (the keys sheet) — specs/26.
 
 ## Verifying
 

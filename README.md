@@ -27,7 +27,7 @@ aeroplane mode on.
 
 | Piece | What it is |
 |---|---|
-| `web/` | The press: `bake.py` reads the corpus and `emit.py` writes the edition — every page, plane and stub the reader touches. `web/static/app.js` is the whole client (no build step): reading, search, the reel composer, the studio, your paper. |
+| `web/` | The press: `bake.py` reads the corpus and `emit.py` writes the edition — every page, plane and stub the reader touches; `story.py`, `charts.py` and `topic.py` tell the front page's stories (the record over time, the latest meeting, a word over time), counted, never modeled. `web/static/app.js` is the whole client (no build step): reading, search told as a story, the reel composer and player, the studio, your paper. |
 | `record/` | The hosted half: the FastAPI service (semantic search, freshness, submissions, the shared-paper store, the steward console), the nightly press job, ingest pipeline, and the ops manual (`record/OPERATING.md`). |
 | `memory/` | The corpus engine: ingest, the issue engine, votes, documents, analysis, embeddings — SQLite at the desk, Postgres+pgvector hosted, one seam. |
 | `czcore/` | The shared core the record draws from (moment scoring, kits, the LLM seam, jobs). |

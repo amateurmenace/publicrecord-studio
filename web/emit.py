@@ -435,7 +435,45 @@ def _story_paths(ms, stats, featured):
 '''
 
 
-def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None):
+def _examples(analytics, issues, n=6):
+    """A few words worth trying: the record's widest issues first (the issue
+    engine's names read as words a person would type — "Vision Zero",
+    "Warrant Articles"), then the recurring transcript topics to fill, with
+    the artifacts out. Short names only; a search box is not a headline."""
+    from .charts import ARTIFACTS
+    out = []
+    have = lambda name: name.lower() in {o.lower() for o in out}
+    for i in sorted(issues or [], key=lambda i: (-int(i.get("n_meetings") or 0), str(i.get("slug") or ""))):
+        if len(out) >= n:
+            break
+        name = str(i.get("name") or "").strip()
+        if name and len(name) <= 26 and name.lower() not in ARTIFACTS and not have(name):
+            out.append(name)
+    for t in ((analytics or {}).get("topics") or []):
+        if len(out) >= n:
+            break
+        name = str(t.get("topic") or "").strip()
+        if name and len(name) <= 26 and name.lower() not in ARTIFACTS and not have(name):
+            out.append(name)
+    return out[:n]
+
+
+def page_topic(t, issues, manifest, base, analytics=None):
+    """A topic story's own page — /app/topic/<slug>/ (specs/25 §2.3): the
+    same story the front page leads with, at an address of its own, so the
+    story travels as a link."""
+    from . import story
+    body = story.topic(t, base="/app", issues=issues,
+                       examples=_examples(analytics, issues), own_page=False)
+    title = f'How {t["town"]} talks about {t["name"]} — publicrecord.studio'
+    desc = (f'“{t["q"]}” on {t["town"]}’s public record: {t["mentions"]} mentions across '
+            f'{t["n_meetings"]} of {t["n_town_meetings"]} meetings — month by month, night by night, '
+            f'with a supercut of every moment. Counted from the transcripts; no model wrote a line of it.')
+    return shell(title, desc, f'{base}/app/topic/{t["slug"]}/', body, "home", manifest,
+                 version=manifest["version"])
+
+
+def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None, topics=None):
     """The front page — two stories, one toggle (specs/24 §2.4).
 
     The record's front page is a story, told by the press: the record over
@@ -455,7 +493,12 @@ def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=
     latest = (story.latest(lead, base="/app") if lead else
               '  <article class="fp-story fp-latest" id="latest"><span class="kicker">the latest meeting on the record</span>'
               '<p class="hint">The record is empty — no meetings pressed yet.</p></article>\n')
-    tabs = story.tabs(lead["title"] if lead else "")
+    # a word, over time (specs/25): the featured topic leads the page when the
+    # record holds one — the search, told as a story, pressed whole
+    topics = topics or []
+    examples = _examples(analytics, issues)
+    told = "".join(story.topic(t, base="/app", issues=issues, examples=examples) for t in topics)
+    tabs = story.tabs(lead["title"] if lead else "", topics)
 
     # -- briefs: the next few meetings --
     briefs = "".join(_brief_card(m) for m in ms[1:6]) or \
@@ -487,8 +530,8 @@ def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=
     <a class="addline" href="/app/add">＋ Add a meeting</a>
   </form>
   <p class="scopeline" id="scopeline" hidden></p>
-  {body_strip()}
-{tabs}{over}{latest}{door}  <div class="storyrow">
+{tabs}{told}{over}{latest}{door}  {body_strip()}
+  <div class="storyrow">
     <section class="story"><div class="sectionhead"><span class="kicker">also on the record</span></div>
       <div class="mcards briefs">{briefs}</div></section>
     <section class="story"><div class="sectionhead"><span class="kicker">the access ledger</span></div>
@@ -530,6 +573,40 @@ def page_meeting(m, manifest, base):
     else:
         player = ('<div class="player local"><p class="phint">the tape lives at '
                   'the station — this page is the meeting as a document.</p></div>')
+    # the night, cut (specs/26 §2.1): the press's reels from this meeting's
+    # moments — the loudest five, and one per kind — as the viewer's own
+    # links; content in the paper palette, no button, no script
+    from . import cuts as _cuts
+    cut = _cuts.meeting_cuts(m)
+    cut_html = ""
+    if cut:
+        kinds = ""
+        for k in cut["kinds"]:
+            count = str(k["n"]) if k["n"] == k["total"] else f'the first {k["n"]} of {k["total"]}'
+            kinds += (f'<a class="btn mp-kind" href="{esc(k["url"])}">{esc(k["label"])} '
+                      f'<span class="mp-kn">{count} · {hms(k["runtime"])}</span></a>')
+        cut_html = (
+            f'<section class="card mp-cut" id="cut"><span class="tag">the night, cut — reels the press made from this meeting’s moments</span>'
+            f'<div class="tp-cut"><a class="btn primary tp-play" href="{esc(cut["loudest"]["url"])}">▶ the night in {hms(cut["loudest"]["runtime"])}</a>'
+            f'<span class="tp-cutmeta">its {n_of(cut["loudest"]["n"], "loudest moment")}, in order · plays clip to clip · the link is the share</span></div>'
+            + (f'<div class="mp-kinds"><span class="kicker">or one kind of moment</span>{kinds}</div>' if kinds else "")
+            + '<p class="hint">Cut from the analyzer’s scored moments — a measurement, not a choice made for you. '
+              'Open a reel and press <b>make this reel yours</b> to re-cut it; tick any moment or transcript line below to cut your own.</p></section>')
+    # the meeting in words (specs/26 §2.3): the highlighter's word cloud, pressed
+    # — each word a deep link to its first mention; with the script on, a
+    # word finds every line that says it
+    from highlighter import insight as _insight
+    from . import charts as _charts
+    words = _insight.word_freq(m.get("segments") or [], top=80) if m.get("segments") else []
+    words_html = ""
+    if words:
+        words_html = (
+            f'<section class="card mp-words" id="words"><span class="tag">the meeting in words — what was said most; '
+            'press a word to find every line that says it</span>'
+            + _charts.word_cloud(words, base="/app", href=lambda w: f'#t{int(float(w.get("t") or 0))}',
+                                 each="each opens the tape at its first mention; with the script on, it finds every line that says it")
+            + f'<p class="hint">“{esc(words[0]["word"])}” came up {n_of(int(words[0]["count"]), "time")}. Sized by how often; '
+              'civic stopwords out. With JavaScript off, a word opens the tape at its first mention.</p></section>')
     langs = ""
     if m["tracks"]:
         opts = "".join(f'<option value="{esc(t["code"])}">{esc(t["name"])}</option>'
@@ -542,7 +619,7 @@ def page_meeting(m, manifest, base):
     if m["summary"]:
         origin = ("AI summary" if (m["summary_origin"] or "").startswith("ai:")
                   else "summary")
-        summ = (f'<section class="card summary"><span class="tag">{origin} — '
+        summ = (f'<section class="card summary" id="summary"><span class="tag">{origin} — '
                 'supplements the official record</span>'
                 f'<p>{esc(m["summary"])}</p></section>')
     # the reading, drafted (specs/24 §4): a model's three paragraphs — what
@@ -552,7 +629,10 @@ def page_meeting(m, manifest, base):
     draft = (m.get("analysis") or {}).get("draft") or None
     if draft and draft.get("text"):
         from . import charts as _charts
-        summ += (f'<section class="card summary draft"><span class="tag">the reading, drafted by a '
+        # the jump bar's "the summary" lands here when no summary card stands
+        # (the piece is built first: an f-string expression holds no backslash)
+        draft_id = "" if m["summary"] else ' id="summary"'
+        summ += (f'<section class="card summary draft"{draft_id}><span class="tag">the reading, drafted by a '
                  f'model — {esc(draft.get("origin") or "")}, labeled · what it meant, who moved it, '
                  'what to watch · check it against the tape</span>'
                  + _charts.receipt_paras(draft["text"], "") + '</section>')
@@ -572,7 +652,7 @@ def page_meeting(m, manifest, base):
                 f'<span class="outcome">{esc(v.get("outcome",""))}</span></a>'
                 f'<div class="roll">{roll}</div></div>')
         votes_html = (
-            '<section class="card ledger"><span class="tag">the vote ledger — '
+            '<section class="card ledger" id="votes"><span class="tag">the vote ledger — '
             'roll calls read from this meeting</span>'
             f'<div class="vledger">{"".join(vrows)}</div>'
             '<p class="hint">Read from the transcript; a name may be misheard — '
@@ -593,7 +673,7 @@ def page_meeting(m, manifest, base):
             f'<span class="lensn">{l["count"]}</span>'
             f'<span class="lensdrift">{DRIFT.get(l["drift"],"")}</span></div>'
             for l in framing["lenses"])
-        framing_html = ('<section class="card"><span class="tag">how the meeting '
+        framing_html = ('<section class="card" id="framing"><span class="tag">how the meeting '
                         'framed it — eight civic lenses, counted from its own '
                         'words</span>'
                         f'<div class="lenses">{rows}</div>'
@@ -611,7 +691,7 @@ def page_meeting(m, manifest, base):
                       f'<span class="ts">{hms(q["t"])}</span> {esc(q["text"])}</a>'
                       for q in qs[:8]) + '</div>'
             for t, qs in sorted(byt.items()))
-        questions_html = ('<section class="card"><span class="tag">the questions '
+        questions_html = ('<section class="card" id="questions"><span class="tag">the questions '
                           'asked — typed by what they ask about</span>'
                           f'<div class="qgroups">{blocks}</div></section>')
     # the town's paper for this meeting
@@ -624,7 +704,7 @@ def page_meeting(m, manifest, base):
             + f' <span class="lmeta">{d.get("pages",0)} pp</span>'
             + ("</a>" if d.get("url") else "</div>")
             for d in m["documents"])
-        docs_html = ('<section class="card"><span class="tag">the town’s paper — '
+        docs_html = ('<section class="card" id="paper"><span class="tag">the town’s paper — '
                      'agendas, minutes, and packets for this meeting</span>'
                      f'<div class="docrows">{drows}</div></section>')
     # the Moments panel (specs/20 §6) — the analyzer's scored moments as cards,
@@ -662,7 +742,7 @@ def page_meeting(m, manifest, base):
             'draft copy, for a producer.</p>'
             if m.get("video_id") else "")
         moments_html = (
-            '<section class="card moments"><span class="tag">the moments — the '
+            '<section class="card moments" id="moments"><span class="tag">the moments — the '
             'analyzer’s scored read of this meeting; click one to jump the '
             'tape</span>'
             f'<div class="mo-grid">{cards}</div>'
@@ -682,6 +762,17 @@ def page_meeting(m, manifest, base):
     tdl = "".join(f'<a class="dl" href="/app/tracks/{m["pid"]}/{esc(t["code"])}.vtt" download>{esc(t["name"])} .vtt</a>'
                   for t in m["tracks"])
     addl = (f'<a class="dl" href="/app/ad/{m["pid"]}.vtt" download>described .vtt</a>' if m["ad"] else "")
+    # on this page (specs/26 §2.4): a jump bar of the sections this meeting
+    # actually has — a four-hour tape is a long page, and orientation is
+    # pressed prose, not chrome
+    jumps = [("tape", "the tape", True), ("summary", "the summary" if m["summary"] else "the reading", bool(summ)),
+             ("cut", "the night, cut", bool(cut_html)), ("moments", "the moments", bool(moments_html)),
+             ("votes", "the votes", bool(votes_html)), ("paper", "the town’s paper", bool(docs_html)),
+             ("framing", "the framing", bool(framing_html)), ("questions", "the questions", bool(questions_html)),
+             ("words", "in words", bool(words_html)), ("transcript", "the transcript", True),
+             ("downloads", "downloads", True)]
+    jump = ('<nav class="mp-jump" aria-label="on this page"><span class="kicker">on this page</span>'
+            + "".join(f'<a href="#{k}">{esc(label)}</a>' for k, label, have in jumps if have) + '</nav>')
     body = f"""
   <article class="meeting" data-pid="{esc(m["pid"])}" data-town="{esc(m["town"])}" data-body="{esc(m["body"])}">
     <div class="mhead">
@@ -691,17 +782,20 @@ def page_meeting(m, manifest, base):
       <div class="chips">{langs}
         <button class="btn cite-all" type="button" data-cite="all">⧉ Cite this meeting</button></div>
     </div>
-    {player}
+    {jump}
+    <div id="tape">{player}</div>
+    {cut_html}
     {summ}
     {moments_html}
     {votes_html}
     {docs_html}
     {framing_html}
     {questions_html}
-    <div class="tbar">
-      <span class="tag">transcript — select any line to Cite it, click a time to jump</span>
+    {words_html}
+    <div class="tbar" id="downloads">
+      <span class="tag">transcript — select any line to Cite it, click a time to jump; ＋ on a line cuts it into your reel</span>
       <span class="dls">{tdl}{addl}
-        <a class="dl" href="/app/m/{m["pid"]}/transcript.txt" download>transcript .txt</a></span>
+        <a class="dl" href="/app/m/{m["pid"]}/transcript.txt" download>transcript .txt</a>{f'<a class="dl" href="/app/kits/{esc(m["pid"])}.json" download>kit .json</a>' if (m.get("video_id") and cut) else ""}</span>
     </div>
     <div class="transcript" id="transcript">{transcript}</div>
     <p class="disclose">AI-touched surfaces are labeled; verify against the official record.
@@ -1231,7 +1325,7 @@ def _search_note() -> str:
             "query leaves this page. (Meaning-search needs the Studio.)")
 
 
-def page_search(manifest, base):
+def page_search(manifest, base, examples=None, topics=None):
     # The two filters are baked as real <select name=…> inside the form, so a
     # scoped search is a URL: /app/s?q=override&town=Brookline&body=Select+Board.
     # That is what makes a filtered result shareable, and it is why they are
@@ -1257,6 +1351,27 @@ def page_search(manifest, base):
                 f'<option value="">every body</option>{opts}</select></label>')
     filters = (f'<div class="searchfilters">{tsel}{bsel}</div>'
                if (tsel or bsel) else "")
+    # the empty state says what a search can do here (specs/25 §2.4): the
+    # three steps, a few of the record's own words to try, the featured
+    # story as the worked example — pressed prose, no script, no button
+    from .charts import search_url as _surl
+    tries = "".join(f'<a class="btn tp-try" href="{esc(_surl(str(x)))}">{esc(x)}</a>'
+                    for x in (examples or [])[:6])
+    worked = "".join(
+        f'<a class="pf-card" href="/app/topic/{esc(t["slug"])}/"><b>How {esc(t["town"])} talks about {esc(t["name"])}</b>'
+        f'<span class="pf-sub">the search for “{esc(t["q"])}”, told as a story — {t["mentions"]} mentions across '
+        f'{t["n_meetings"]} meetings, month by month, with a supercut</span></a>' for t in (topics or []))
+    guide = f'''
+    <div class="sq-guide" id="sq-guide">
+      <ol class="tp-steps">
+        <li><b>Search a word.</b> A program, a street, a worry. Three letters is enough — the record searches as you type. Every hit is one line of one transcript, with its time.</li>
+        <li><b>See how it was said.</b> The record counts every line that says it and draws the count: month by month, night by night, the words beside it. Nothing modeled; every number opens the tape.</li>
+        <li><b>Cut it, share it.</b> Press <b>▶ play all</b> and the hits play as a reel. Press <b>＋ reel</b> on any hit to cut your own. The link is the share — no account, nothing uploaded.</li>
+      </ol>
+      {f'<p class="tp-tries"><span class="kicker">try one</span>{tries}</p>' if tries else ""}
+      {f'<div class="sq-worked"><span class="kicker">a search, told as a story</span><div class="pf-cards">{worked}</div></div>' if worked else ""}
+      <p class="sq-keys"><span class="kicker">keys</span> <kbd>/</kbd> search from any page · <kbd>j</kbd> <kbd>k</kbd> walk the hits · <kbd>enter</kbd> opens the tape · <kbd>c</kbd> cuts the hit under the cursor</p>
+    </div>'''
     body = f"""
   <section class="searchpage">
     <h1>Search the record</h1>
@@ -1266,9 +1381,12 @@ def page_search(manifest, base):
     </form>
     {filters}
     <p class="hint" id="search-note">{_search_note()}</p>
+    <div class="sq-prog" id="sq-prog" hidden aria-live="polite"><span class="sq-progbar"><i></i></span><span class="sq-progtext"></span></div>
+    <div id="sq-story"></div>
     <div id="results"><noscript><p class="hint">Search needs JavaScript.
       <a href="/app/">Browse the record</a> instead — every meeting is a readable
       document with JavaScript off.</p></noscript></div>
+    {guide}
   </section>
 """
     return shell("Search — the record", "Search everything the town has said.",
@@ -2119,7 +2237,7 @@ self.addEventListener('fetch', e => {{
 
 def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
                analytics=None, graph=None, towns=None, tombstones=None,
-               kits=None):
+               kits=None, topics=None):
     v = manifest["version"]
     # before a single stub renders: the chrome needs to know what it may offer
     set_edition(towns)
@@ -2128,10 +2246,17 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     featured = featured_papers(meetings, issues, stats)
     (out / "index.html").write_text(
         page_home(meetings, issues, stats, manifest, base, featured=featured,
-                  analytics=analytics),
+                  analytics=analytics, topics=topics),
         encoding="utf-8")
+    # a word, over time — each featured topic story at an address of its own
+    for t in (topics or []):
+        d = out / "topic" / t["slug"]
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "index.html").write_text(
+            page_topic(t, issues, manifest, base, analytics=analytics), encoding="utf-8")
     (out / "s" / "index.html").parent.mkdir(parents=True, exist_ok=True)
-    (out / "s" / "index.html").write_text(page_search(manifest, base), encoding="utf-8")
+    (out / "s" / "index.html").write_text(
+        page_search(manifest, base, examples=_examples(analytics, issues), topics=topics), encoding="utf-8")
     (out / "add" / "index.html").parent.mkdir(parents=True, exist_ok=True)
     (out / "add" / "index.html").write_text(page_add(manifest, base), encoding="utf-8")
     (out / "covenant" / "index.html").parent.mkdir(parents=True, exist_ok=True)
