@@ -115,15 +115,21 @@ answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
   its place; the read path keeps `NO_PAPER`. (3) The moderation stance: the night in the
   gallery is the steward's window — `seasoned` (`gallery.seasoned_at`) is a
   day old AND shared before the last pressing's `pressed_at`, which the
-  press reads from the bucket's pressing.json (`press.last_pressed_at`,
-  best effort; `SEASONED_DAYS` = 2 by the calendar stands in when there is
-  none), because a page shared after one morning's press is first listed by
+  press reads from the live site's pressing.json, then the bucket's
+  (`press.last_pressed_at`, best effort; `SEASONED_DAYS` = 2 by the
+  calendar stands in when there is none) — and `main()` takes that stamp
+  BEFORE it lists the store and hands it to `_write_pressing`, so every page
+  shared before it was in that pressing's listing (a third skeptic's catch:
+  stamped at the end, a page shared during the press led on its first
+  night) — because a page shared after one morning's press is first listed by
   the next at age one and would have been seated by that same press (a
   reviewer's catch: the window did not exist; a skeptic's: the calendar
   over-waited and collapsed on a skipped night); `strip_cards` seats only a
   seasoned page that `cites` the record (a held meeting or issue, or a
-  `WIDE_KINDS` block scoped to nothing the pressing lacks); OPERATING §5
-  names the morning glance as the review step. The bits ride the gate's
+  `WIDE_KINDS` block — chart · week · threads · strip · names — with no
+  scope or a held town; a `who` scope is never vouched for, and a search
+  box is a control, not a receipt); OPERATING §5 names the morning glance
+  as the review step. The bits ride the gate's
   digest and the worker's key as before. (4) The board copy stands as
   built; the boards are behind the build on the lines P1's notes list.
 - **The record's own, named**: `web/emit.py::PRESS_BY` (`&by=press`) rides
@@ -141,12 +147,30 @@ answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
   itself wraps inside), `table.twin` cells (the charts' twins on the front
   page) `overflow-wrap:anywhere`; measured in the pane at 1024 with the
   panel open and at 1400 without.
-- **Tests**: ⟦TESTS⟧.
-- **Deploy**: r50 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+- **Tests**: 931 (110 PG-backed skip without a DSN). New: the strip's
+  citing rule read from the bytes (a held meeting, a wide block, a scoped
+  one the pressing lacks, a note alone), the exact seating rule against a
+  press's moment (a skipped night, a same-day re-press), the taken page's
+  410 words, the codec twin's marker, the share hint's tokens.
+- **Deploy**: r50 (image `sha256:8a1a7233…`, built from cd8f296) on the service
   (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.3`
   (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.3` at ⟦TAGAT⟧.
-- **Reviewed**: ⟦REVIEW⟧.
+  tag `v2.2.3` at cd8f296.
+- **Reviewed**: one adversarial pass with two lenses at once (ten
+  findings, ten folded: the steward's window that did not exist, the ask
+  missing on a title-only page, the kicker denying the labels beneath it,
+  a promise of an outcome, a heckler's veto in the lede, the forgeable
+  marker, a meta still past the edge, the wrong table named, a 410 that
+  copied nothing, the strip's rule misnamed); a skeptic on the folds
+  (four, folded: the guard blind to an apostrophe, a scoped wide block
+  counted, the calendar's over-wait and its collapse on a skipped night,
+  stale words); a third on those folds (four, folded: the stamp taken at
+  the end of the press, not before the listing — a page shared during the
+  press would have led on its first night; an unnormalised `listed_before`
+  that would have dropped every seasoned card silently; the person scope
+  said to be checked when it is refused; an empty search box counted as a
+  receipt — and the plain note that the job's gate is always open, its
+  disk being new each night).
 - **Next, in order**: prove the listing path on production with one real
   page (share one; tonight's press lists it, tomorrow's seats it on the
   strip, the worker key gains its suffix); *said alongside it* (board 6)
@@ -173,7 +197,8 @@ touches it next:
   `card_of` counts only the meetings and issues the pressing holds and
   reads a town off an issue slug when the plane names none. `own_cards`
   presses the record's own from the featured papers; `strip_cards` seats
-  the newest reader's page that is a day old (`STRIP_READERS` = 1);
+  the newest reader's page that is a day old (`STRIP_READERS` = 1; superseded in v2.2.3, above: a previous press
+  must have listed it, and it must cite the record);
   `page_body` presses the filter nav `hidden` (a control that did nothing
   with the script off would be the dishonesty the covenant is against) and
   the count as `role="status"`.

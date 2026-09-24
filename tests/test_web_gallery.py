@@ -305,6 +305,8 @@ class TestGalleryPress(unittest.TestCase):
         self.assertFalse(mk([{"kind": "week", "town": "salem"}])["cites"])                          # …or to one it lacks
         self.assertFalse(mk([{"kind": "chart", "chart": "numbers", "pid": "gone"}])["cites"])     # a wide kind scoped to a meeting it lacks
         self.assertFalse(mk([{"kind": "names", "who": "p-nobody"}])["cites"])                     # a person is a scope the card cannot vouch for
+        self.assertFalse(mk([{"kind": "search"}])["cites"])                                          # a search box is a control, not a receipt
+        self.assertFalse(mk([{"kind": "note", "text": "a shout"}, {"kind": "search"}])["cites"])
         self.assertFalse(mk([{"kind": "note", "text": "a shout"}])["cites"])                       # a title over paragraphs
         self.assertFalse(mk([{"kind": "story", "story": "meeting", "pid": "gone"}])["cites"])     # names nothing this pressing holds
 
@@ -368,6 +370,9 @@ class TestGalleryPress(unittest.TestCase):
         before = "2026-09-30T02:00:00+00:00"                                            # shared before TODAY's press
         self.assertFalse(gallery.seasoned_at(before, TODAY, press(TODAY, 12)))          # a re-press the same day: a day old is still required
         self.assertTrue(gallery.seasoned_at(before, TODAY + day, press(TODAY)))         # one night in the gallery, then the strip
+        self.assertTrue(gallery.seasoned_at(after, TODAY + 2 * day, "2026-10-01T08:30:00Z"))          # a stamp as a string
+        self.assertTrue(gallery.seasoned_at(after, TODAY + 2 * day, dt.datetime(2026, 10, 1, 8, 30)))  # …or naive: normalised, never a throw
+        self.assertTrue(gallery.seasoned_at(after, TODAY + 2 * day, "junk"))                           # unreadable: the calendar stands in
         self.assertEqual(gallery.age_bits(after, TODAY + day, press(TODAY))[1], False)
         self.assertEqual(gallery.age_bits(after, TODAY + 2 * day, press(TODAY + day))[1], True)
         rows = [{"id": "e" * 16, "created": after, "data": b"{}"}]
@@ -391,6 +396,27 @@ class TestGalleryPress(unittest.TestCase):
             self.assertIn("shared_hash", json.loads((root / "a" / "manifest.json").read_text()))       # a press with a store carries the digest
             bake.bake(str(db), str(root / "c"), "1.0.0", "https://x.org", today=TODAY)
             self.assertNotIn("shared_hash", json.loads((root / "c" / "manifest.json").read_text()))   # a desk manifest is what it was
+
+    def test_the_pressing_s_stamp_is_the_moment_the_listing_began(self):
+        """The seating rule leans on `pressed_at` naming a moment before which
+        every shared page was in that pressing's listing, so main() takes the
+        stamp before it lists the store and hands it to the press; the stamp
+        is read back from a pressing.json — raw or gzipped — or not at all."""
+        import gzip
+        from record import press
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            doc = press._write_pressing(out, {"corpus_hash": "abc"}, "fp", stamp="2026-09-30T08:30:00Z")
+            self.assertEqual(doc["pressed_at"], "2026-09-30T08:30:00Z")
+            self.assertEqual(json.loads((out / "pressing.json").read_text())["pressed_at"], "2026-09-30T08:30:00Z")
+            self.assertRegex(press._write_pressing(out, {}, "fp")["pressed_at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        raw = json.dumps({"pressed_at": "2026-09-30T08:30:00Z"}).encode()
+        when = dt.datetime(2026, 9, 30, 8, 30, tzinfo=dt.timezone.utc)
+        self.assertEqual(press._stamp_of(raw), when)
+        self.assertEqual(press._stamp_of(gzip.compress(raw)), when)
+        for bad in (b"", b"{}", b"not json", json.dumps({"pressed_at": "2026-09-30 08:30"}).encode()):
+            self.assertIsNone(press._stamp_of(bad))
+        self.assertEqual(press.last_pressed_at("", "app", ""), (None, ""))                 # nothing to read: the calendar stands in
 
     def test_the_share_hint_says_what_a_short_link_does(self):
         for token in ("⚡ short link — on the front pages after tonight’s press",

@@ -158,7 +158,7 @@ section below, updated on main.
 ## State of main (lane A updates this)
 
 - 2026-09-24, ⟦TIME⟧ — **v2.2.3 / r50 is LIVE: the decisions made** (specs/29,
-  after P2; tag `v2.2.3` at ⟦TAGAT⟧, the commit the image was built from; the
+  after P2; tag `v2.2.3` at cd8f296, the commit the image was built from; the
   service and all six jobs on r50; the press at `--version 2.2.3`). Stephen
   handed over the four open decisions: the listing threshold stays; the
   takedown ask is on every stored page (a mail to the steward's published
@@ -168,7 +168,7 @@ section below, updated on main.
   night's press has already listed and that cites the record — that night
   is the steward's window; the board copy stands as built. Also: the press marks
   its own links `by=press` and the page says so, and the 1024 overflow with
-  the panel open is gone. Reviewed ⟦REVIEW⟧. r50 / 2.2.3 are spent; next
+  the panel open is gone. Reviewed through one two-lens pass and three skeptics (ten, four and four folded). r50 / 2.2.3 are spent; next
   numbers r51 / 2.2.4.
 - 2026-09-24, 11:23Z — **v2.2.2 / r49 is LIVE: the front pages, listed** (specs/29
   P2; tag `v2.2.2` at 629302a, the commit the image was built from; the

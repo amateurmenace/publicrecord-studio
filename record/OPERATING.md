@@ -570,9 +570,13 @@ from any one day (a flood buries a day, not the store); and the front page's
 strip seats a reader's page only once a previous press has already listed
 it (and it cites the record), so the gallery — and the press log, which
 prints the newest five titles each night — comes first. The store moving is a reason to press: its listing is folded into
-the pressing's fingerprint, so a night with no new meeting and one new
-shared page still presses, and the service worker's key carries a digest of
-the listed set, so returning readers get the new list.
+the pressing's fingerprint, so on a desk that keeps its last pressing a
+night with no new meeting and one new shared page still presses (the job's
+disk is new every night, so its gate is always open and it presses nightly
+regardless; the workflow's carry step, which ignores a pressing whose only
+change is `pressed_at`, is what keeps a quiet night quiet on the public
+site), and the service worker's key carries a digest of the listed set, so
+returning readers get the new list.
 
 **Taking a page down is the steward's act, and it is one move:**
 
@@ -602,10 +606,13 @@ nothing else. **The morning glance is the review step:** the press log
 names the newest listed titles each night, the gallery shows them the same
 night, and the front page's strip seats a reader's page only after a
 previous press has already listed it — the press reads the last pressing's
-`pressed_at` from the bucket (`record/press.py::last_pressed_at`; the log
-says so) and seats a page shared before that moment and a day old; when the
-stamp cannot be read, `web/gallery.py::SEASONED_DAYS` = 2 by the calendar
-stands in — and only when it cites the record:
+`pressed_at` from the live site's pressing.json, or the bucket's when the
+site cannot be read (`record/press.py::last_pressed_at`; the log says
+which), and seats a page shared before that moment and a day old; the stamp
+is taken before the store is listed, so every page shared before it was in
+that pressing's listing; when no stamp can be read,
+`web/gallery.py::SEASONED_DAYS` = 2 by the calendar stands in — and only
+when it cites the record:
 a held meeting or issue, or a block drawn from the whole of it. That night
 is your window, and the one move above is the whole act. (The stance, the words and the reach of the
 listing threshold were Stephen's open decisions after v2.2.2; he handed

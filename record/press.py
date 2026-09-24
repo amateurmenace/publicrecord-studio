@@ -78,6 +78,7 @@ import gzip
 import hashlib
 import json
 import mimetypes
+import os
 import re
 import shutil
 import sys
@@ -166,7 +167,8 @@ def _no_sidecars(tool: str) -> Path:
 
 
 def press(corpus, out_dir: str, version: str = "",
-          site_base: str = "", api: str = "", stills=None, shared=None, today=None, listed_before=None) -> dict:
+          site_base: str = "", api: str = "", stills=None, shared=None, today=None, listed_before=None,
+          pressed_at: str = "") -> dict:
     """Press the specs/16 edition out of a store — here, a `PgCorpus`.
 
     This is `web.bake.bake()` with its two desk-shaped assumptions replaced:
@@ -255,7 +257,7 @@ def press(corpus, out_dir: str, version: str = "",
                     towns=towns, tombstones=tombstones, kits=kits, topics=topics,
                     stills=b.have_stills, frontpages=frontpages)
 
-    pressing = _write_pressing(out, manifest, fingerprint)
+    pressing = _write_pressing(out, manifest, fingerprint, stamp=pressed_at)
 
     if stills:
         print(f"  stills: {len(b.have_stills)} meeting(s) with pictures — {stills.note()}")
@@ -276,7 +278,7 @@ def press(corpus, out_dir: str, version: str = "",
             "pressed_at": pressing["pressed_at"], **rep}
 
 
-def _write_pressing(out: Path, manifest: dict, fingerprint: str) -> dict:
+def _write_pressing(out: Path, manifest: dict, fingerprint: str, stamp: str = "") -> dict:
     """The hosted record's freshness signal, kept apart from the manifest.
 
     Two dates live here and they are named for what they are, because
@@ -288,12 +290,18 @@ def _write_pressing(out: Path, manifest: dict, fingerprint: str) -> dict:
     compares `fingerprint` against the one its cached shell was built from;
     an equal fingerprint with a newer `pressed_at` means the record is
     unchanged and publicrecord is alive, which is a real and reassuring answer.
+    `stamp`, when the caller hands one in, is the moment this pressing BEGAN
+    — main() takes it before it lists the share store — so every reader's
+    page shared before `pressed_at` was in this pressing's listing; the front
+    pages' seating rule (web/gallery.py seasoned_at) leans on that (a
+    skeptic's catch: stamped at the end, a page shared during the press was
+    "listed" by a pressing that never saw it).
     """
     doc = {
         "fingerprint": fingerprint,
         "corpus_hash": manifest.get("corpus_hash", ""),
         "edition_date": manifest.get("edition_date", ""),
-        "pressed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "pressed_at": stamp or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "version": manifest.get("version", ""),
         "schema": manifest.get("schema", 0),
         "counts": manifest.get("counts", {}),
@@ -453,21 +461,49 @@ def shared_digest(shared, today=None, listed_before=None) -> str:
     return ("|s" + hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()[:12]) if rows else ""
 
 
-def last_pressed_at(bucket: str, prefix: str = "app"):
-    """When the edition now in the bucket was pressed — its pressing.json's
-    `pressed_at`, as an aware datetime — for the front pages' rule that a
-    previous press must already have listed a reader's page before the strip
-    seats it (web/gallery.py seasoned_at). Best effort: None when the bucket,
-    the file or the stamp cannot be read, and the calendar rule stands in."""
+def _stamp_of(raw: bytes):
+    """A pressing.json's `pressed_at` as an aware UTC datetime, or None —
+    gzip bytes accepted, any other shape refused quietly."""
     try:
-        from google.cloud import storage
-        raw = storage.Client().bucket(bucket).blob(f"{prefix.strip('/')}/{PRESSING}").download_as_bytes()
         if raw[:2] == b"\x1f\x8b":
             raw = gzip.decompress(raw)
         stamp = str((json.loads(raw.decode("utf-8")) or {}).get("pressed_at") or "")
         return _dt.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc)
     except Exception:
         return None
+
+
+def last_pressed_at(bucket: str, prefix: str = "app", site_base: str = ""):
+    """The moment the pressing the public has began — `pressed_at` from the
+    live site's pressing.json first (what readers actually saw listed, so a
+    night whose carry to Pages failed advances nothing), then the bucket's —
+    for the front pages' rule that a previous press must already have
+    listed a reader's page before the strip seats it (web/gallery.py
+    seasoned_at). Returns (an aware datetime or None, where it came from).
+    Best effort: nothing readable means None, and the calendar rule stands
+    in."""
+    import urllib.request
+    path = "/".join(x for x in (prefix.strip("/"), PRESSING) if x)
+    if site_base:
+        try:
+            req = urllib.request.Request(f"{site_base.rstrip('/')}/{path}",
+                                         headers={"User-Agent": "publicrecord.studio press (+https://publicrecord.studio)",
+                                                  "Cache-Control": "no-cache"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                when = _stamp_of(r.read(1_000_000))
+            if when:
+                return when, "the live site"
+        except Exception:
+            pass
+    if bucket:
+        try:
+            from google.cloud import storage
+            when = _stamp_of(storage.Client().bucket(bucket).blob(path).download_as_bytes())
+            if when:
+                return when, "the bucket"
+        except Exception:
+            pass
+    return None, ""
 
 
 def needs_press(corpus, manifest_path: str, shared=None, today=None, listed_before=None) -> bool:
@@ -711,7 +747,10 @@ def main(argv=None):
         # the front pages (specs/29 P2): what the share store holds, listed
         # BEFORE the gate — the store moving is a reason to press — and
         # pressed beside the record's own; a store that cannot be listed
-        # tonight costs the readers' cards, never the press
+        # tonight costs the readers' cards, never the press. The pressing's
+        # stamp is taken HERE, before the listing, so every page shared
+        # before it is in tonight's listing (the front pages' seating rule)
+        stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         shared = None
         if not settings.papers_bucket:
             print("  front pages: no share store configured (RECORD_PAPERS_BUCKET) — the record's own alone")
@@ -727,9 +766,12 @@ def main(argv=None):
         today = _dt.date.today()   # one day for the gate and the press alike (the cards' day bits)
         # the last pressing's moment, from the bucket: a reader's page leads
         # the front page only once a previous press has listed it
-        listed_before = last_pressed_at(bucket, args.prefix) if bucket else None
+        # the live site is asked only when it was named outright (--base or
+        # RECORD_SITE_BASE, as the job sets it) — the settings' default names
+        # another domain, whose pressing is nobody's stamp for this one
+        listed_before, whence = last_pressed_at(bucket, args.prefix, args.base or os.environ.get("RECORD_SITE_BASE", ""))
         if listed_before:
-            print(f"  front pages: the last pressing ran {listed_before.strftime('%Y-%m-%dT%H:%M:%SZ')} — "
+            print(f"  front pages: the last pressing began {listed_before.strftime('%Y-%m-%dT%H:%M:%SZ')} ({whence}) — "
                   "a page shared before it, a day old, may lead the front page")
         elif shared:
             print("  front pages: the last pressing's moment could not be read — the strip waits two days by the calendar")
@@ -749,7 +791,7 @@ def main(argv=None):
                 print(f"  stills: seeded {seed['copied']} of {seed['listed']} from gs://{bucket}"
                       + (f" — the seed failed: {seed['error']}" if seed["error"] else ""))
         report = press(corpus, out_dir, args.version, args.base, api=args.api,
-                       stills=stills, shared=shared, today=today, listed_before=listed_before)
+                       stills=stills, shared=shared, today=today, listed_before=listed_before, pressed_at=stamp)
     finally:
         corpus.close()
 

@@ -45,7 +45,7 @@ MAX_LISTED = 400          # a press lists this many of the newest shared pages (
 PER_DAY = 12              # …and this many from any one day
 STRIP_READERS = 1         # readers' pages on the front page's strip (board 1)
 SEASONED_DAYS = 2         # …seated only once a previous press has listed them; without the last pressing's time, two days by the calendar
-WIDE_KINDS = ("chart", "week", "threads", "strip", "names", "search")   # blocks drawn from the whole record
+WIDE_KINDS = ("chart", "week", "threads", "strip", "names")   # blocks drawn from the whole record (a search box is a control, not a receipt)
 WEEK_DAYS = 7
 LISTED_SINCE = _dt.date(2026, 9, 24)   # the day "⚡ short link" began to say "lists it on the front pages"
 SCHEMA = "publicrecord.paper/1"
@@ -216,6 +216,7 @@ def seasoned_at(created, today: _dt.date, listed_before=None) -> bool:
     age = (today - d).days
     if age < 1:
         return False
+    listed_before = _when(listed_before)   # a naive datetime, a date, a string — never a throw here (a skeptic's catch)
     if listed_before is not None:
         c = _when(created)
         return bool(c and c < listed_before)
@@ -308,9 +309,11 @@ def card_of(paper: dict, pid: str, created, meetings_by_pid: Dict[str, dict], is
         made.append(n_of(len(held_slugs), "issue"))
     # a page cites the record when it names a meeting or issue the pressing
     # holds, or draws on the whole of it (the roll calls, the year, the
-    # threads) — a wide block scoped to a meeting, an issue, a person or a
-    # town this pressing lacks renders "not in this pressing" and counts for
-    # nothing (a skeptic's catch); a title over paragraphs alone does not
+    # threads) — a wide block scoped to a meeting, an issue or a town this
+    # pressing lacks renders "not in this pressing" and counts for nothing,
+    # and a person's scope (`who`) is never vouched for here, since the
+    # card has no names plane to ask (two skeptics' catches); a title over
+    # paragraphs alone does not
     towns_held = {town_slug(str(m.get("town") or "")) for m in meetings_by_pid.values()
                   if isinstance(m, dict) and m.get("town")}
     def _wide(b) -> bool:
