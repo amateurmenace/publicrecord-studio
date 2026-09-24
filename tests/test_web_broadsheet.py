@@ -325,11 +325,14 @@ class TestTheChartsArePure(unittest.TestCase):
         phone = css[css.index("@media screen and (max-width:720px){"):]
         phone = phone[:phone.index("\n}\n")]
         for rule in (".bs-year .fp-chartwrap{display:none}", ".bs-yearphone{display:block}",
-                     ".bs-river-svg text,.bs-river-svg .bs-rjoinline{display:none}", ".bs-scorecard{display:none}",
+                     ".bs-river-svg text,.bs-river-svg .bs-rjoinline{display:none}", ".bs-tonight .bs-scorecard{display:none}",
                      ".bs-onwide{display:none}", ".bs-onphone{display:revert}",
                      ".bs-river-svg.bs-iso .bs-band,.bs-river-svg.bs-iso .bs-band.on{opacity:.86}"):
             self.assertIn(rule, phone)
             self.assertEqual(css.count(rule), 1, rule)                                   # never in a block print can match
+        # a meeting page's score is its jump bar: never hidden by the front page's phone rule (a skeptic's catch)
+        self.assertNotRegex(css, r"(?m)^\s*\.bs-scorecard\{display:none")
+        self.assertIn(".bs-nameplate{padding-bottom:18px}", css[css.index("@media print{\n  .bs-spine"):])
         self.assertIn('dots = $$(".bs-ydot", box)', JS)
         self.assertIn('dots.forEach(c => { c.classList.toggle("bs-dim", dim.has(c.dataset.pid));', JS)
         self.assertIn('narrow.addEventListener("change", letGo)', JS)                      # a pick lets go across 720px

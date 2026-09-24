@@ -48,7 +48,12 @@ b,strong{font-weight:var(--weight-bold)}
 /* the wordmark, the spine, the switch — in that order in the page (board
    3: the spine second on a phone); wide, the switch sits at the wordmark's
    right and the spine spans beneath them */
-.bs-nameplate{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:40px;align-items:end;padding:30px 0 0}
+/* the two columns share the row as main's flex row shared it — in the ratio
+   of their natural widths (the promise's 640px to a two-town switch's 396px;
+   a one-town switch is narrower), so a narrow desktop squeezes neither alone
+   (a skeptic's catch: an auto column took the switch's full width first) */
+.bs-nameplate{display:grid;grid-template-columns:minmax(0,1.62fr) minmax(0,1fr);column-gap:40px;align-items:end;padding:30px 0 0}
+.bs-nameplate:has(.bs-muni.one){grid-template-columns:minmax(0,2.8fr) minmax(0,1fr)}
 .bs-nameplate>.bs-wordmark-box{grid-column:1;grid-row:1}
 .bs-nameplate>.bs-muni{grid-column:2;grid-row:1}
 .bs-nameplate>.bs-spine{grid-column:1 / -1;grid-row:2;margin-top:18px}
@@ -2496,7 +2501,7 @@ a.tp-mcol:hover b{text-decoration:underline}
   .bs-stamp .bs-stamp-say{display:none}
   .fp-twinwrap{overflow-x:auto;max-width:100%}
   .bs-nameplate{display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:18px 0 10px}
-  .bs-nameplate>.bs-spine{margin-top:0}
+  .bs-nameplate>.bs-spine{margin-top:0;padding-bottom:0}
   .bs-wordmark{font-size:40px}
   .bs-promise{font-size:14px}
   .bs-muni{align-items:flex-start}
@@ -2569,14 +2574,15 @@ a.tp-mcol:hover b{text-decoration:underline}
   /* tonight's tape keeps its still and Play-from chip; the score's eight
      lanes cannot be read at this width, and the now-at card carries the
      night (board 3; a peer's note) */
-  .bs-scorecard{display:none}
+  .bs-tonight .bs-scorecard{display:none}     /* the front page's tonight only — a meeting page's score is its jump bar (a skeptic's catch) */
   /* the three frames from inside the night, a row to swipe rather than a
      column a thousand pixels tall */
-  .bs-filmstrip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;padding-bottom:6px}
+  .bs-filmstrip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;padding:4px 4px 8px;margin:-4px -4px 0}   /* room inside the row for a frame's focus ring and its lit halo */
   .bs-filmstrip>.bs-frame{flex:0 0 78%;scroll-snap-align:start}
 }
 @media print{
   .bs-spine,.bs-stamp,.bs-navrow,.bs-ta,.bs-topbar .bs-edline{display:none !important}
+  .bs-nameplate{padding-bottom:18px}   /* the spine hides in print; the nameplate keeps the gap it held before tonight's section */
   .fp-chartwrap,.bs-weekrow{overflow:visible !important}
   .bs-weekrow{flex-wrap:wrap}
   .bs-year-svg,.bs-score-svg{min-width:0 !important}
