@@ -1703,7 +1703,7 @@ class TestReaderDegradesToStatic(unittest.TestCase):
 
     def test_the_static_path_touches_no_api(self):
         """The prebuilt index answers from this origin and nowhere else."""
-        static = self.lift(r"  async function staticSearch\(q, terms, box\) \{.+?\n  \}")
+        static = self.lift(r"  async function staticSearch\(q, terms, box, run\) \{.+?\n  \}")
         for forbidden in ("askStudio", "API +", "/api/search"):
             self.assertNotIn(forbidden, static,
                              f"the static path reached for {forbidden!r}")
@@ -1722,6 +1722,7 @@ class TestReaderDegradesToStatic(unittest.TestCase):
             'const API = "https://api.example";',
             "const API_TIMEOUT_MS = 50;",
             "let API_DOWN = false;",
+            "let API_SEQ = 0, API_SETTLED = 0;",
             self.lift(r"  async function askStudio\(path\) \{.+?\n  \}"),
             "(async () => {",
             "  const a = await askStudio('/api/search?q=x');",
@@ -1746,6 +1747,7 @@ class TestReaderDegradesToStatic(unittest.TestCase):
             'const API = "https://api.example";',
             "const API_TIMEOUT_MS = 60;",
             "let API_DOWN = false;",
+            "let API_SEQ = 0, API_SETTLED = 0;",
             self.lift(r"  async function askStudio\(path\) \{.+?\n  \}"),
             "(async () => {",
             "  const t0 = Date.now();",
@@ -1759,6 +1761,41 @@ class TestReaderDegradesToStatic(unittest.TestCase):
         r = self.node(body)
         self.assertEqual(r.returncode, 0,
                          f"askStudio did not give up:\n{r.stdout}{r.stderr}")
+
+    def test_a_retired_search_s_failure_never_switches_a_live_studio_off(self):
+        """A search the reader had typed past timed out after the newer one's
+        live answer, and switched the Studio off for the page — every later
+        search static, under a note saying the Studio was not answering (a
+        re-review catch), and did too when it landed just before the newer
+        answer (a second). A failure counts only when it is the newest
+        request sent; a success newer than every settled one stands."""
+        body = "\n".join([
+            "let calls = 0; const gates = [];",
+            "const AbortController = globalThis.AbortController;",
+            "const fetch = () => { calls++; return new Promise((res, rej) => gates.push({ res, rej })); };",
+            "const ok = { ok: true, json: async () => ({ hits: [] }) };",
+            'const API = "https://api.example";',
+            "const API_TIMEOUT_MS = 5000;",
+            "let API_DOWN = false;",
+            "let API_SEQ = 0, API_SETTLED = 0;",
+            self.lift(r"  async function askStudio\(path\) \{.+?\n  \}"),
+            "const tick = () => new Promise(r => setTimeout(r, 5));",
+            "(async () => {",
+            "  const a = askStudio('/api/search?q=hang'), b = askStudio('/api/search?q=parking');",
+            "  gates[1].res(ok); await b; gates[0].rej(new Error('timeout')); await a;",
+            "  if (API_DOWN) { console.log('FAIL: a retired failure switched the Studio off'); process.exit(1); }",
+            "  const c = askStudio('/api/search?q=x'), d = askStudio('/api/search?q=y');",
+            "  gates[2].rej(new Error('timeout')); await c; await tick();",
+            "  if (API_DOWN) { console.log('FAIL: a retired failure landing BEFORE the newer answer switched it off'); process.exit(1); }",
+            "  gates[3].res(ok); await d;",
+            "  const e = askStudio('/api/search?q=z'); gates[4].rej(new Error('down')); await e;",
+            "  if (!API_DOWN) { console.log('FAIL: the newest request failing is the Studio down'); process.exit(1); }",
+            "  if (await askStudio('/api/search?q=w') !== null || calls !== 5) { console.log('FAIL: asked again after the newest failed: ' + calls); process.exit(1); }",
+            "  console.log('ok');",
+            "})();",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0, f"askStudio let a retired search decide:\n{r.stdout}{r.stderr}")
 
     def test_no_reader_request_ever_carries_credentials(self):
         """Readers are never identified. The fetch says so explicitly rather

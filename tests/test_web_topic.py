@@ -624,7 +624,7 @@ class TestTopicPress(unittest.TestCase):
     def test_the_list_says_its_scopes_own_count_and_that_it_shows_the_newest(self):
         js = (REPO / "web" / "static" / "app.js").read_text()
         static = js[js.index("async function staticSearch("):js.index("function peek(")]
-        self.assertIn('box.innerHTML = `<p class="hint">${tpN(cut, "line")} `', static)
+        self.assertIn('const html = `<p class="hint">${tpN(cut, "line")} `', static)
         self.assertIn('(cut > hits.length ? ` — the newest ${hits.length} below` : "")', static)
         self.assertIn("const marks = feat ? feat.phrases : terms;", static)   # phrases highlight whole
         self.assertIn("const [idx, feat] = await Promise.all([sqIndex(), sqFeatured(q)]);", static)
@@ -632,6 +632,105 @@ class TestTopicPress(unittest.TestCase):
         self.assertIn('the ${tpN(hitsAll.length, "line")} themselves', story)
         banner = js[js.index("function banner(ed) {"):js.index("const inScope = ")]
         self.assertIn("You chose the whole record", banner)
+
+    def test_the_list_follows_the_stretch_the_story_counts(self):
+        """The range switch narrowed the count and left the list the whole
+        record — and on the live edition the sentence over the list said
+        "newest first" over the Studio's closest-first lines (v2.2.8). Now a
+        stretch lists the lines it counted, each drawn as the index's list
+        draws it, and the whole record puts back what the search first
+        answered; a search a newer one retired draws no list and no story.
+        Executed over a fixture: 85 new lines, one untowned, two old."""
+        tw = TestTopicTwins()
+        js = tw.JS
+        body = "\n".join([
+            tw.PRELUDE, tw.helpers(),
+            tw.lift(r"  const esc = s => String\(s == null[\s\S]*?\[c\]\)\);"),
+            tw.lift(r"  const cut = \(s, n\) => s[\s\S]*?\.slice\(0, n\)[^\n]*\n"),
+            "let SCOPE = { town: 'T', body: '', pids: [] };",
+            tw.lift(r"  const inScope = \(town, body\) =>.+?;\n"),
+            tw.lift(r"  const tpN = [^\n]+"),
+            tw.lift(r"  const tpDay = d => \{.+?; \};"),
+            tw.lift(r"  const scopeWords = [^\n]+\n[^\n]+"),
+            tw.lift(r"  function mark\(text, terms, after\) \{.+?\n  \}"),
+            tw.lift(r"  function peek\(segs, id, mi\) \{.+?\n  \}"),
+            tw.lift(r"  function searchTick\(pid, t, text, title, body, town, date\) \{.+?\n  \}"),
+            tw.lift(r"  function sqHits\(idx, ids, phrases\) \{.+?\n  \}"),
+            tw.lift(r"  function sqItem\(idx, id, marks\) \{.+?\n  \}"),
+            tw.lift(r"  function sqStretchList\(idx, hits, since, marks, q\) \{.+?\n  \}"),
+            "const idx = { meta: [{ pid: 'n', title: 'New', date: '2026-09-10', town: 'T', body: 'B' },",
+            "                     { pid: 'u', title: 'Untowned', date: '2026-09-01', town: '', body: 'B' },",
+            "                     { pid: 'o', title: 'Old', date: '2026-01-10', town: 'T', body: 'B' },",
+            "                     { pid: 'x', title: 'Elsewhere', date: '2026-09-12', town: 'X', body: 'B' }], segs: [] };",
+            "for (let i = 0; i < 85; i++) idx.segs.push([0, i * 10, '', 'the parking lot ' + i]);",
+            "idx.segs.push([1, 5, '', 'parking again']);",
+            "idx.segs.push([2, 7, '', 'old parking'], [2, 9, '', 'old parking twice']);",
+            "idx.segs.push([3, 4, '', 'parking in another town']);",
+            "const ids = idx.segs.map((s, i) => i);",
+            "const hitsAll = sqHits(idx, ids, ['parking']);",
+            "const keep = new Set(['n', 'u']);",
+            "const hits = hitsAll.filter(h => keep.has(h.pid));",
+            "const list = sqStretchList(idx, hits, '2026-08-20', ['parking'], 'parking');",
+            "const empty = sqStretchList(idx, [], '2026-08-20', ['parking'], 'parking');",
+            "const every = sqStretchList(idx, hitsAll, '2025-01-01', ['parking'], 'parking');",
+            "console.log(JSON.stringify({ ids: hitsAll.map(h => h.id), n: hitsAll.length,",
+            "  head: list.slice(0, list.indexOf('</p>')), rows: (list.match(/class=\"swrap\"/g) || []).length,",
+            "  first: sqItem(idx, 0, ['parking']), same: list.includes(sqItem(idx, 0, ['parking'])), empty,",
+            "  every: every.slice(0, every.indexOf('</p>')) }));",
+        ])
+        r = tw.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+        # the counted lines carry their own place in the index, the other town's out
+        self.assertEqual(got["n"], 88)
+        self.assertEqual(got["ids"], list(range(88)))
+        # the stretch's own lines, in the reader's scope — and no count said as the whole
+        # record's (it was the scope's, the other town's line left out: a review catch)
+        self.assertEqual(got["head"], '<p class="hint">86 lines in T since August 20, 2026 — the newest 80 below'
+                                      ' · 1 line from meetings with no town recorded')
+        self.assertEqual(got["rows"], 80)
+        self.assertEqual(got["every"], '<p class="hint">88 lines in T since January 1, 2025 — the newest 80 below'
+                                       ' · 1 line from meetings with no town recorded')
+        self.assertTrue(got["same"])                                   # a line looks the same in either list
+        self.assertIn('href="/app/m/n#t0"', got["first"])
+        self.assertIn("<mark>parking</mark>", got["first"])
+        self.assertIn('data-czcut="hit"', got["first"])
+        self.assertEqual(got["empty"], '<p class="hint">nothing says “parking” in T since August 20, 2026.</p>')
+        # the story paints the list before it can return early, and says what is painted
+        story = js[js.index("async function sqStory("):js.index("function sqTray(")]
+        draw = story[story.index("const draw = () => {"):story.index("const wireRange = () => {")]
+        self.assertLess(draw.index("listFor(since, hits);"), draw.index("if (!d || (townFixed && d.town !== townFixed))"))
+        self.assertIn("res.innerHTML = since ? sqStretchList(idx, hits, since, marks, q) : run.list;", story)
+        # a stretch's lines are the words alone, and on the live edition the sentence says so
+        self.assertIn('newest first${run.live ? " (the words alone, as counted above)" : ""}${byTown}`', story)
+        # lines with no town recorded are said as what they are over any stretch, not "nothing"
+        self.assertIn("const why = (!d && hits.length)", story)
+        # named, never pointed at ("below" was the Studio's list, or eighty of them), and one line "says"
+        self.assertIn('`the ${tpN(hits.length, "line")} that ${one ? "says" : "say"} it${since ?', story)
+        why = story[story.index("const why = (!d && hits.length)"):]
+        self.assertNotIn("below", why[:why.index(": `nothing says")])
+        self.assertNotIn("!whole && hitsAll.length && !since", story)
+        self.assertIn("run.live ? `the Studio’s ${tpN(run.n, \"line\")} below, closest first (the count above reads the words alone)`", story)
+        self.assertNotIn("the list is the whole record", js)
+        # a retired search draws nothing: the story, the list, both paths, the emptied box
+        self.assertIn("if (!box || run !== SQ_NOW) return;", story)
+        self.assertRegex(draw, r"^const draw = \(\) => \{\s*if \(run !== SQ_NOW\) return;")
+        # a retired story's range buttons take no press (they set the next story's stretch unseen)
+        self.assertIn("b.onclick = () => { if (run !== SQ_NOW) return; SQ_RANGE = b.dataset.range;", story)
+        # every static search on a Studio edition says the Studio is not answering — a failure
+        # a newer search retired says nothing, and the note went on promising meaning
+        run_ = js[js.index("async function runSearch("):js.index("async function liveSearch(")]
+        live_block = run_[run_.index("if (API && !API_DOWN) {"):]
+        live_block = live_block[:live_block.index("\n    }\n") + 6]
+        self.assertNotIn("saySearchIsStatic", live_block)
+        self.assertLess(run_.index("if (API) saySearchIsStatic("), run_.rindex("return staticSearch(q, terms, box, run);"))
+        static = js[js.index("async function staticSearch("):js.index("function peek(")]
+        self.assertEqual(static.count("if (run !== SQ_NOW) return;"), 2)
+        self.assertIn("hits.map(id => sqItem(idx, id, marks))", static)
+        live = js[js.index("async function liveSearch("):js.index("async function sqStoryFor(")]
+        self.assertLess(live.index("if (run !== SQ_NOW) return true;"), live.index("if (!r || !Array.isArray(r.hits)) return false;"))
+        self.assertIn("Object.assign(run, { list: html, live: true, n: r.hits.length });", live)
+        self.assertIn("if (!val) { SQ_NOW = null;", js)
 
     def test_the_supercut_is_one_thing_on_both_stories(self):
         """The front page's numbers called the one-clip-a-night cut "the
