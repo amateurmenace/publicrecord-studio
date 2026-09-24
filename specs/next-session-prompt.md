@@ -115,9 +115,11 @@ answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
   its place; the read path keeps `NO_PAPER`. (3) The moderation stance: the night in the
   gallery is the steward's window — `seasoned` (`gallery.seasoned_at`) is a
   day old AND shared before the last pressing's `pressed_at`, which the
-  press reads from the live site's pressing.json, then the bucket's
-  (`press.last_pressed_at`, best effort; `SEASONED_DAYS` = 2 by the
-  calendar stands in when there is none) — and `main()` takes that stamp
+  press reads from the live site's pressing.json (`press.last_pressed_at`,
+  best effort — a site named but unreadable yields nothing, never the
+  bucket's stamp of a press the public may not have; the bucket is asked
+  only when no site is named; `SEASONED_DAYS` = 2 by the calendar stands in
+  when there is none) — and `main()` takes that stamp
   BEFORE it lists the store and hands it to `_write_pressing`, so every page
   shared before it was in that pressing's listing (a third skeptic's catch:
   stamped at the end, a page shared during the press led on its first
@@ -147,15 +149,18 @@ answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
   itself wraps inside), `table.twin` cells (the charts' twins on the front
   page) `overflow-wrap:anywhere`; measured in the pane at 1024 with the
   panel open and at 1400 without.
-- **Tests**: 931 (110 PG-backed skip without a DSN). New: the strip's
+- **Tests**: 932 (110 PG-backed skip without a DSN). New: the strip's
   citing rule read from the bytes (a held meeting, a wide block, a scoped
   one the pressing lacks, a note alone), the exact seating rule against a
   press's moment (a skipped night, a same-day re-press), the taken page's
   410 words, the codec twin's marker, the share hint's tokens.
-- **Deploy**: r50 (image `sha256:8a1a7233…`, built from cd8f296) on the service
+- **Deploy**: r50 (image `sha256:8c632fd9…`, built from 311625f) on the service
   (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.3`
   (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
-  tag `v2.2.3` at cd8f296.
+  tag `v2.2.3` at ⟦TAGAT2⟧. Deploy-day note: the live pressing.json the
+  first r50 press read carried v2.2.2's end-of-press stamp (11:22:24Z);
+  the deploy pressed and carried at once, so no page could lead on its
+  first listing off the old stamp (the store held none eligible anyway).
 - **Reviewed**: one adversarial pass with two lenses at once (ten
   findings, ten folded: the steward's window that did not exist, the ask
   missing on a title-only page, the kicker denying the labels beneath it,

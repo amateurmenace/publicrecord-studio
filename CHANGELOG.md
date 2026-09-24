@@ -23,8 +23,9 @@ the site cannot be read — and seats a page shared before it and a day old;
 the stamp is taken before the store is listed, so a page shared after one
 morning's press is first listed by the next and cannot lead that same night,
 and a night the press skips, or a carry to the site that fails, seats
-nothing early; the desk, with no pressing to read, waits two days by the
-calendar), and only when it cites the record: a meeting or issue the pressing holds, or a block drawn from the
+nothing early while the site can be read — when it cannot, the calendar
+stands in rather than the bucket's un-carried stamp; the desk, with no
+pressing to read, waits two days), and only when it cites the record: a meeting or issue the pressing holds, or a block drawn from the
 whole of it. That night in the gallery, named in the press log too, is the
 steward's window, and one move takes a page down; a title over paragraphs
 alone is listed, never led with. **The board copy stands

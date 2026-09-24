@@ -473,36 +473,45 @@ def _stamp_of(raw: bytes):
         return None
 
 
-def last_pressed_at(bucket: str, prefix: str = "app", site_base: str = ""):
-    """The moment the pressing the public has began — `pressed_at` from the
-    live site's pressing.json first (what readers actually saw listed, so a
-    night whose carry to Pages failed advances nothing), then the bucket's —
-    for the front pages' rule that a previous press must already have
-    listed a reader's page before the strip seats it (web/gallery.py
-    seasoned_at). Returns (an aware datetime or None, where it came from).
-    Best effort: nothing readable means None, and the calendar rule stands
-    in."""
+def _fetch_site(url: str) -> bytes:
     import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "publicrecord.studio press (+https://publicrecord.studio)",
+                                               "Cache-Control": "no-cache"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return r.read(1_000_000)
+
+
+def _fetch_bucket(bucket: str, path: str) -> bytes:
+    from google.cloud import storage
+    return storage.Client().bucket(bucket).blob(path).download_as_bytes()
+
+
+def last_pressed_at(bucket: str, prefix: str = "app", site_base: str = "",
+                    fetch_site=_fetch_site, fetch_bucket=_fetch_bucket):
+    """The moment the pressing the public has began — `pressed_at` from the
+    live site's pressing.json, what readers actually saw listed — for the
+    front pages' rule that a previous press must already have listed a
+    reader's page before the strip seats it (web/gallery.py seasoned_at).
+    A site named but unreadable answers None — never the bucket's stamp,
+    which marks a press the public may not have (a carry that failed, and a
+    site outage, are the same night as often as not; a skeptic's catch) —
+    and the calendar rule stands in. The bucket is asked only when no site
+    is named at all. Returns (an aware datetime or None, where it came
+    from); nothing readable means None."""
     path = "/".join(x for x in (prefix.strip("/"), PRESSING) if x)
     if site_base:
         try:
-            req = urllib.request.Request(f"{site_base.rstrip('/')}/{path}",
-                                         headers={"User-Agent": "publicrecord.studio press (+https://publicrecord.studio)",
-                                                  "Cache-Control": "no-cache"})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                when = _stamp_of(r.read(1_000_000))
-            if when:
-                return when, "the live site"
+            when = _stamp_of(fetch_site(f"{site_base.rstrip('/')}/{path}"))
         except Exception:
-            pass
+            when = None
+        return (when, "the live site") if when else (None, "")
     if bucket:
         try:
-            from google.cloud import storage
-            when = _stamp_of(storage.Client().bucket(bucket).blob(path).download_as_bytes())
-            if when:
-                return when, "the bucket"
+            when = _stamp_of(fetch_bucket(bucket, path))
         except Exception:
-            pass
+            when = None
+        if when:
+            return when, "the bucket"
     return None, ""
 
 
@@ -764,8 +773,8 @@ def main(argv=None):
                       f"({type(exc).__name__}: {str(exc)[:120]}) — the record's own alone tonight")
         manifest_path = str(Path(out_dir) / PRESSING)
         today = _dt.date.today()   # one day for the gate and the press alike (the cards' day bits)
-        # the last pressing's moment, from the bucket: a reader's page leads
-        # the front page only once a previous press has listed it
+        # the last pressing's moment, from the live site: a reader's page
+        # leads the front page only once a previous press has listed it
         # the live site is asked only when it was named outright (--base or
         # RECORD_SITE_BASE, as the job sets it) — the settings' default names
         # another domain, whose pressing is nobody's stamp for this one

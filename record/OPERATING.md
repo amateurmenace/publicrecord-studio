@@ -606,9 +606,10 @@ nothing else. **The morning glance is the review step:** the press log
 names the newest listed titles each night, the gallery shows them the same
 night, and the front page's strip seats a reader's page only after a
 previous press has already listed it — the press reads the last pressing's
-`pressed_at` from the live site's pressing.json, or the bucket's when the
-site cannot be read (`record/press.py::last_pressed_at`; the log says
-which), and seats a page shared before that moment and a day old; the stamp
+`pressed_at` from the live site's pressing.json (`record/press.py::
+last_pressed_at`; the log says so — a site that cannot be read leaves the
+calendar to stand in, never the bucket's stamp, which may mark a press the
+public never got), and seats a page shared before that moment and a day old; the stamp
 is taken before the store is listed, so every page shared before it was in
 that pressing's listing; when no stamp can be read,
 `web/gallery.py::SEASONED_DAYS` = 2 by the calendar stands in — and only

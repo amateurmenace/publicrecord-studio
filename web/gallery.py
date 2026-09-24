@@ -202,7 +202,7 @@ def _when(iso) -> Optional[_dt.datetime]:
 def seasoned_at(created, today: _dt.date, listed_before=None) -> bool:
     """A previous press has already listed the page, and it is a day old at
     least. With the last pressing's moment at hand (`listed_before` — the
-    bucket's pressing.json `pressed_at`, record/press.py last_pressed_at)
+    live site's pressing.json `pressed_at`, record/press.py last_pressed_at)
     that is exactly `created` before it: a night the press skipped seats
     nothing early, and a press re-run within the day seats nothing that
     only that morning's press first showed. Without it (the desk, the

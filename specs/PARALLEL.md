@@ -158,7 +158,7 @@ section below, updated on main.
 ## State of main (lane A updates this)
 
 - 2026-09-24, ⟦TIME⟧ — **v2.2.3 / r50 is LIVE: the decisions made** (specs/29,
-  after P2; tag `v2.2.3` at cd8f296, the commit the image was built from; the
+  after P2; tag `v2.2.3` at 311625f, the commit the image was built from; the
   service and all six jobs on r50; the press at `--version 2.2.3`). Stephen
   handed over the four open decisions: the listing threshold stays; the
   takedown ask is on every stored page (a mail to the steward's published

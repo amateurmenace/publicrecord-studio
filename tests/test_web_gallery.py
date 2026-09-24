@@ -417,6 +417,19 @@ class TestGalleryPress(unittest.TestCase):
         for bad in (b"", b"{}", b"not json", json.dumps({"pressed_at": "2026-09-30 08:30"}).encode()):
             self.assertIsNone(press._stamp_of(bad))
         self.assertEqual(press.last_pressed_at("", "app", ""), (None, ""))                 # nothing to read: the calendar stands in
+        asked = []
+        site_ok = lambda url: asked.append(url) or raw
+        site_down = lambda url: (_ for _ in ()).throw(OSError("down"))
+        bucket_ok = lambda b, p: asked.append(f"gs://{b}/{p}") or raw
+        self.assertEqual(press.last_pressed_at("b", "app", "https://x.org/", fetch_site=site_ok, fetch_bucket=bucket_ok), (when, "the live site"))
+        self.assertEqual(asked, ["https://x.org/app/pressing.json"])                       # the site answered: the bucket was not asked
+        asked.clear()
+        self.assertEqual(press.last_pressed_at("b", "app", "https://x.org", fetch_site=site_down, fetch_bucket=bucket_ok), (None, ""))
+        self.assertEqual(asked, [])                                                         # a site named but down: never the bucket's stamp
+        self.assertEqual(press.last_pressed_at("b", "app", "", fetch_site=site_down, fetch_bucket=bucket_ok), (when, "the bucket"))
+        self.assertEqual(asked, ["gs://b/app/pressing.json"])                              # no site named: the bucket
+        self.assertEqual(press.last_pressed_at("b", "", "", fetch_bucket=bucket_ok)[1], "the bucket")
+        self.assertEqual(asked[-1], "gs://b/pressing.json")                                 # an empty prefix keeps the path whole
 
     def test_the_share_hint_says_what_a_short_link_does(self):
         for token in ("⚡ short link — on the front pages after tonight’s press",
