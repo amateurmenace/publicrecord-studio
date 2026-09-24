@@ -2,6 +2,40 @@
 
 ## unreleased
 
+### The list follows its count; a phrase said both ways shows once; a phone fetches only the pictures it shows — 2026-09-24 (v2.2.8)
+
+Three corrections from the list of what was left, none touching a stored
+field:
+
+- **The search list follows its stretch.** The count's range switch — the
+  last month, six months, a year, the whole record — narrowed the story and
+  left the list beneath it the whole record, with a parenthesis to say so.
+  A stretch now lists the lines it counted, newest first, each drawn as the
+  index's own list draws it, and the whole record puts back what the search
+  first answered. On the live edition that is the Studio's list, closest
+  first; the sentence over it said "newest first" of it, and now says what
+  is painted — and over a stretch, that its lines are the words alone, as
+  counted. A slow answer can no longer land after a newer search and
+  replace it, nor a retired search's timeout switch a healthy Studio off
+  for the page: a failure counts only when it is the newest request.
+- **A phrase said both ways shows once.** "complete street" and "complete
+  streets" stood side by side beside Vision Zero. A phrase said in both
+  numbers — either of its words — now shows once, as it was said most, with
+  that form's own count, and the other gives up its place. Never a sum:
+  each chip opens the record's search for its phrase, which reads words
+  exactly, so a summed count would promise lines the chip's search cannot
+  open. An issue's own names are left out in either number, and in the
+  possessive: Complete Streets no longer shows "complete street" beside
+  itself, nor a historical society its own "historical society's".
+- **A phone fetches only the pictures it shows.** The year in tapes draws
+  each meeting's still as an SVG image, which cannot load lazily, and a
+  phone shows board 3's dots in its place — yet it downloaded every still.
+  The stills now wait until the strip is seen (a wide screen, a phone turned
+  across 720 px, or paper); the picture file keeps them whole. Every tape
+  wears its town's colour and its day beneath its still, and a still that
+  cannot come leaves them standing. Paper does not wait for a late still, so
+  a phone's print may show a tape's colour where its still had not arrived.
+
 ### Every reel row pictures its meeting — 2026-09-24 (v2.2.7)
 
 Board 6 draws a paper's reel with a still on every row — the picture, the
