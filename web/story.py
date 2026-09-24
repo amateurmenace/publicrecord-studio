@@ -657,11 +657,15 @@ def topic(d: dict, base: str = "/app", issues: Sequence[dict] = (), examples: Se
     # URL limit, its clips spread from the first night to the latest
     full_said = (f'{reel["full_n"]} of {n_of(reel.get("full_all", reel["full_n"]), "clip")}, first to latest'
                  if reel.get("full_all", reel["full_n"]) > reel["full_n"] else n_of(reel["full_n"], "clip"))
+    # past the link's cap the supercut is not every night: it says so
+    nights = len(d.get("chapters") or [])
+    short_said = (f'{reel["short_n"]} of {nights} nights, one clip each, first to latest' if nights > reel["short_n"]
+                  else f'{n_of(reel["short_n"], "clip")}, one per night')
     parts.append(
         f'<section class="fp-part">{kicker("the supercut — every one of those moments, played in order")}'
         f'<div class="tp-cut">'
         f'<a class="btn primary tp-play" href="{esc(reel["short"])}">▶ play the supercut</a>'
-        f'<span class="tp-cutmeta">{n_of(reel["short_n"], "clip")}, one per night · {hms(reel["short_runtime"])}</span>'
+        f'<span class="tp-cutmeta">{short_said} · {hms(reel["short_runtime"])}</span>'
         f'<a class="btn tp-full" href="{esc(reel["full"])}">the full cut — {full_said} · {hms(reel["full_runtime"])}</a>'
         f'</div>'
         + say('A reel plays the tape clip to clip, in this browser, and the whole reel lives in its link — copy the address and it is shared; '

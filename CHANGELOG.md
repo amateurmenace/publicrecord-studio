@@ -35,10 +35,11 @@ Select Board to Chapter 40B — each in plain language with its public
 source and the record's own count of it town by town, the definitions
 written with Claude and labeled so; and wherever a step needs the desk,
 the desktop app's download beside it. Six adversarial reviews, every
-finding folded with a test; five re-reviews of the folds, and their 48
-findings folded too — the gravest a repair that would have overwritten
-every model answer on any failed call, now one that changes nothing unless
-the model answered and was refused, and logs each row before it writes.
+finding folded with a test; five re-reviews of the folds and three of
+theirs, and their 71 findings folded too — the gravest a repair that would
+have overwritten every model answer on any failed call, now one that
+changes nothing unless the model answered and was refused, writes a meeting
+whole or not at all, and logs each row before it writes.
 
 ### The steward's desk — 2026-09-24 (v2.1.22)
 

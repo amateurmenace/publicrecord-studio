@@ -411,6 +411,30 @@ class TestTheRendererReadsTheModelsProse(unittest.TestCase):
         # and nothing but labels says nothing
         self.assertEqual(receipt_paras("**Who moved it:**\n## What to watch", "", limit=900), "")
 
+    def test_the_lede_keeps_bold_decisions_and_a_headline_that_starts_with_a_label(self):
+        """A second re-review's catches of the first fold: a bullet that is all
+        bold ("* **Approved the override [1:12:24]**") is a decision, not a
+        heading — the lede dropped them (10.5k of 120k fuzz cases lost
+        items); a headline that starts with a label is words; a heading-only
+        summary is pressed as a paragraph, never a head; a too-long line of
+        bare syntax before any words no longer ends the lede empty."""
+        from web.charts import receipt_paras
+        rp = lambda t: receipt_paras(t, "/m", limit=900)
+        out = rp("The Select Board met to take up the override [0:10].\n* **Approved the override for the ballot [1:12:24]**\n"
+                 "* **Rejected the parking plan [2:03:00]**")
+        self.assertIn('<li><b>Approved the override for the ballot <a class="ts" href="/m#t4344">[1:12:24]</a></b></li>', out)
+        self.assertTrue(out.endswith('<li><b>Rejected the parking plan <a class="ts" href="/m#t7380">[2:03:00]</a></b></li></ul>'), out)
+        self.assertIn("<li><b>Parking: rejected</b></li></ul>", rp("Decisions tonight:\n- **Override: to the ballot [1:12:24]**\n- **Parking: rejected**"))
+        self.assertTrue(rp("**What it means: the town will borrow $10M for the school [1:00].**")
+                        .startswith("<p><b>What it means:</b> the town will borrow $10M"))
+        self.assertEqual(rp("## **The Select Board sent the override to the ballot.**"),
+                         "<p>The Select Board sent the override to the ballot.</p>")
+        self.assertEqual(rp("**`**\n# The Select Board sent the override to the ballot."),
+                         "<p>The Select Board sent the override to the ballot.</p>")
+        self.assertEqual(rp("`" * 1000 + "\nThe board voted to adopt the budget."), "<p>The board voted to adopt the budget.</p>")
+        self.assertEqual(rp("The board met.\n*What to watch:*"), "<p>The board met.</p>")
+        self.assertEqual(rp("The board met.\n**What to watch**:"), "<p>The board met.</p>")
+
     def test_spaced_rules_and_bare_markers_say_nothing(self):
         from web.charts import receipt_paras
         self.assertEqual(receipt_paras("* * *\n- - -\n_ _ _\n## \n•  •", ""), "")
@@ -630,26 +654,35 @@ class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
         "The next item is the reserve fund transfer requested by the department of public works.",
     ])]
 
-    def run_repair(self, rows, todo, complete):
+    live = {"m0", "m1", "m2", "n0", "x", "e0"}
+    bare = {"e0"}
+
+    def run_repair(self, rows, todo, complete, probe=False):
         import contextlib
         import io
         from record import repair
         from memory import analyze
         writes, segs = [], self.SEGS
 
+        live = self.live
+
         class Store:
             def transcript(self, mid):
-                return segs
+                return [] if mid in self.bare else segs
+
+            def get_meeting(self, mid):
+                return {"id": mid, "status": "live" if mid in live else "forgotten"}
 
             def upsert_meeting(self, row):
                 writes.append(row)
+        Store.bare = self.bare
         buf = io.StringIO()
         with mock.patch.object(repair, "PAUSE", 0), \
              mock.patch.object(analyze.llm, "enabled", lambda: True), \
              mock.patch.object(analyze.llm, "complete", complete), \
              mock.patch.object(analyze.llm, "status", lambda: {"model": "gemini-3.6-flash"}), \
              contextlib.redirect_stdout(buf):
-            r = repair.repair(Store(), rows, todo)
+            r = repair.repair(Store(), rows, todo, probe=probe)
         return r, writes, buf.getvalue()
 
     def rows(self, n=3):
@@ -719,6 +752,62 @@ class TestTheRepairAsksAgainOnlyForFragments(unittest.TestCase):
         r, writes, out = self.run_repair(bare, [{"id": "n0", "want": ["draft"]}], cut)
         self.assertEqual((writes, r["kept"], r["fixed"]), ([], 1, 0))
         self.assertNotIn("UPDATED", out)
+
+    def test_a_meeting_is_written_whole_or_not_at_all(self):
+        """A summary written and a draft that failed would leave the draft's
+        fragment on the record for good: the row is newer than the cutoff
+        and no run would plan it again (a second re-review's catch). Now
+        neither half is written, and the next run asks for both."""
+        rows = self.rows(1)
+        calls = []
+
+        def summary_whole_draft_quota(prompt, system="", **k):
+            calls.append(system[:20])
+            if "reading" in system:
+                raise RuntimeError("rate limited by the API (429) — wait a moment and retry")
+            return "The board met [00:10]."
+        r, writes, out = self.run_repair(rows, [{"id": "m0", "want": ["summary", "draft"]}], summary_whole_draft_quota)
+        self.assertEqual(writes, [])
+        self.assertEqual((r["fixed"], r["kept"], r["failed"]), (0, 1, 1))
+        self.assertIn("HELD m0", out)
+        self.assertNotIn("UPDATED", out)
+
+    def test_a_fallback_needs_every_ask_refused_as_a_fragment(self):
+        """A timeout and then one cut is not "refused twice": the stored
+        draft stays (a second re-review's catch)."""
+        from czcore import llm
+        seq = iter([RuntimeError("couldn't reach the API (timed out)"), llm.CutOff("cut", "At", "MAX_TOKENS")] * 2)
+
+        def complete(*a, **k):
+            raise next(seq)
+        r, writes, out = self.run_repair(self.rows(1), [{"id": "m0", "want": ["draft"]}], complete)
+        self.assertEqual((writes, r["failed"]), ([], 1))
+        self.assertNotIn("refused twice", out)
+
+    def test_another_models_whole_draft_is_not_asked_again_for_its_age(self):
+        from record.repair import plan
+        gpt = json.dumps({"draft": {"text": "What it means: whole.", "origin": "ai:gpt-4o-mini"}})
+        cut = json.dumps({"draft": {"text": "What it means: the", "origin": "ai:gpt-4o-mini"}})
+        rows = [{"id": "g", "summary": "", "summary_origin": "extractive", "analysis_json": gpt, "updated_at": 0},
+                {"id": "c", "summary": "", "summary_origin": "extractive", "analysis_json": cut, "updated_at": 0}]
+        self.assertEqual(plan(rows, 100.0), [{"id": "c", "want": ["draft"]}])
+
+    def test_no_transcript_is_skipped_a_probe_counts_its_failures_and_a_forgotten_meeting_is_not_rewritten(self):
+        from czcore import llm
+        rows = [{"id": "e0", "title": "T", "summary": "At", "summary_origin": "ai:gemini-3.6-flash", "analysis_json": "{}"}]
+        r, writes, out = self.run_repair(rows, [{"id": "e0", "want": ["summary"]}], lambda *a, **k: "Whole.")
+        self.assertEqual((writes, r["failed"], r["kept"]), ([], 0, 1))
+        self.assertIn("SKIP e0 — no transcript", out)
+
+        def quota(*a, **k):
+            raise RuntimeError("rate limited by the API (429) — wait a moment and retry")
+        r, writes, out = self.run_repair(self.rows(1), [{"id": "m0", "want": ["summary"]}], quota, probe=True)
+        self.assertEqual((writes, r["failed"]), ([], 1))              # the probe's exit says it failed
+        self.assertIn("SUMMARY m0 none 0 chars", out)                # never the fallback it did not write
+        gone = [{**self.rows(1)[0], "id": "zz"}]
+        r, writes, out = self.run_repair(gone, [{"id": "zz", "want": ["summary"]}], lambda *a, **k: "Whole.")
+        self.assertEqual(writes, [])
+        self.assertIn("GONE zz", out)
 
     def test_an_analysis_it_cannot_read_is_never_planned_nor_written(self):
         """The planner tolerated bad JSON and planned a draft for it; the run

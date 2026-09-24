@@ -203,7 +203,18 @@ repair, the renderer and the summaries, the drag, the glossary's facts and
 code, the pictures and the search, the desk links); every finding folded
 with a test (b37f56f). Then five re-reviews of those folds — and the folds
 had regressed again, as the last five features' did: 49 findings, 48 folded
-with tests. The gravest was the repair: on ANY failed call (a quota, a key,
+with tests (ee37799). Then three re-reviews of THAT fold, and it had
+regressed too: 24 findings, 23 folded with tests — the repair could write
+one half of a meeting and strand the other (a written row is newer than the
+cutoff, so its failed half was never planned again; now a meeting is written
+whole or not at all), took a timeout and one cut for "refused twice", and
+would have asked a desk model's whole draft again for its age; the lede
+dropped a bullet that was all bold (a decision, read as a heading — 10.5k of
+120k fuzz cases lost items); "overlay" alone had been pointed at the zoning
+entry, when on a budget night it is the assessors' reserve for abatements;
+a capped cut ended on an undated night instead of the latest dated one. The
+one left to a person: a prompt the model declines every time keeps that
+meeting's fragment until someone decides (OPERATING says how). The gravest was the repair: on ANY failed call (a quota, a key,
 a rejected request) it would have written the extractive summary over every
 Gemini summary and removed every draft, printed `REPAIR DONE` and exited 0,
 past any re-run's reach. Now only a cut answer licenses a fallback; a failed
@@ -228,5 +239,11 @@ note the commits carry no `Co-Authored-By` trailer, which CLAUDE.md asks for
 and the constitution page's "co-authored in the open" implies; this
 session's instructions forbid the trailer, so the question is his (§4).
 
-760 tests (110 PG-backed skip without `RECORD_TEST_PG_DSN`). The deploy's
-own checks are below.
+766 tests (110 PG-backed skip without `RECORD_TEST_PG_DSN`). Pressed locally
+from a corpus seeded off the live edition and read in the pane with the
+service worker unregistered: the search for "select board" marks all 80 lines
+it lists (17 showed nothing before), its reel is "120 of 623 clips, first to
+latest" in a 2.8 KB link that runs from 2025-12-09 to 2026-09-16, the tray
+takes 120 and says so, a receipt past a tape's end highlights nothing, the ten
+picture links on the front page carry ten names, and no page scrolls sideways
+at 375 px. The deploy's own checks are below.

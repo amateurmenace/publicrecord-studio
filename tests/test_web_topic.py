@@ -175,6 +175,7 @@ class TestTopicTwins(unittest.TestCase):
             self.lift(r"const TP_WINDOW = .+?;"),
             self.lift(r"const TP_FLOOR_LINES = .+?;"),
             self.lift(r"const tpSpread = .+?\n  \};"),
+            self.lift(r"const tpCapSpread = .+?\n  \};"),
             self.lift(r"const phraseRe = .+?;\n"),
             self.lift(r"function mentionsIn\(text, after, pats\) \{.+?\n  \}"),
             self.lift(r"const TP_MONTH = .+?;\n"),
@@ -494,6 +495,8 @@ class TestTopicPress(unittest.TestCase):
                          [d["reel"]["full"], d["reel"]["full_n"], d["reel"]["full_all"], d["reel"]["short"], d["reel"]["short_n"]])
         story = (REPO / "web" / "story.py").read_text()
         self.assertIn("first to latest", story)
+        # past the link's cap the pressed supercut says it is not every night
+        self.assertIn("nights, one clip each, first to latest' if nights > reel[\"short_n\"]", story)
 
     def test_every_reel_link_stays_under_the_hosts_limit(self):
         """A link past ~8 KB is a dead page (414): the reader's reelShareURL
@@ -520,7 +523,42 @@ class TestTopicPress(unittest.TestCase):
         js = TestTopicTwins.JS
         self.assertEqual(js.count("a link plays the first ${REEL_LINK_CAP}"), 2)
         tray = js[js.index("function sqTray("):js.index("async function search()")]
-        self.assertIn("tpSpread(clips, TP_FULL_CAP)", tray)
+        self.assertIn("tpCapSpread(clips, dated, TP_FULL_CAP)", tray)
+        story = js[js.index("async function sqStory("):js.index("function sqTray(")]
+        self.assertIn('✂ put ${d.reel.full_all > TP_FULL_CAP ? `${TP_FULL_CAP} of ${tpN(d.reel.full_all, "clip")}` : "every clip"} on my tray', story)
+        panel = js[js.index("function refreshReelSummary("):]
+        self.assertIn("the first ${REEL_LINK_CAP} of ${n} clips", panel[:panel.index("\n  }\n")])
+
+    def test_the_latest_night_is_the_last_of_a_capped_cut_even_with_an_undated_one(self):
+        """Undated nights sort last, so the spread's last pick was the undated
+        night — "first to latest" left out the night the story calls the
+        latest (a second re-review's catch). The dated nights are spread
+        first to latest, the undated take the room left, in both twins."""
+        meetings = [{"pid": f"p{i:03d}", "title": "T", "date": f"2025-{1 + i % 12:02d}-{1 + i // 12:02d}", "body": "Board",
+                     "town": "Testville", "duration": 9000.0} for i in range(60)]
+        meetings.append({"pid": "tbd", "title": "T", "date": "TBD", "body": "Board", "town": "Testville", "duration": 9000.0})
+        latest = max(meetings[:60], key=lambda m: m["date"])
+        hits = [{"pid": m["pid"], "t": 100.0 * k, "text": "housing", "before": "", "after": "", "mentions": 1}
+                for m in meetings for k in (range(1, 2) if m is latest else range(1, 11))]
+        t = {"slug": "h", "name": "housing", "q": "housing", "phrases": ["housing"]}
+        d = topic.aggregate(meetings, hits, t)
+        self.assertEqual(d["latest"]["pid"], latest["pid"])
+        tw = TestTopicTwins()
+        body = "\n".join([
+            tw.PRELUDE, tw.helpers(),
+            f"const meetings = {json.dumps(meetings)}; const hits = {json.dumps(hits)};",
+            f"const d = tpAggregate(meetings, hits, {json.dumps(t)}, '', true);",
+            "const pids = decodeReel(new URL(d.reel.full, 'http://x').search).clips.map(c => c.pid);",
+            "console.log(JSON.stringify([d.reel.full, pids[pids.length - 1], d.reel.short]));",
+        ])
+        r = tw.node(body)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        js_full, last_pid, js_short = json.loads(r.stdout.strip().splitlines()[-1])
+        self.assertEqual([js_full, js_short], [d["reel"]["full"], d["reel"]["short"]])
+        self.assertEqual(last_pid, latest["pid"])                       # the latest dated night closes the cut
+        self.assertNotIn("tbd", d["reel"]["full"])
+        self.assertEqual(topic.cap_spread(list("abcde"), [True, False, True, True, False], 3), ["a", "c", "d"])
+        self.assertEqual(topic.cap_spread(list("abcde"), [True, False, False, True, False], 4), ["a", "d", "b", "c"])
 
     def test_a_blank_caption_line_is_no_line_as_the_index_reads_it(self):
         """The index skips blank lines; the press now does too, so a phrase a

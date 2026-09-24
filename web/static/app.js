@@ -753,7 +753,9 @@
     const rl = $(".cz-rclips", body); if (rl && keepScroll) rl.scrollTop = keepScroll;
     wireDrag(rl, ".cz-rclip", (from, to, key) => trayMove(from, to, undefined, key));
     if (mini) { mini.hidden = false; mini.href = url;
-      mini.textContent = `▶ ${n} clip${n > 1 ? "s" : ""} · ${hms(reelRuntime(clips))}`; }
+      // the pill's link plays the first REEL_LINK_CAP: it says so, and times those
+      mini.textContent = `▶ ${n > REEL_LINK_CAP ? `the first ${REEL_LINK_CAP} of ${n} clips` : `${n} clip${n > 1 ? "s" : ""}`}`
+        + ` · ${hms(reelRuntime(clips.slice(0, REEL_LINK_CAP)))}`; }
     pvShow();   // the row being previewed keeps its mark across the repaint
     if (focus) {
       let t = focus.act === "row"
@@ -2133,7 +2135,7 @@
                  town: meta.town || "", body: meta.body || "",
                  date: meta.date || "" },
       runtime: reelRuntime(clips),
-      share: shareURL(meta.pid, clips),
+      share: shareURL(meta.pid, clips.slice(0, REEL_LINK_CAP)),
       clips: clips.map(c => ({ start: r1(c.start), end: r1(c.end),
                                kind: c.kind || "moment", quote: c.quote || "",
                                source_t: c.t == null ? r1(c.start) : r1(c.t) })),
@@ -2661,7 +2663,7 @@
       // scrolls the page, as a phone or a tablet expects (only the glyph says
       // touch-action:none; a pen pressed elsewhere would scroll, and the
       // browser would cancel the drag it started)
-      if (e.pointerType !== "mouse" && !(e.target.closest && e.target.closest(".dg-grip"))) return;
+      if ((e.pointerType === "touch" || e.pointerType === "pen") && !(e.target.closest && e.target.closest(".dg-grip"))) return;
       const row = grip.closest(rowSel), rows = $$(rowSel, list), from = rows.indexOf(row);
       if (from < 0 || rows.length < 2) return;
       const clip = trayClips()[from], key = clip ? clipKey(clip) : "";
@@ -6010,6 +6012,14 @@
     if (cap <= 1) return items.slice(0, cap);
     return Array.from({ length: cap }, (_, i) => items[Math.floor(i * (n - 1) / (cap - 1))]);
   };
+  /* the spread over the DATED items (so "the latest" is the latest night a
+     date names, never an undated one sorted last), then the undated in the
+     room left — the press's cap_spread */
+  const tpCapSpread = (items, dated, cap) => {
+    const d = items.filter((_, i) => dated[i]), u = items.filter((_, i) => !dated[i]);
+    const out = tpSpread(d, cap);
+    return out.concat(u.slice(0, Math.max(0, cap - out.length)));
+  };
   /* whole-word, case-blind — the press's phrase_re; no lookbehind, so an
      older browser still parses it (the prefix group is consumed, and the
      phrase's own start is index + prefix length) */
@@ -6155,8 +6165,9 @@
     const chapters = said.map(r => ({ pid: r.pid, date: r.date, body: r.body, title: r.title, n: r.n,
       t: r.hits[0].t, quote: tpContext(r.hits[0]),
       clip: { pid: r.pid, start: r.hits[0].t, end: r.clips.length ? r.clips[0].end : r.hits[0].t + TP_WINDOW } }));
-    const every = [].concat(...said.map(r => r.clips)), full = tpSpread(every, TP_FULL_CAP);
-    const short = tpSpread(chapters.map(c => c.clip), REEL_LINK_CAP);
+    const every = [].concat(...said.map(r => r.clips));
+    const full = tpCapSpread(every, [].concat(...said.map(r => r.clips.map(() => tpIsMonth(r.date)))), TP_FULL_CAP);
+    const short = tpCapSpread(chapters.map(c => c.clip), chapters.map(c => tpIsMonth(c.date)), REEL_LINK_CAP);
     const rt = cs => cs.reduce((a, c) => a + Math.max(0, c.end - c.start), 0);
     return { slug: topic.slug || "", name: topic.name || topic.slug || "", q: topic.q || topic.name || "",
       phrases, town, moments: all.length, mentions: all.reduce((a, h) => a + (+h.mentions || 0), 0),
@@ -6479,11 +6490,11 @@
         <p class="decksrc">counted in your browser from the record’s own index — every line of every transcript that says ${saidAs}, whole-word${feat ? (feat.kind === "glossary"
           // the glossary's count is its own towns' only: a Boston search for a
           // Brookline word is not the glossary's number, and is not credited to it
-          ? (!feat.only.length || feat.only.includes(SCOPE.town || "") ? `, the words <a href="${BASE}/glossary/#${encodeURIComponent(feat.slug)}">the glossary</a> counts` : "")
+          ? (!feat.only.length || feat.only.includes(d.town || "") ? `, the words <a href="${BASE}/glossary/#${encodeURIComponent(feat.slug)}">the glossary</a> counts` : "")
           : `, the words <a href="${BASE}/topic/${encodeURIComponent(feat.slug)}/">the front page’s story</a> counts`) : ""}; no model, nothing sent anywhere; every number opens the tape</p>
         <div class="sq-acts">
           <a class="btn primary tp-play" href="${esc(d.reel.full)}">▶ play ${d.reel.full_all > d.reel.full_n ? `${d.reel.full_n} of ${tpN(d.reel.full_all, "clip")}, first to latest,` : `all ${tpN(d.reel.full_n, "clip")}`} as a reel · ${hms(d.reel.full_runtime)}</a>
-          <button type="button" class="btn" data-sq="tray">✂ put every clip on my tray</button>
+          <button type="button" class="btn" data-sq="tray">✂ put ${d.reel.full_all > TP_FULL_CAP ? `${TP_FULL_CAP} of ${tpN(d.reel.full_all, "clip")}` : "every clip"} on my tray</button>
           <button type="button" class="btn" data-sq="share">⧉ copy the link to this search</button>
         </div>
         <section class="fp-part"><div class="sectionhead"><span class="kicker">“${esc(q)}”, by the numbers</span></div>
@@ -6537,8 +6548,9 @@
      facts from the index (the tape, its length, the date) */
   function sqTray(d, q, idx) {
     const byPid = Object.create(null); for (const m of idx.meta) if (m && m.pid) byPid[m.pid] = m;
-    const clips = [];
+    const clips = [], dated = [];
     for (const r of d.meetings) for (const c of r.clips) {
+      dated.push(tpIsMonth(r.date));
       const m = byPid[c.pid] || {};
       const h = r.hits.find(h => h.t === c.start) || r.hits[0] || {};
       clips.push({ pid: c.pid, start: r1(c.start), end: r1(c.end), t: r1(c.start), kind: "hit",
@@ -6548,7 +6560,7 @@
     if (!clips.length) return;
     // a word said six hundred times is not a tray: the full cut's own
     // spread, first to latest, and the toast says how many of how many
-    const take = tpSpread(clips, TP_FULL_CAP);
+    const take = tpCapSpread(clips, dated, TP_FULL_CAP);
     const have = readReel(REEL_KEY);
     const next = takeMerge("append", have, take, true);
     const added = next.length - have.length;

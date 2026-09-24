@@ -417,8 +417,10 @@ newer than the cutoff, so a re-run is safe. Run it outside 03:00–06:30 ET:
 the nightly poll, ingest and embed share the model's quota and the database.
 
 ```bash
-# no execution still on the old image? (none RUNNING, or note when it ends)
+# no execution still on the old image? (list them; for one that started before
+# the deploy, its end is status.completionTime — the list shows only creation)
 gcloud run jobs executions list --job=record-pipeline --region=us-east1 --limit=3
+gcloud run jobs executions describe EXECUTION --region=us-east1 --format='value(status.completionTime)'
 B=2026-09-24T03:00Z     # the later of the deploy and that execution's end
 # look first — the plan, nothing changed
 gcloud run jobs execute record-pipeline --region=us-east1 --wait \
@@ -433,19 +435,28 @@ gcloud logging read 'resource.type="cloud_run_job" AND resource.labels.job_name=
   --limit=160 --freshness=1h --format='value(textPayload)' | grep -E 'REPAIR|PLAN|UPDATED|SUMMARY|DRAFT|BACKUP'
 ```
 
-Then press and carry the edition (below) — once the log shows no call that
-could not be asked. What is written: a whole answer, always. A fallback only
-when the model answered twice and the seam refused both as fragments — the
-summary becomes the extractive one, labeled so, and a draft is removed rather
-than pressed as a fragment. **A call that failed** (a quota, a bad key, a
-request the API refused, a timeout) **changes nothing**: that row stays as
-stored, two such meetings in a row stop the run (`REPAIR STOPPED`), and the
-job exits 1. Each row's old values are printed as a `BACKUP {json}` line
-before it is written, so a run that went wrong can be put back from its own
-log. Each call's line prints the tokens it spent (the thought included) and
-the seam's reason when it fell back. One repair runs at a time (an advisory
-lock). Read the `--probe` lines before the real run: both must say
-`ai:gemini-…` with no reason in brackets.
+Then press and carry the edition (below) — only once the last attempt's
+final line reads `REPAIR DONE — … 0 could not be asked`. The repair runs as a
+`record-pipeline` execution, so it inherits that job's hour and its one
+automatic retry: a run that exits 1 is run again at once (harmless — what was
+written is newer than the cutoff, what failed is asked again), and a run
+killed at the hour prints no final line at all; either way, read the last
+attempt, re-run, or narrow it with `--limit` / `--only`. What is written: a
+whole answer, always. A fallback only when the model answered both asks and
+the seam refused both as fragments — the summary becomes the extractive one,
+labeled so, and a draft is removed rather than pressed as a fragment. **A call
+that failed** (a quota, a bad key, a request the API refused, a timeout, a
+prompt the model declined) **changes nothing**: a meeting is written whole or
+not at all (`HELD`), two such meetings in a row stop the run
+(`REPAIR STOPPED`), and the job exits 1. A prompt the model declines every
+time keeps its meeting's fragment until a person decides (`--only` the others
+past it). Each row's old values are printed as a `BACKUP {json}` line before
+it is written, so a run that went wrong can be put back from its own log.
+Each call's line prints the tokens it spent (the thought included) and the
+seam's reason, in parentheses, when it fell back. One repair runs at a time
+(an advisory lock, taken before the rows are read). Read the `--probe` lines
+before the real run: each call it made (one or two, by what the first
+planned meeting needs) must say `ai:gemini-…` and `— whole`.
 
 ### Hand-files at the Pages-repo root
 

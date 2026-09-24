@@ -343,6 +343,7 @@ class TestTheGlossary(unittest.TestCase):
         self.assertNotIn("harms no one", says["variance"])
         self.assertIn("Putting money in takes a simple majority", says["stabilization-fund"])
         self.assertIn("strategy for collective bargaining or litigation", says["executive-session"])
+        self.assertIn("meeting may hurt the body’s position", says["executive-session"])     # c.30A §21: "may have a detrimental effect"
         # where the two differ the source is the authority: the statute is named first
         src = {e["slug"]: e["sources"] for e in glossary.ENTRIES}
         for slug in ("levy", "proposition-2-half"):
@@ -386,6 +387,8 @@ class TestTheGlossary(unittest.TestCase):
         self.assertIn('href="/app/s?q=free%20cash&amp;town=Testville"', e)
         self.assertEqual(glossary._day("TBD"), "in an undated meeting")
         self.assertEqual(glossary._day("2026"), "in an undated meeting")
+        self.assertEqual(glossary._day("2026-13-45"), "in an undated meeting")            # the calendar has no such day
+        self.assertEqual(glossary._whole_day("２０２６-01-01"), "")                          # ASCII digits only
         self.assertEqual(glossary._day("2026-03-03"), "on March 3, 2026")
         # a meeting that said only "no action" is not named "favorable action"
         n = [{"pid": "na", "date": "2026-01-01", "town": "Brookline", "segments": [{"start": 0, "text": "no action on it"}]}]
@@ -401,7 +404,8 @@ class TestTheGlossary(unittest.TestCase):
             {"pid": "bk", "date": "2026-01-01", "town": "Brookline", "segments": [{"start": 0, "text": "the advisory committee"}]}]))}
         self.assertEqual(idx["advisory-committee"]["only"], ["Brookline"])
         story = JS[JS.index("async function sqStory("):JS.index("function sqTray(")]
-        self.assertIn('(!feat.only.length || feat.only.includes(SCOPE.town || "") ? `, the words <a href="${BASE}/glossary/#', story)
+        # the story's own town decides (an unscoped search still tells Brookline's story)
+        self.assertIn('(!feat.only.length || feat.only.includes(d.town || "") ? `, the words <a href="${BASE}/glossary/#', story)
 
     def test_a_phrase_finds_the_entry_that_explains_it(self):
         from web import glossary
@@ -416,9 +420,12 @@ class TestTheGlossary(unittest.TestCase):
         # every other acronym is the same word in any case — the analyzer's topics are lowercase
         for word, slug in (("40b", "chapter-40b"), ("zba", "zoning-board-of-appeals"), ("cip", "capital-improvement-plan"),
                            ("bpda", "bpda"), ("dese", "dese"), ("metco", "metco"), ("fy27", "fiscal-year"), ("FY27", "fiscal-year"),
-                           ("overlay", "overlay-district"), ("overlays", "overlay-district"),
-                           ("MBTA community", "mbta-communities")):
+                           ("MBTA community", "mbta-communities"), ("overlay district", "overlay-district")):
             self.assertEqual((glossary.entry_for(word) or {}).get("slug"), slug, word)
+        # "overlay" alone, on a budget night, is the assessors' reserve for abatements —
+        # not a zoning overlay: it must not link to the zoning entry (a re-review catch)
+        self.assertIsNone(glossary.entry_for("overlay"))
+        self.assertIsNone(glossary.entry_for("overlays"))
         self.assertIsNone(glossary.entry_for("parking"))
         self.assertIsNone(glossary.entry_for(""))
 

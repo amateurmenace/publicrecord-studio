@@ -23,7 +23,7 @@ never assumed.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m unittest discover -s tests -t . -q   # 760 tests; PG-backed ones
+.venv/bin/python -m unittest discover -s tests -t . -q   # 766 tests; PG-backed ones
                                                           # skip without RECORD_TEST_PG_DSN
 ```
 

@@ -27,10 +27,12 @@ answered twice and the seam refused both as fragments — then the summary
 is the extractive one, labeled so, and a draft is removed rather than left
 a fragment. A call that FAILED (a quota, a bad key, a request the API
 refused, a timeout) licenses nothing: that row stays exactly as stored,
-the run stops after two such meetings in a row, and it exits 1. Every
-row's old values are printed (BACKUP) before it is written, so a run that
-went wrong can be put back from its own log. Re-runs are safe: a repaired
-row is newer than the cutoff. One repair at a time (an advisory lock).
+the run stops after two such meetings in a row, and it exits 1. A meeting is
+written whole or not at all — if either half could not be asked, neither is
+written, so a re-run asks for both. Every row's old values are printed
+(BACKUP) before it is written, so a run that went wrong can be put back from
+its own log. Re-runs are safe: a repaired row is newer than the cutoff. One
+repair at a time (an advisory lock).
 """
 
 from __future__ import annotations
@@ -92,7 +94,10 @@ def plan(rows: Iterable[dict], before: float = 0.0) -> List[dict]:
         d = an.get("draft") if an is not None else None
         if isinstance(d, dict) and str(d.get("origin") or "").startswith("ai:"):
             dt = str(d.get("text") or "")
-            if old or is_cut(dt) or "**" in dt:
+            # the old budget was Gemini's: another model's whole draft (a desk
+            # import) is not asked again for its age — only for its own cut
+            gem = str(d.get("origin") or "").startswith("ai:gemini")
+            if (old and gem) or is_cut(dt) or "**" in dt:
                 want.append("draft")
         elif old and an is not None:
             want.append("draft")          # a live meeting with no draft: the recovery path
@@ -121,18 +126,19 @@ def _spent(n0: int) -> str:
 
 def _ask(fn, kind: str, segs, info, tries: int = 2):
     """One call, and once more after a pause if it fell back → (text,
-    origin, why, cut). `cut` is True only when the model answered and the
-    seam refused the answer as a fragment — the one failure that licenses a
-    fallback. Any other failure licenses nothing."""
+    origin, why, cut). `cut` is True only when EVERY ask came back and the
+    seam refused each as a fragment — the one failure that licenses a
+    fallback (a timeout and then one cut is not two cuts). Any other
+    failure licenses nothing."""
     from czcore import llm
     from memory import analyze
-    text, origin, why, cut = "", "none", "", False
+    text, origin, why, cut = "", "none", "", tries > 0
     for k in range(tries):
         text, origin = fn(segs, info)
         if text and str(origin).startswith("ai:"):
             return text, origin, "", False
         why = analyze.LAST_FALLBACK.get(kind, "") or "the model gave no answer"
-        cut = isinstance(analyze.LAST_ERROR.get(kind), llm.CutOff)
+        cut = cut and isinstance(analyze.LAST_ERROR.get(kind), llm.CutOff)
         if k + 1 < tries:
             time.sleep(PAUSE)
     return text, origin, why, cut
@@ -140,8 +146,11 @@ def _ask(fn, kind: str, segs, info, tries: int = 2):
 
 def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
     """Ask again for each planned meeting and write what the rules allow
-    (the module's docstring) — `c` needs `transcript(id)` and
-    `upsert_meeting(row)`. Returns the counts; prints one line per call."""
+    (the module's docstring) — `c` needs `transcript(id)`, `get_meeting(id)`
+    and `upsert_meeting(row)`. A meeting is written whole or not at all: if
+    either half could not be asked, neither is written, so the next run asks
+    for both (a row written once is newer than the cutoff, and would never
+    be planned again). Returns the counts; prints one line per call."""
     from memory import analyze
     by = {m["id"]: m for m in rows}
     fixed = kept = failed = streak = 0
@@ -153,6 +162,11 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
         upd = {"id": m["id"]}
         bad = []
         segs = c.transcript(m["id"])
+        if not segs:
+            # nothing to ask a model about: not a failure, and nothing to write
+            print(f"  SKIP {m['id']} — no transcript on the record; nothing asked", flush=True)
+            kept += 1
+            continue
         info = {"title": m.get("title") or ""}
         if "summary" in t["want"]:
             n0, t0 = _calls(), time.time()
@@ -167,7 +181,10 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
                                   else "refused twice as a fragment — the tape gave no sentences; none"), True
                 s, o = s or "", "extractive"
             else:
+                # nothing was said: the line shows nothing, not the fallback
+                # that was never written
                 verdict, write = "could not be asked — kept as stored", False
+                s, o = "", "none"
                 bad.append(why)
             if write and (s, o) != (m.get("summary"), m.get("summary_origin")):
                 upd["summary"], upd["summary_origin"] = s, o
@@ -194,10 +211,24 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
                   f" — {verdict}" + (f" ({why})" if why else ""), flush=True)
             if probe:
                 print(f"    {text[:900]!r}", flush=True)
+        if bad:
+            failed += 1
+            streak += 1
+        else:
+            streak = 0
         if probe:
             print("REPAIR PROBE — nothing was written", flush=True)
             break
-        if len(upd) > 1:
+        cur = c.get_meeting(m["id"]) if len(upd) > 1 and not bad else None
+        if bad:
+            kept += 1
+            print(f"  HELD {m['id']} — a part could not be asked; nothing written, the next run asks again",
+                  flush=True)
+        elif len(upd) > 1 and not (cur and cur.get("status") == "live"):
+            # forgotten (or re-queued) while the run asked: never re-insert it
+            kept += 1
+            print(f"  GONE {m['id']} — no longer live; nothing written", flush=True)
+        elif len(upd) > 1:
             # the row as it stood, in the log, before it changes: a run that
             # went wrong is put back from here
             print("  BACKUP " + json.dumps({"id": m["id"], "summary": m.get("summary"),
@@ -208,16 +239,11 @@ def repair(c, rows: List[dict], todo: List[dict], probe: bool = False) -> dict:
             print(f"UPDATED {m['id']} {sorted(k for k in upd if k != 'id')}", flush=True)
         else:
             kept += 1
-        if bad:
-            failed += 1
-            streak += 1
-            if streak >= STREAK:
-                stopped = bad[-1]
-                print(f"REPAIR STOPPED — {streak} meetings in a row could not be asked ({stopped}); "
-                      "every row after them is unchanged", flush=True)
-                break
-        else:
-            streak = 0
+        if streak >= STREAK:
+            stopped = bad[-1]
+            print(f"REPAIR STOPPED — {streak} meetings in a row could not be asked ({stopped}); "
+                  "every row after them is unchanged", flush=True)
+            break
     return {"fixed": fixed, "kept": kept, "failed": failed, "stopped": stopped}
 
 
@@ -237,40 +263,45 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     bridge_model_key(os.environ, Settings().gemini_key)
     c = PgCorpus()
-    with c._con() as con:
-        rows = [dict(r) for r in con.execute(
-            "SELECT id, title, summary, summary_origin, analysis_json, updated_at FROM meetings "
-            "WHERE status = 'live' ORDER BY added_at").fetchall()]
-    todo = plan(rows, _when(a.before))
-    if a.only:
-        todo = [t for t in todo if t["id"] == a.only]
-    if a.limit:
-        todo = todo[:a.limit]
-    print(f"REPAIR {len(rows)} live meetings, {len(todo)} to ask again; lane: "
-          f"{analyze.llm.status().get('model')} enabled={analyze.llm.enabled()}", flush=True)
-    for t in todo:
-        print(f"  PLAN {t['id']} {'+'.join(t['want'])}", flush=True)
-    if a.dry_run or not todo:
-        c.close()
-        return 0
-    if not analyze.llm.enabled():
-        print("REPAIR STOPPED — no model key on this job; nothing was changed", flush=True)
-        c.close()
-        return 1
-    # one repair at a time: two overlapping runs could let one's failure
-    # undo what the other just wrote. The lock is the session's; it goes
-    # when this connection does.
-    lock = c._psycopg.connect(c.dsn, autocommit=True)
+    # one repair at a time, and the lock taken BEFORE the rows are read: two
+    # overlapping runs could let one act on rows the other just rewrote. A
+    # dry run reads only. The lock is the session's; it goes with it.
+    lock = None if a.dry_run else c._psycopg.connect(c.dsn, autocommit=True)
     try:
-        if not lock.execute("SELECT pg_try_advisory_lock(hashtext('record.repair'))").fetchone()[0]:
+        if lock is not None and not lock.execute(
+                "SELECT pg_try_advisory_lock(hashtext('record.repair'))").fetchone()[0]:
             print("REPAIR STOPPED — another repair is running; nothing was changed", flush=True)
+            return 1
+        with c._con() as con:
+            rows = [dict(r) for r in con.execute(
+                "SELECT id, title, summary, summary_origin, analysis_json, updated_at FROM meetings "
+                "WHERE status = 'live' ORDER BY added_at").fetchall()]
+        todo = plan(rows, _when(a.before))
+        if a.only:
+            todo = [t for t in todo if t["id"] == a.only]
+        if a.limit:
+            todo = todo[:a.limit]
+        print(f"REPAIR {len(rows)} live meetings, {len(todo)} to ask again; lane: "
+              f"{analyze.llm.status().get('model')} enabled={analyze.llm.enabled()}", flush=True)
+        by = {m["id"]: m for m in rows}
+        for t in todo:
+            m = by[t["id"]]
+            d = (_analysis(m.get("analysis_json")) or {}).get("draft")
+            was = f"summary {m.get('summary_origin') or 'none'}, draft " + (
+                str(d.get("origin") or "none") if isinstance(d, dict) else "none")
+            print(f"  PLAN {t['id']} {'+'.join(t['want'])} ({was})", flush=True)
+        if a.dry_run or not todo:
+            return 0
+        if not analyze.llm.enabled():
+            print("REPAIR STOPPED — no model key on this job; nothing was changed", flush=True)
             return 1
         r = repair(c, rows, todo, probe=a.probe)
     finally:
-        lock.close()
+        if lock is not None:
+            lock.close()
         c.close()
     if not a.probe:
-        print(f"REPAIR DONE — {r['fixed']} updated, {r['kept']} unchanged, "
+        print(f"REPAIR {'ENDED' if r['stopped'] else 'DONE'} — {r['fixed']} updated, {r['kept']} unchanged, "
               f"{r['failed']} could not be asked", flush=True)
     return 1 if r["failed"] else 0
 

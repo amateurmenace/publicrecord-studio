@@ -151,6 +151,16 @@ def spread(items: Sequence, cap: int) -> list:
     return [items[(i * (n - 1)) // (cap - 1)] for i in range(cap)]
 
 
+def cap_spread(items: Sequence, dated: Sequence[bool], cap: int) -> list:
+    """The spread over the DATED items — so "the latest" is the latest night a
+    date names, never an undated one sorted last — then the undated in the
+    room left. app.js tpCapSpread is the twin."""
+    d = [x for x, k in zip(items, dated) if k]
+    u2 = [x for x, k in zip(items, dated) if not k]
+    out = spread(d, cap)
+    return out + u2[:max(0, cap - len(out))]
+
+
 def reel_url(clips: Sequence[dict], base: str = "/app") -> str:
     """The viewer's link, exactly as app.js reelShareURL writes it: v1 while
     the clips are one meeting's (`m=<pid>&c=<start>-<end>,…`), v2 the moment
@@ -327,8 +337,8 @@ def aggregate(meetings: Sequence[dict], hits: Sequence[dict], topic: dict,
                           "end": r["clips"][0]["end"] if r["clips"] else r["hits"][0]["t"] + WINDOW}}
                 for r in said]
     every = [c for r in said for c in r["clips"]]
-    full = spread(every, FULL_CAP)
-    short = spread([c["clip"] for c in chapters], LINK_CAP)
+    full = cap_spread(every, [is_month(r["date"]) for r in said for _ in r["clips"]], FULL_CAP)
+    short = cap_spread([c["clip"] for c in chapters], [is_month(c["date"]) for c in chapters], LINK_CAP)
     return {
         "slug": topic["slug"], "name": topic.get("name") or topic["slug"],
         "long": topic.get("long") or topic.get("name") or topic["slug"],

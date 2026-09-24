@@ -144,7 +144,7 @@ ENTRIES: List[dict] = [
     {"slug": "executive-session", "group": "meeting", "term": "executive session", "where": ["Massachusetts"],
      "says": "The part of a meeting a public body may hold in private — only for a reason the Open Meeting Law "
              "lists, among them a person’s reputation, negotiations with staff outside a union, and — when an open "
-             "meeting would hurt the body’s position and the chair says so — strategy for collective bargaining "
+             "meeting may hurt the body’s position and the chair says so — strategy for collective bargaining "
              "or litigation and the purchase or lease of real estate — entered by a roll-call vote in open "
              "session, with the reason stated.",
      "phrases": ["executive session"], "sources": [law("M.G.L. c. 30A § 21", "TitleIII/Chapter30A/Section21")]},
@@ -258,7 +258,7 @@ ENTRIES: List[dict] = [
     {"slug": "overlay-district", "group": "built", "term": "overlay district", "where": ["Massachusetts"],
      "says": "A zone drawn over the existing zoning that adds rules or allows more — denser housing near transit, "
              "a historic area’s protections — without erasing the zoning beneath it.",
-     "phrases": ["overlay district", "overlay districts", "overlay zoning"], "aka": ["overlay"],
+     "phrases": ["overlay district", "overlay districts", "overlay zoning"],
      "sources": [law("M.G.L. c. 40A", "TitleVII/Chapter40A")]},
     {"slug": "special-permit", "group": "built", "term": "special permit", "where": ["Massachusetts"],
      "says": "Permission for a use or a building the zoning allows only case by case, granted by a named board "
@@ -506,13 +506,21 @@ def terms_on(m: dict, counts: Dict[str, dict], top: int = 6) -> List[dict]:
     return [{"slug": e["slug"], "term": _short(e), "n": n} for n, e in rows[:top]]
 
 
-_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}")
+_DAY = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 def _whole_day(d) -> str:
-    """A meeting's day when it is a whole date (YYYY-MM-DD…), else ""."""
+    """A meeting's day when it is a real whole date (YYYY-MM-DD…, a day the
+    calendar has), else ""."""
+    import datetime as _dt
     d = str(d or "")
-    return d[:10] if _DAY.match(d) else ""
+    if not _DAY.match(d):
+        return ""
+    try:
+        _dt.date.fromisoformat(d[:10])
+    except ValueError:
+        return ""
+    return d[:10]
 
 
 def _day(d: str) -> str:
