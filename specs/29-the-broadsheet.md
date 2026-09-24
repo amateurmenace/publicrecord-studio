@@ -37,19 +37,36 @@ own; and **more templates**, the issue-over-time story first.
 
 ## The boards
 
-1. **Front page — read** (`Main`). Masthead: wordmark, one-line promise,
+1. **Front page — read** (`Main`, interactive — press Play). Masthead: wordmark, one-line promise,
    the municipality switch (Boston · Brookline · The whole record, with
    counts). **The search spine**: a 56 px search box under the wordmark
    ("Search the record — a word, a name, a street, a vote. Every hit is a
    moment you can play."), six "try" chips, and the sentence *everything you
    see is a search — click a name, a place, a thread*. Then, on the grid:
-   - cols 1–7 **Tonight's meeting**: the still with a "Play from the moment it
-     turned · 0:18:48" chip and a duration/captions chip; a *Find in this
+   - **The year on the record, in four chapters** (the opening data story):
+     bars of hours a month, meetings as dots sized by length and coloured by
+     town, a rust dashed annotation on the active chapter; four chapter
+     buttons at the right (December — the budget night · Winter into spring —
+     the roll calls · June — the marathons · September — Boston arrives),
+     the active one open with a counted paragraph; clicking a dot names the
+     meeting under the chart. State: `chapter`, `pick`.
+   - **What they talked about, and how it shifted** (the river): a stacked
+     stream of the eight lenses' shares across every meeting, oldest to
+     newest; a legend of lens buttons with each lens's share of all lens
+     words; clicking a lens or a band isolates it and the italic caption
+     names where it was loudest. State: `lens`.
+   - **Tonight's meeting** as a night band (ink ground): the still with a
+     "Play from the moment it turned" and a duration/captions chip; a *Find in this
      meeting* box; the headline; a counted lede whose topics are links; the
      three labels (summary · the reading · counted); *make this your front
      page →*; the three moments that decided it as cards.
-   - cols 8–12 **The record, over time**: headline with the counts,
-     meetings-by-month dots (each a link), three number tiles, two buttons.
+   - **Four columns — each a story you can delve into** (the newspaper
+     band, hairlines between): *The money words* (lens totals as bars: money
+     is the widest lens by far), *Who spoke, and where* (names and streets as
+     bars; each a search), *The roll calls* (27 votes as dots by month, the
+     one that failed in rust; who appears in the most rolls), *Warrant
+     season* (the thread's sparkline and the five nights). Each ends in a
+     rust "delve →".
    - **Front pages — the record's own, and readers'**: five cards — tonight's
      meeting covered, the roll calls watched, the longest thread watched (the
      three `featured_papers` that exist today), one reader's page, and the
@@ -106,7 +123,10 @@ own; and **more templates**, the issue-over-time story first.
 ## The rules the build keeps
 
 - The reader is static files the press writes; the toggles are links; a
-  page reads with scripts off. The search spine and type-ahead are
+  page reads with scripts off. The opening's interactivity (chapters, the
+  picked dot, the isolated lens) is `app.js` over numbers the press already
+  ships in `analytics.json`; with scripts off the chart shows the last
+  chapter and all eight lenses, and the chapter buttons are anchors. The search spine and type-ahead are
   progressive: the box submits to the search page without scripts, and
   `app.js` adds the panel over the index that already ships.
 - Stills are **pressed into the edition** (`app/stills/<pid>.jpg`, fetched
@@ -173,8 +193,11 @@ green first (`.venv/bin/python -m unittest discover -s tests -t . -q`).
 **Build P0 from the plan above, in this order:** (1) `record/press.py`
 presses stills into `app/stills/`; (2) `web/charts.py` gains `still()`,
 `jump_bar()`, `timeline()`, `month_dots()`; (3) `web/emit.py::page_home` on
-the twelve-column grid with the sections of board 1, the masthead switch,
-the mode stamp, the front-pages strip from `featured_papers`; (4) the meeting
+the twelve-column grid with the sections of board 1 — the four-chapter year
+chart and the lens river first (`web/charts.py::year_chapters`, `lens_river`,
+pressed as SVG with the data for `app.js` to re-light), the night band, the
+four columns, then the rest — the masthead switch, the mode stamp, the
+front-pages strip from `featured_papers`; (4) the meeting
 page's jump bar and find box; (5) `app.js`: the search spine's type-ahead
 over the shipped index, grouped as board 2, keyboard-first, no network; the
 stamp replaces the mode bar; (6) phone; (7) the CSS system (fonts self-hosted,
