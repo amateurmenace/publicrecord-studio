@@ -157,6 +157,14 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24 04:03Z — **v2.1.23 / r46 is LIVE** (specs/28; tag `v2.1.23` at
+  02d4e8b, the commit the image was built from; the service and all four jobs
+  on r46; the press at `--version 2.1.23`; Pages bc0dab0). The seam refuses a
+  cut answer and gives a thinking model room; the repair asked again for
+  every stored summary and reading (26 updated, 0 could not be asked, every
+  answer whole). The desk's last pieces in the paper: *housing*, picture
+  downloads, drag to reorder, the glossary, the desktop app's DMG. 766 tests.
+  Next numbers: r47 / 2.2.0 are the broadsheet's (specs/29).
 - 2026-09-24 02:30Z — **v2.1.22 / r45 is LIVE**; `record-pg` resized to
   `db-g1-small` (100 vector updates: 341 s → 16.7 s); migration 002 applied;
   103,779 segments still without a vector. Next number: v2.1.23 / r46.

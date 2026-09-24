@@ -246,4 +246,22 @@ it lists (17 showed nothing before), its reel is "120 of 623 clips, first to
 latest" in a 2.8 KB link that runs from 2025-12-09 to 2026-09-16, the tray
 takes 120 and says so, a receipt past a tape's end highlights nothing, the ten
 picture links on the front page carry ten names, and no page scrolls sideways
-at 375 px. The deploy's own checks are below.
+at 375 px.
+
+**Deployed 2026-09-24, 04:03Z** — image `r46` (built from 02d4e8b) on
+`record-api` (revision `record-api-00038-6p9`) and all four jobs; the press at
+`--version 2.1.23`. No pipeline execution was running on the old image (the
+last ended 02:09Z), so the repair's cutoff was the deploy itself,
+`--before 2026-09-24T04:03:14Z`. The dry run planned all 26 live meetings (16
+summary + draft, 10 draft only — their gpt-4o-mini summaries are whole). The
+probe on one (`tj-9c8c_wC0`) came back whole on both calls (a 1,643-character
+summary in 11.3 s — 2,048 tokens out, the thought included — and a
+1,491-character reading in 9.0 s), which is also the proof that the API takes
+`thinkingLevel: low`. The repair: `REPAIR DONE — 26 updated, 0 unchanged, 0
+could not be asked` — 16 summaries and 26 readings, every one whole
+(700–2,450 characters, median 1,496; 9.0 s a call, 388 s in all), 26 `BACKUP`
+lines in its log, no fallback. Before it, the live edition's ten Gemini
+summaries ran 26–95 characters and its twenty readings 43–184, every one cut
+mid-sentence. The press (26 meetings, 215 issues, 145,593 lines indexed)
+synced to the bucket; carried to Pages (bc0dab0) with the gzip loop, the
+hand-files kept.

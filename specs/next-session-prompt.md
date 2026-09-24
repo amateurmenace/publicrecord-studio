@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.1.22, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.1.23, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -94,6 +94,41 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
+## 2026-09-24, 04:03Z — v2.1.23 / r46 IS LIVE: the model's words whole; the desk's last pieces in the paper
+
+specs/28 has it all (the verdict read on a phone, what answered it, three
+rounds of review, the deploy's numbers). In short:
+
+- **The seam** (`czcore/llm.py`): Gemini's thinking had spent the whole
+  output budget — every hosted summary and every drafted reading on the
+  record was stored cut off mid-sentence ("At the September 22, 2026,").
+  A thinking model now gets `thinkingLevel: low` (3.x) / a 1,024 budget
+  (2.5) / no field for a name the file does not know, 8,192 tokens of room
+  on top of the answer, and any answer that did not end whole is refused
+  (`CutOff`) and never stored. The API took `thinkingLevel: low` (the probe).
+- **The repair ran** (`record/repair.py`; OPERATING "Repairing a model's cut
+  answers"): `REPAIR DONE — 26 updated, 0 unchanged, 0 could not be asked`;
+  16 summaries and 26 readings asked again, every one whole (700–2,450
+  characters), no fallback. The log (`record-pipeline-8xzj4`) holds a
+  `BACKUP` line per meeting with what it replaced. Its rule, for any later
+  run: only an answer refused as a fragment twice licenses a fallback; a
+  failed call writes nothing; a meeting is written whole or not at all.
+- **The reader**: Markdown read, receipts linked; the search counts a
+  featured or glossary word by its story's own rule; every reel link holds
+  at most 240 clips (the host refuses past ~8 KB); capped cuts spread from
+  the first dated night to the latest; *housing* is the second featured
+  word; every picture downloads as an .svg (`app/pictures/`); tray clips
+  drag; the glossary (`/app/glossary/`, 47 entries); the desktop app's DMG
+  beside every step that needs the desk.
+- **Stephen's, new**: read the glossary against its sources and flip
+  `glossary.REVIEWED`; the co-author trailer (CLAUDE.md asks for it, this
+  session's instructions forbade it, the constitution page says the work is
+  "co-authored in the open" — one of them should change); mirror the seam
+  fix into control-z's `czcore/llm.py` (the desk's Gemini lane still cuts);
+  per-clip thumbnails and `chart·topic` still wait on him (specs/28 §4).
+- `search/segs.json` is 2,057 KB gzipped at 26 meetings — the press warns it
+  is past the design envelope (specs/13 §P2's "Bureau conversation").
+
 ## 2026-09-24, 02:30Z — v2.1.22 / r45 IS LIVE: the steward's desk; the database resized
 
 - **The desk** (specs/27): `/steward` opens on Tonight (what is running with its
@@ -118,11 +153,9 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - **The first full night landed 11 tapes** (15 → 26 live). The two the
   hour-kills interrupted sit `queued`/mid-flight until the 03:30 ET drain
   reclaims them (by design, v2.1.20).
-- Another session ("Community Highlighter features into record") ships
-  v2.1.23 / r46 next from branch `desk-in-the-paper` (a fix for Gemini's
-  cut-off summaries, plus renderer features; its spec is 28). The main
-  checkout on this machine is on `main` but was left behind the remote —
-  `git pull` there before anything.
+- ~~Another session ships v2.1.23 / r46 next~~ — shipped (below). A third
+  session is building **specs/29 — the broadsheet** on `broadsheet-p0`, and
+  takes **r47 / 2.2.0**; it rebases on v2.1.23.
 
 0. **`PAGES_TOKEN` cannot write.** The 2026-09-23 dispatch cloned the Pages
    repo with it and the push was refused (`Permission to
