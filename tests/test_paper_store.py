@@ -417,8 +417,9 @@ class TestPaperEndpoints(unittest.TestCase):
     def test_a_taken_page_offered_again_is_refused_at_the_door(self):
         """A steward's takedown (record/OPERATING.md §5) moves the object
         under taken/; the same bytes POSTed again are not stored and the
-        share is told so — 410 with the read path's own sentence — never a
-        200 whose link answers 404 (a skeptic's catch on the P2 folds)."""
+        share is told so — 410 with the share's own sentence, the full link
+        copied in the short one's place — never a 200 whose link answers 404
+        (a skeptic's catch on the P2 folds; the words decided 2026-09-24)."""
         r = self.client.post("/api/papers", json=portable())
         self.assertEqual(r.status_code, 200)
         pid = r.json()["id"]

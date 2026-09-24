@@ -166,7 +166,7 @@ def _no_sidecars(tool: str) -> Path:
 
 
 def press(corpus, out_dir: str, version: str = "",
-          site_base: str = "", api: str = "", stills=None, shared=None, today=None) -> dict:
+          site_base: str = "", api: str = "", stills=None, shared=None, today=None, listed_before=None) -> dict:
     """Press the specs/16 edition out of a store — here, a `PgCorpus`.
 
     This is `web.bake.bake()` with its two desk-shaped assumptions replaced:
@@ -212,9 +212,9 @@ def press(corpus, out_dir: str, version: str = "",
     # corpus this edition was pressed from; taking it afterwards would name a
     # corpus that may have moved during the press and quietly certify an
     # edition as fresher than it is.
-    fingerprint = corpus_fingerprint(corpus) + shared_digest(shared, today)
+    fingerprint = corpus_fingerprint(corpus) + shared_digest(shared, today, listed_before)
 
-    b = _bake.Bake(corpus, out, version, _no_sidecars, stills=stills, shared=shared, today=today)
+    b = _bake.Bake(corpus, out, version, _no_sidecars, stills=stills, shared=shared, today=today, listed_before=listed_before)
 
     print("pressing the edition…")
     # the pictures first (specs/29 §P0.2): the poster and three frames of
@@ -422,15 +422,16 @@ def corpus_fingerprint(corpus) -> str:
     return h.hexdigest()[:16]
 
 
-def shared_digest(shared, today=None) -> str:
+def shared_digest(shared, today=None, listed_before=None) -> str:
     """The share store's listing, digested onto the fingerprint (specs/29
     P2): a night with no new meeting and one new shared page — or one taken
     down — is a night the edition changes, so it presses. A row the press
     would list (minted on or after the gallery's LISTED_SINCE) carries its
     day-relative bits for `today` too (web/gallery.py age_bits: this week,
-    a day old, the year said), so the night a listed page turns a day old —
-    the strip may seat it — leaves this week, or sees the year turn is a
-    night that presses, and a quiet night after that is quiet again; a row
+    seasoned — a previous press listed it, by `listed_before` — the year
+    said), so the night a listed page may first lead the front page, leaves
+    this week, or sees the year turn is a night that presses, and a quiet
+    night after that is quiet again; a row
     the press never lists brings its id and day alone, so its old flips
     move nothing (two skeptics' catches: the strip moved behind a gate that
     never saw a day pass, then a gate that saw days for pages it never
@@ -446,13 +447,30 @@ def shared_digest(shared, today=None) -> str:
         d = _gallery._day(r.get("created"))
         bits = ""
         if d and d >= _gallery.LISTED_SINCE:
-            bits = "|" + "".join(str(int(b)) for b in _gallery.age_bits(d, today))
+            bits = "|" + "".join(str(int(b)) for b in _gallery.age_bits(r.get("created"), today, listed_before))
         rows.append(f"{r.get('id')}|{r.get('created') or ''}{bits}")
     rows.sort()
     return ("|s" + hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()[:12]) if rows else ""
 
 
-def needs_press(corpus, manifest_path: str, shared=None, today=None) -> bool:
+def last_pressed_at(bucket: str, prefix: str = "app"):
+    """When the edition now in the bucket was pressed — its pressing.json's
+    `pressed_at`, as an aware datetime — for the front pages' rule that a
+    previous press must already have listed a reader's page before the strip
+    seats it (web/gallery.py seasoned_at). Best effort: None when the bucket,
+    the file or the stamp cannot be read, and the calendar rule stands in."""
+    try:
+        from google.cloud import storage
+        raw = storage.Client().bucket(bucket).blob(f"{prefix.strip('/')}/{PRESSING}").download_as_bytes()
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        stamp = str((json.loads(raw.decode("utf-8")) or {}).get("pressed_at") or "")
+        return _dt.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_dt.timezone.utc)
+    except Exception:
+        return None
+
+
+def needs_press(corpus, manifest_path: str, shared=None, today=None, listed_before=None) -> bool:
     """Would a press produce something different from what is already there?
 
     `manifest_path` may point at either the edition's `manifest.json` or its
@@ -472,7 +490,7 @@ def needs_press(corpus, manifest_path: str, shared=None, today=None) -> bool:
                  or "")
     if not fp:
         return True
-    return fp != corpus_fingerprint(corpus) + shared_digest(shared, today)
+    return fp != corpus_fingerprint(corpus) + shared_digest(shared, today, listed_before)
 
 
 def _read_json(p: Path) -> Optional[dict]:
@@ -706,8 +724,16 @@ def main(argv=None):
                 print(f"  front pages: the share store could not be listed "
                       f"({type(exc).__name__}: {str(exc)[:120]}) — the record's own alone tonight")
         manifest_path = str(Path(out_dir) / PRESSING)
-        today = _dt.date.today()   # one day for the gate and the press alike (the cards' "a day old")
-        if not args.force and not needs_press(corpus, manifest_path, shared=shared, today=today):
+        today = _dt.date.today()   # one day for the gate and the press alike (the cards' day bits)
+        # the last pressing's moment, from the bucket: a reader's page leads
+        # the front page only once a previous press has listed it
+        listed_before = last_pressed_at(bucket, args.prefix) if bucket else None
+        if listed_before:
+            print(f"  front pages: the last pressing ran {listed_before.strftime('%Y-%m-%dT%H:%M:%SZ')} — "
+                  "a page shared before it, a day old, may lead the front page")
+        elif shared:
+            print("  front pages: the last pressing's moment could not be read — the strip waits two days by the calendar")
+        if not args.force and not needs_press(corpus, manifest_path, shared=shared, today=today, listed_before=listed_before):
             print(f"the record has not moved since the last pressing "
                   f"({corpus_fingerprint(corpus)}) — nothing to press")
             return 0
@@ -723,7 +749,7 @@ def main(argv=None):
                 print(f"  stills: seeded {seed['copied']} of {seed['listed']} from gs://{bucket}"
                       + (f" — the seed failed: {seed['error']}" if seed["error"] else ""))
         report = press(corpus, out_dir, args.version, args.base, api=args.api,
-                       stills=stills, shared=shared, today=today)
+                       stills=stills, shared=shared, today=today, listed_before=listed_before)
     finally:
         corpus.close()
 

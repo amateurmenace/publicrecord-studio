@@ -9,8 +9,8 @@ signs, because the record keeps no reader identity, so a front page is
 judged by its receipts. A steward takes a page down by moving its object out
 of the listed prefix (record/OPERATING.md §5, "the front pages"): the next
 press stops listing it, the store refuses the same bytes again, and its
-short link says the store holds nothing at that address — the reader's
-existing words, none new.
+short link says the store holds nothing at that address; the share, offered
+the same bytes again, is refused with its own sentence.
 
 Everything here is pure over the pressed planes, the stored bytes and one
 reference day (the pressing's, handed in — never the wall clock at render,
@@ -26,8 +26,9 @@ Three brakes, all derived from the store's own timestamps and no new field
 press, and nothing metering the store): pages minted before LISTED_SINCE —
 the day the short-link button began to say it lists the page — are not
 listed; at most PER_DAY pages from any one day are (a flood buries a day,
-not the store); and the front page's strip seats only a page a day old,
-so a steward's morning glance at the gallery comes first.
+not the store); and the front page's strip seats only a page a previous
+press has already listed — and that cites the record — so a steward's
+morning glance at the gallery and the press log comes first.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ from .charts import esc, n_of, still_src
 MAX_LISTED = 400          # a press lists this many of the newest shared pages (record/papers.py LIST_MAX)
 PER_DAY = 12              # …and this many from any one day
 STRIP_READERS = 1         # readers' pages on the front page's strip (board 1)
-SEASONED_DAYS = 2         # …seated only once a night's press has already listed them (two days by the calendar)
+SEASONED_DAYS = 2         # …seated only once a previous press has listed them; without the last pressing's time, two days by the calendar
 WIDE_KINDS = ("chart", "week", "threads", "strip", "names", "search")   # blocks drawn from the whole record
 WEEK_DAYS = 7
 LISTED_SINCE = _dt.date(2026, 9, 24)   # the day "⚡ short link" began to say "lists it on the front pages"
@@ -175,10 +176,50 @@ def what_of(blocks: Sequence[dict], cap: int = 5) -> str:
 
 
 def _day(iso) -> Optional[_dt.date]:
+    if isinstance(iso, _dt.datetime):
+        return iso.date()
+    if isinstance(iso, _dt.date):
+        return iso
     try:
         return _dt.datetime.fromisoformat(str(iso).replace("Z", "+00:00")).date()
     except (TypeError, ValueError):
         return None
+
+
+def _when(iso) -> Optional[_dt.datetime]:
+    """The moment a page was shared, aware (UTC when the stamp says nothing)."""
+    if isinstance(iso, _dt.datetime):
+        return iso if iso.tzinfo else iso.replace(tzinfo=_dt.timezone.utc)
+    if isinstance(iso, _dt.date):
+        return _dt.datetime(iso.year, iso.month, iso.day, tzinfo=_dt.timezone.utc)
+    try:
+        c = _dt.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return c if c.tzinfo else c.replace(tzinfo=_dt.timezone.utc)
+
+
+def seasoned_at(created, today: _dt.date, listed_before=None) -> bool:
+    """A previous press has already listed the page, and it is a day old at
+    least. With the last pressing's moment at hand (`listed_before` — the
+    bucket's pressing.json `pressed_at`, record/press.py last_pressed_at)
+    that is exactly `created` before it: a night the press skipped seats
+    nothing early, and a press re-run within the day seats nothing that
+    only that morning's press first showed. Without it (the desk, the
+    tests) two days by the calendar stand in — a page shared after one
+    morning's press is first listed by the next at age one, and must not
+    lead that same night (two reviewers' catches: the window did not
+    exist; then the calendar over-waited and collapsed on a skipped night)."""
+    d = _day(created)
+    if not d:
+        return False
+    age = (today - d).days
+    if age < 1:
+        return False
+    if listed_before is not None:
+        c = _when(created)
+        return bool(c and c < listed_before)
+    return age >= SEASONED_DAYS
 
 
 def when_words(created, today: _dt.date) -> str:
@@ -190,22 +231,21 @@ def when_words(created, today: _dt.date) -> str:
     return f"{d.strftime('%B')} {d.day}" + ("" if d.year == today.year else f", {d.year}")
 
 
-def age_bits(d: Optional[_dt.date], today: _dt.date) -> Tuple[bool, bool, bool]:
-    """A card's three day-relative facts — (this week; seasoned: a night's
-    press has already listed it, which by the calendar is two days, since a
-    page shared after one morning's press is first listed by the next at
-    age one and must not be seated by that same press; the year said:
-    when_words names it once it is not today's) — the only things about a
-    listed page that change with nobody touching the store.
+def age_bits(created, today: _dt.date, listed_before=None) -> Tuple[bool, bool, bool]:
+    """A card's three day-relative facts — (this week; seasoned: a previous
+    press has already listed it, see seasoned_at; the year said: when_words
+    names it once it is not today's) — the only things about a listed page
+    that change with nobody touching the store.
     The press's gate and the worker's key both fold them in (record/press.py
     shared_digest, web/bake.py shared_hash), so the night the strip may seat
     a page, a card leaves this week, or the year turns is a night that
     presses and reaches returning readers (a skeptic's catch: the strip
     moved behind a gate and a key that never saw a day pass)."""
+    d = _day(created)
     if not d:
         return False, False, False
     age = (today - d).days
-    return 0 <= age < WEEK_DAYS, age >= SEASONED_DAYS, d.year != today.year
+    return 0 <= age < WEEK_DAYS, seasoned_at(created, today, listed_before), d.year != today.year
 
 
 def _town_of_slug(slug: str) -> str:
@@ -236,7 +276,7 @@ def is_page(paper) -> bool:
 
 
 def card_of(paper: dict, pid: str, created, meetings_by_pid: Dict[str, dict], issues_by_slug: Dict[str, dict],
-            stills, base: str, today: _dt.date) -> Optional[dict]:
+            stills, base: str, today: _dt.date, listed_before=None) -> Optional[dict]:
     """One reader's page as a card, or None when the bytes are not a page."""
     if not is_page(paper):
         return None
@@ -268,21 +308,30 @@ def card_of(paper: dict, pid: str, created, meetings_by_pid: Dict[str, dict], is
         made.append(n_of(len(held_slugs), "issue"))
     # a page cites the record when it names a meeting or issue the pressing
     # holds, or draws on the whole of it (the roll calls, the year, the
-    # threads); a title over paragraphs alone does not
-    cites = bool(held or held_slugs or any(isinstance(b, dict) and b.get("kind") in WIDE_KINDS for b in blocks))
+    # threads) — a wide block scoped to a meeting, an issue, a person or a
+    # town this pressing lacks renders "not in this pressing" and counts for
+    # nothing (a skeptic's catch); a title over paragraphs alone does not
+    towns_held = {town_slug(str(m.get("town") or "")) for m in meetings_by_pid.values()
+                  if isinstance(m, dict) and m.get("town")}
+    def _wide(b) -> bool:
+        if not isinstance(b, dict) or b.get("kind") not in WIDE_KINDS or b.get("pid") or b.get("slug") or b.get("who"):
+            return False
+        t = str(b.get("town") or "")
+        return (not t) or (town_slug(t) in towns_held)
+    cites = bool(held or held_slugs or any(_wide(b) for b in blocks))
     d = _day(created)
-    week, seasoned, dated = age_bits(d, today)
+    week, seasoned, dated = age_bits(created, today, listed_before)
     return {"id": pid, "href": f"{base}/p?p={pid}", "title": title[:200], "kind": kind_of(blocks),
             "made": " · ".join(made), "cites": cites, "what": what_of(blocks), "when": when_words(created, today),
             "towns": towns, "town": towns[0] if len(towns) == 1 else "", "still": still, "by": "readers",
             "day": d.isoformat() if d else "",
-            # this week, a day old at least (the strip seats a page only after
-            # a night's press has already listed it in the gallery), the year said
+            # this week; seasoned (a previous press has already listed it, so
+            # the strip may seat it — seasoned_at); the year said
             "week": week, "seasoned": seasoned, "dated": dated}
 
 
 def readers_cards(shared: Optional[Sequence[dict]], meetings: Sequence[dict], issues: Sequence[dict], stills,
-                  base: str = "/app", today: Optional[_dt.date] = None) -> List[dict]:
+                  base: str = "/app", today: Optional[_dt.date] = None, listed_before=None) -> List[dict]:
     """The store's pages as cards, newest first — each parsed from its own
     canonical bytes; bytes that are not a page, whatever their shape, make
     no card. Pages minted before LISTED_SINCE are not listed; at most
@@ -303,7 +352,7 @@ def readers_cards(shared: Optional[Sequence[dict]], meetings: Sequence[dict], is
         data = row.get("data")
         try:
             doc = json.loads(data.decode("utf-8") if isinstance(data, (bytes, bytearray)) else str(data or ""))
-            card = card_of(doc, pid, row.get("created"), by_pid, by_slug, stills, base, today)
+            card = card_of(doc, pid, row.get("created"), by_pid, by_slug, stills, base, today, listed_before)
         except Exception:   # not a page, whatever its shape — no card, never a failed press
             continue
         if card:

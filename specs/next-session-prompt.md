@@ -113,18 +113,25 @@ answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
   A taken page offered again gets the share's own 410 sentence
   (`record/app.py` `TAKEN_AGAIN`) and the editor copies the full link in
   its place; the read path keeps `NO_PAPER`. (3) The moderation stance: the night in the
-  gallery is the steward's window — `seasoned` is `SEASONED_DAYS` = 2 by
-  the calendar, because a page shared after one morning's press is first
-  listed by the next at age one and would have been seated by that same
-  press (a reviewer's catch: the window did not exist); `strip_cards` seats
-  only a seasoned page that `cites` the record (a held meeting or issue, or
-  a `WIDE_KINDS` block); OPERATING §5 names the morning glance as the
-  review step. (4) The board copy stands as
+  gallery is the steward's window — `seasoned` (`gallery.seasoned_at`) is a
+  day old AND shared before the last pressing's `pressed_at`, which the
+  press reads from the bucket's pressing.json (`press.last_pressed_at`,
+  best effort; `SEASONED_DAYS` = 2 by the calendar stands in when there is
+  none), because a page shared after one morning's press is first listed by
+  the next at age one and would have been seated by that same press (a
+  reviewer's catch: the window did not exist; a skeptic's: the calendar
+  over-waited and collapsed on a skipped night); `strip_cards` seats only a
+  seasoned page that `cites` the record (a held meeting or issue, or a
+  `WIDE_KINDS` block scoped to nothing the pressing lacks); OPERATING §5
+  names the morning glance as the review step. The bits ride the gate's
+  digest and the worker's key as before. (4) The board copy stands as
   built; the boards are behind the build on the lines P1's notes list.
 - **The record's own, named**: `web/emit.py::PRESS_BY` (`&by=press`) rides
   on the three featured links; `decodePaper` reads `by`; the read page's
   `from` is `press` only for a link the stub's own `#pfeat` pressed that
-  carries no `note` (a marker anyone can type is not a byline), and the
+  carries no `note` (a marker anyone can type is not a byline; compared by
+  the anchors' `.search`, normalised as `location.search` is, so a title's
+  apostrophe matches — a skeptic's catch), and the
   kicker and `.pfrom` say the record's own, pressed nightly · no byline —
   the counts are the tape's (the labels beneath still count a model's
   parts). The codec twin strips the marker before comparing

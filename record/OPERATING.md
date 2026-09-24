@@ -567,9 +567,9 @@ Three brakes, none a new stored field: only pages minted on or after
 2026-09-24 are listed (the day the button began to say it lists the page —
 `web/gallery.py::LISTED_SINCE`; Stephen may move it); at most twelve pages
 from any one day (a flood buries a day, not the store); and the front page's
-strip seats a reader's page only once it is a day old, so the gallery — and
-the press log, which prints the newest five titles each night — comes
-first. The store moving is a reason to press: its listing is folded into
+strip seats a reader's page only once a previous press has already listed
+it (and it cites the record), so the gallery — and the press log, which
+prints the newest five titles each night — comes first. The store moving is a reason to press: its listing is folded into
 the pressing's fingerprint, so a night with no new meeting and one new
 shared page still presses, and the service worker's key carries a digest of
 the listed set, so returning readers get the new list.
@@ -591,8 +591,8 @@ not hold it again* — and the editor copies the full link in the short one's
 place), so a re-share cannot undo the move. The record keeps the bytes under `taken/` for its own account
 and serves them to no one.
 
-**The request reaches you from the page itself.** Every stored page's foot
-carries *Want this page taken down? Ask the steward* — a `mailto:` to the
+**The request reaches you from the page itself.** Every stored page
+carries, under its foot, *Want this page taken down? Ask the steward* — a `mailto:` to the
 address the record already publishes for corrections (`STEWARD_EMAIL` in
 `app.js`), subject *take down front page <id>*, the page's link in the
 body. The page says plainly that the record keeps no address for the
@@ -601,9 +601,11 @@ is gone at the next night's press — you decide, and the page promises
 nothing else. **The morning glance is the review step:** the press log
 names the newest listed titles each night, the gallery shows them the same
 night, and the front page's strip seats a reader's page only after a
-night's press has already listed it (`web/gallery.py::SEASONED_DAYS` = 2 by
-the calendar — a page shared after one morning's press is first listed by
-the next and cannot lead the same night) and only when it cites the record:
+previous press has already listed it — the press reads the last pressing's
+`pressed_at` from the bucket (`record/press.py::last_pressed_at`; the log
+says so) and seats a page shared before that moment and a day old; when the
+stamp cannot be read, `web/gallery.py::SEASONED_DAYS` = 2 by the calendar
+stands in — and only when it cites the record:
 a held meeting or issue, or a block drawn from the whole of it. That night
 is your window, and the one move above is the whole act. (The stance, the words and the reach of the
 listing threshold were Stephen's open decisions after v2.2.2; he handed

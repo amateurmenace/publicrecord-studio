@@ -138,7 +138,7 @@ class TestCards(unittest.TestCase):
         self.assertEqual(one["kind"], "One meeting")
         self.assertEqual(one["made"], "1 meeting")
         self.assertTrue(one["week"])
-        self.assertFalse(one["seasoned"])          # shared today: the gallery lists it, the strip waits a day
+        self.assertFalse(one["seasoned"])          # shared today: the gallery lists it, the strip waits for a press to have listed it
         self.assertEqual(one["when"], "September 30")
         self.assertEqual(issue["kind"], "An issue over time")
         self.assertEqual(issue["made"], "2 meetings · 1 issue")
@@ -152,7 +152,7 @@ class TestCards(unittest.TestCase):
         self.assertLess(html.index("<b>Overrides"), html.index("A reader’s front page"))   # the title leads the link's name
         for bad in ("author", "writer", "@", "cz-", "2026-09-26T"):
             self.assertNotIn(bad, html)
-        self.assertEqual(gallery.strip_cards(cards), [issue])   # the newest page that is a day old
+        self.assertEqual(gallery.strip_cards(cards), [issue])   # the newest page a previous press has listed
         # a meeting the pressing lacks is not counted among a page's makings
         c = gallery.card_of(json.loads(SHARED[0]["data"]), "a" * 16, SHARED[0]["created"], {"vid1": {"town": "T"}}, {}, {}, "/app", TODAY)
         self.assertEqual(c["made"], "1 meeting")
@@ -271,8 +271,8 @@ class TestGalleryPress(unittest.TestCase):
         home = (OUT / "index.html").read_text()
         strip = home[home.index('class="bs-frontpages"'):home.index("</section>", home.index('class="bs-frontpages"'))]
         self.assertEqual(strip.count('data-by="readers"'), 1)
-        # the strip seats the newest page that is a day old — the one shared
-        # today waits for the gallery's night (and the steward's glance)
+        # the strip seats the newest page a night's press has already listed —
+        # the one shared today waits for the gallery's night (and the steward's glance)
         self.assertIn("Overrides, watched", strip)
         self.assertNotIn("The board, in one night", strip)
         # the masthead's word points at the gallery, and the gallery marks it current
@@ -301,6 +301,10 @@ class TestGalleryPress(unittest.TestCase):
                                             "2026-09-20T00:00:00+00:00", {"vid1": {"pid": "vid1", "town": "Boston"}}, {}, {}, "/app", TODAY)
         self.assertTrue(mk([{"kind": "story", "story": "meeting", "pid": "vid1"}])["cites"])
         self.assertTrue(mk([{"kind": "chart", "chart": "votes"}])["cites"])                       # drawn from the whole record
+        self.assertTrue(mk([{"kind": "week", "town": "boston"}])["cites"])                          # scoped to a town the pressing holds
+        self.assertFalse(mk([{"kind": "week", "town": "salem"}])["cites"])                          # …or to one it lacks
+        self.assertFalse(mk([{"kind": "chart", "chart": "numbers", "pid": "gone"}])["cites"])     # a wide kind scoped to a meeting it lacks
+        self.assertFalse(mk([{"kind": "names", "who": "p-nobody"}])["cites"])                     # a person is a scope the card cannot vouch for
         self.assertFalse(mk([{"kind": "note", "text": "a shout"}])["cites"])                       # a title over paragraphs
         self.assertFalse(mk([{"kind": "story", "story": "meeting", "pid": "gone"}])["cites"])     # names nothing this pressing holds
 
@@ -336,8 +340,8 @@ class TestGalleryPress(unittest.TestCase):
                 c.close()
 
     def test_a_day_passing_moves_the_gate_and_the_key(self):
-        """The strip seats a page once it is a day old and a card leaves this
-        week after seven — bits that change with nobody touching the store —
+        """The strip seats a page once a previous press has listed it and a
+        card leaves this week after seven — bits that change with nobody touching the store —
         so the pressing's fingerprint and the worker's key carry them: the
         night they flip presses and reaches returning readers, and a quiet
         night after that is quiet again (a skeptic's catch)."""
@@ -351,6 +355,24 @@ class TestGalleryPress(unittest.TestCase):
         self.assertEqual(gallery.age_bits(TODAY + day, TODAY), (False, False, False))
         self.assertEqual(gallery.age_bits(None, TODAY), (False, False, False))
         self.assertEqual(gallery.age_bits(dt.date(2026, 12, 20), dt.date(2027, 1, 1)), (False, True, True))   # the year is said
+        # with the last pressing's moment at hand the rule is exact: listed by
+        # a previous press AND a day old — a skipped night seats nothing early,
+        # a same-day re-press seats nothing that only the morning's press showed
+        utc = dt.timezone.utc
+        press = lambda day, h=8, m=30: dt.datetime(day.year, day.month, day.day, h, m, tzinfo=utc)
+        after = "2026-09-30T10:00:00+00:00"                                             # shared after TODAY's 08:30 press
+        self.assertFalse(gallery.seasoned_at(after, TODAY, press(TODAY)))               # age 0
+        self.assertFalse(gallery.seasoned_at(after, TODAY + day, press(TODAY)))         # first listed tonight — the last press ran before it
+        self.assertTrue(gallery.seasoned_at(after, TODAY + 2 * day, press(TODAY + day)))  # last night's press listed it
+        self.assertFalse(gallery.seasoned_at(after, TODAY + 2 * day, press(TODAY)))     # a skipped night: no press has listed it yet
+        before = "2026-09-30T02:00:00+00:00"                                            # shared before TODAY's press
+        self.assertFalse(gallery.seasoned_at(before, TODAY, press(TODAY, 12)))          # a re-press the same day: a day old is still required
+        self.assertTrue(gallery.seasoned_at(before, TODAY + day, press(TODAY)))         # one night in the gallery, then the strip
+        self.assertEqual(gallery.age_bits(after, TODAY + day, press(TODAY))[1], False)
+        self.assertEqual(gallery.age_bits(after, TODAY + 2 * day, press(TODAY + day))[1], True)
+        rows = [{"id": "e" * 16, "created": after, "data": b"{}"}]
+        self.assertNotEqual(shared_digest(rows, TODAY + 2 * day, press(TODAY)),
+                            shared_digest(rows, TODAY + 2 * day, press(TODAY + day)))   # the moment a press listed it moves the gate
         self.assertNotEqual(shared_digest(SHARED, TODAY + day), shared_digest(SHARED, TODAY + 2 * day))   # a page shared TODAY turns seasoned
         self.assertEqual(shared_digest(SHARED, TODAY + 8 * day), shared_digest(SHARED, TODAY + 9 * day))   # both past every flip: quiet
         old = [{"id": "c" * 16, "created": "2026-09-20T00:00:00+00:00", "data": b"{}"}]        # before LISTED_SINCE: never listed
@@ -375,7 +397,7 @@ class TestGalleryPress(unittest.TestCase):
                       "A short link lists your page among the record’s front pages after the next nightly press, unsigned; a steward can take it down.",
                       "function bsGallery(", "nav.hidden = false;", 'window.addEventListener("hashchange", fromHash);',
                       'const take = from === "stored"', "a steward reads the ask, and a page taken down is gone at the next night’s press",
-                      'minted.includes(`${BASE}/p${location.search}`)', 'if (r.status === 410) { copyText(paperShareURL(p), said + " — full link copied instead"); return; }'):
+                      'minted.includes(location.search)', 'map(a => a.search)', 'if (r.status === 410) { copyText(paperShareURL(p), said + " — full link copied instead"); return; }'):
             self.assertIn(token, JS)
         self.assertIn("bsSpine(); bsScore(); bsYear(); bsRiver(); bsGallery();", JS)
 

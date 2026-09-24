@@ -4684,9 +4684,12 @@
       // type is not a byline: the page says "the record's own" only for a
       // link this stub itself pressed (#pfeat's cards, this pressing's) that
       // carries no writer's paragraph; any other link is one somebody shared
-      // (a review catch: the marker alone put the record's name on any URL)
-      const minted = $$("#pfeat a.pf-card").map(a => a.getAttribute("href"));
-      const isPress = st.by === "press" && minted.includes(`${BASE}/p${location.search}`)
+      // (a review catch: the marker alone put the record's name on any URL).
+      // Compared as the browser spells a query — an anchor's .search is
+      // normalised exactly as location.search is, so a title's apostrophe
+      // (%27 in the address bar, raw in the pressed href) still matches
+      const minted = $$("#pfeat a.pf-card").map(a => a.search);
+      const isPress = st.by === "press" && minted.includes(location.search)
         && !st.blocks.some(b => b.kind === "note");
       doc = normalizePaper({ title: st.title, blocks: st.blocks }); from = isPress ? "press" : "link";
     } else if ((location.search || "").length > 1) {

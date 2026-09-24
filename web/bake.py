@@ -504,7 +504,7 @@ _EXTRACTIVE_DELTA = re.compile(r"“.+?” returned.*?\. That is \d+ appearances
 # --------------------------------------------------------------------------
 
 class Bake:
-    def __init__(self, corpus, out: Path, version: str, media, stills=None, shared=None, today=None):
+    def __init__(self, corpus, out: Path, version: str, media, stills=None, shared=None, today=None, listed_before=None):
         self.c = corpus
         self.out = out
         self.version = version
@@ -517,6 +517,7 @@ class Bake:
         self.have_stills = {}      # pid -> {"poster": bool, "frames": [1, 2, 3]}
         self.shared = list(shared or [])   # the share store's rows (specs/29 P2) — the press hands them in
         self.today = today                 # the pressing's day for the front pages' words; None = today
+        self.listed_before = listed_before  # the last pressing's moment — a page shared before it has been listed (gallery.seasoned_at)
         self.shared_hash = ""              # a digest of the listed pages — the worker's key changes with the list
 
     def note(self, label, gz):
@@ -1313,7 +1314,7 @@ class Bake:
         import hashlib
         from . import gallery
         cards = gallery.readers_cards(self.shared, meetings, issues, self.have_stills, "/app",
-                                      today=self.today or _dt.date.today())
+                                      today=self.today or _dt.date.today(), listed_before=self.listed_before)
         # the listed set, digested: the service worker's cache key carries it,
         # so a page taken down (or newly listed) on a quiet week still reaches
         # returning readers (a review catch: the key knew the corpus alone) —
@@ -1349,7 +1350,7 @@ class Bake:
 
 
 def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
-         api: str = "", stills=None, shared=None, today=None) -> dict:
+         api: str = "", stills=None, shared=None, today=None, listed_before=None) -> dict:
     """Press the desk's edition. `stills` is a record.stills.Stills (the
     picture desk) or None: the desk presses no stills unless asked (a test
     bake must never touch the network), and every page that would show one
@@ -1371,7 +1372,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     out.mkdir(parents=True, exist_ok=True)
 
     corpus = Corpus(corpus_db) if corpus_db else Corpus()
-    b = Bake(corpus, out, version, media_dir, stills=stills, shared=shared, today=today)
+    b = Bake(corpus, out, version, media_dir, stills=stills, shared=shared, today=today, listed_before=listed_before)
 
     print("pressing the edition…")
     # the pictures first (specs/29 §P0.2), so every plane can say whether

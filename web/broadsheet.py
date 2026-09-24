@@ -351,7 +351,7 @@ def frontpages_section(featured: Sequence[dict], meetings: Sequence[dict], still
     cards, the same ones the gallery page lists."""
     from . import gallery
     own = gallery.own_cards(featured or [], meetings, stills, base)
-    readers = gallery.strip_cards(shared or [])   # the newest reader's page that is a day old
+    readers = gallery.strip_cards(shared or [])   # the newest reader's page a previous press has listed, and that cites the record
     cards = "".join(gallery.card_html(c) for c in own) + "".join(gallery.card_html(c) for c in readers)
     return f'''<section class="bs-frontpages" id="frontpages">
   {section_head("Front pages", "the record’s own, and readers’", "all front pages →", f"{base}/front-pages/")}
