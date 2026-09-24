@@ -439,3 +439,50 @@ class TestTwoPathsKinds(unittest.TestCase):
         doc = json.loads(c)
         self.assertEqual(doc["blocks"], blocks)
         self.assertEqual(canonical(json.loads(c)), c)
+
+class TestBroadsheetKinds(unittest.TestCase):
+    """specs/29 P1: the broadsheet's six blocks are enums and refs like every
+    kind before them — a lead names a meeting, a search box names nothing,
+    and week / threads / strip / names may name a municipality (names may
+    name one name instead). No new free text; a block that names both a town
+    and a who, an unknown key, or a ref that is not slug-shaped is refused,
+    never corrected."""
+
+    def test_the_six_kinds_store_as_refs(self):
+        from record.papers import canonical, BS_KINDS
+        blocks = [{"kind": "lead", "pid": "2YhgO14jXys"},
+                  {"kind": "week"}, {"kind": "week", "town": "brookline"},
+                  {"kind": "threads"}, {"kind": "threads", "town": "boston"},
+                  {"kind": "strip"}, {"kind": "strip", "town": "boston", "layout": "half"},
+                  {"kind": "names"}, {"kind": "names", "town": "brookline"},
+                  {"kind": "names", "who": "p-paul-warren"},
+                  {"kind": "search"}]
+        c = canonical(portable(blocks=blocks))
+        doc = json.loads(c)
+        self.assertEqual(doc["blocks"], blocks)
+        self.assertEqual(canonical(json.loads(c)), c)
+        self.assertEqual(BS_KINDS, ("lead", "week", "threads", "strip", "names", "search"))
+
+    def test_the_six_kinds_are_strict(self):
+        from record.papers import canonical, PaperError
+        bad = [
+            ({"kind": "lead"}, "exactly"),                             # a lead names a meeting
+            ({"kind": "lead", "pid": "a b"}, "not a meeting id"),
+            ({"kind": "lead", "pid": "x", "town": "boston"}, "exactly"),
+            ({"kind": "search", "q": "housing"}, "exactly"),           # a search box stores no query
+            ({"kind": "week", "town": "Brookline MA"}, "municipality slug"),
+            ({"kind": "week", "who": "p-x"}, "may carry only town"),
+            ({"kind": "strip", "town": ""}, "municipality slug"),
+            ({"kind": "threads", "n": 6}, "may carry only town"),
+            ({"kind": "names", "town": "boston", "who": "p-x"}, "not both"),
+            ({"kind": "names", "who": "Paul Warren"}, "name slug"),
+            ({"kind": "names", "who": "boston"}, "name slug"),          # a who wears its kind's letter
+            ({"kind": "names", "town": "Boston"}, "municipality slug"),   # a town is the press's lower-case slug
+            ({"kind": "strip", "town": "x" * 97}, "municipality slug"),
+            ({"kind": "names", "name": "Paul Warren"}, "may carry only town, who"),
+        ]
+        for b, why in bad:
+            with self.assertRaises(PaperError, msg=b) as cm:
+                canonical(portable(blocks=[b]))
+            self.assertIn(why, str(cm.exception), b)
+

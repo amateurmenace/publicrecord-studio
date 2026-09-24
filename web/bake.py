@@ -55,6 +55,14 @@ def nslug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-") or "none"
 
 
+def who_slug(kind: str, name: str) -> str:
+    """A name's handle in analytics.json — its kind's letter, then nslug — the
+    ref a names block carries (specs/29 P1). The reader mints the same one
+    (app.js bsWho; a node twin holds them equal) and resolves it against the
+    plane, so a shared page can never assert a name the record does not hold."""
+    return f'{"l" if kind == "places" else "o" if kind == "organizations" else "p"}-{nslug(name)[:96]}'
+
+
 def _thumb(m: dict) -> str:
     v = m.get("video_id") or ""
     return f"https://i.ytimg.com/vi/{v}/hqdefault.jpg" if v else ""
@@ -1066,6 +1074,21 @@ class Bake:
                                           "t": e.get("t", 0)})
         names = sorted((r for r in name_hits.values() if len(r["meetings"]) >= 2),
                        key=lambda r: (-len(r["meetings"]), -r["count"]))[:40]
+        # the names block's ref (specs/29 P1) — and one row per slug: two
+        # spellings that slug alike ("Kent St." / "Kent St") are one name to
+        # the reader, so they are one row here, counts summed, meetings joined
+        # (a review catch: the reader's find() reached only the first)
+        by_slug = {}
+        for r in names:
+            r["slug"] = who_slug(r["kind"], r["name"])
+            m = by_slug.get(r["slug"])
+            if m is None:
+                by_slug[r["slug"]] = r
+                continue
+            m["count"] += r["count"]
+            seen = {x["pid"] for x in m["meetings"]}
+            m["meetings"].extend(x for x in r["meetings"] if x["pid"] not in seen)
+        names = list(by_slug.values())
         doc = {"lens_order": lens_order, "lens_color": lens_color,
                "framing": fmatrix, "topics": topics, "names": names,
                "n_meetings": len(meetings)}

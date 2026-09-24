@@ -127,7 +127,8 @@ class TestScopeResolution(unittest.TestCase):
         if not node:
             self.skipTest("node not available")
         js = (REPO / "web" / "static" / "app.js").read_text()
-        fn = re.search(r"  function resolve\(ed\) \{.+?\n  \}", js, re.S)
+        # resolve, the pid scope it reads (specs/29) and the town half it hands off to
+        fn = re.search(r"  function resolve\(ed\) \{.+?\n  \}\n  const scopePids = .+?\n  function resolveTown\(ed, p\) \{.+?\n  \}", js, re.S)
         self.assertTrue(fn, "resolve() not found in the reader — did it move?")
         cases = ([{"label": l, "towns": t, "stored": s, "qs": q, "want": w, "asked": False}
                   for l, t, s, q, w in self.TABLE]
@@ -178,7 +179,8 @@ class TestScopeResolution(unittest.TestCase):
                           f"writeTown reached from {owner} — the choice must "
                           f"only be written when the reader makes one")
         # and resolve() itself is pure over (edition, location, storage)
-        fn = re.search(r"  function resolve\(ed\) \{.+?\n  \}", js, re.S).group(0)
+        # resolve, the pid scope it reads (specs/29) and the town half it hands off to
+        fn = re.search(r"  function resolve\(ed\) \{.+?\n  \}\n  const scopePids = .+?\n  function resolveTown\(ed, p\) \{.+?\n  \}", js, re.S).group(0)
         for forbidden in ("writeTown", "localStorage.setItem", "fetch("):
             self.assertNotIn(forbidden, fn,
                              f"resolve() must not {forbidden} — it is read-only")
@@ -2734,6 +2736,13 @@ class TestPaper(unittest.TestCase):
             self.lift(r"const C2_KINDS = .+?;"),
             self.lift(r"const DOC_REF = .+?;"),
             self.lift(r"const DIGEST_MAX = .+?;"),
+            self.lift(r"const BS_KINDS = .+?;"),
+            self.lift(r"const BS_SCOPED = .+?;"),
+            self.lift(r"const BS_PART = .+?;"),
+            self.lift(r"const BS_KIND_OF = .+?;"),
+            self.lift(r"const bsSlug = .+?;"),
+            self.lift(r"const bsWho = .+?;"),
+            self.lift(r"const BS_TOWN_REF = .+?;"),
             self.lift(r"const withLayout = .+?;"),
             self.lift(r"function chartRecordURL\(b\) \{.+?\n  \}"),
             self.lift(r"function normalizePaper\(p\) \{.+?\n  \}"),
@@ -3068,6 +3077,7 @@ class TestPaper(unittest.TestCase):
             self.lift(r"function chartShell\(kicker, sub, body, twin, src\) \{.+?\n  \}"),
             self.lift(r"const chartUnfetched = .+?;"),
             self.lift(r"const chartDay = .+?;"),
+            self.lift(r"  const PB = .+?;"),
             self.lift(r"function chartVotes\(plane\) \{.+?\n  \}"),
         ])
         body = "\n".join([
@@ -3079,7 +3089,7 @@ class TestPaper(unittest.TestCase):
             "  {pid:'vid1', date:'2026-03-10', t:30, motion:'c', outcome:'tabled', tally:''},",
             "]});",
             "if ((mixed.match(/<circle/g) || []).length !== 2) fail('two circles expected');",
-            "if (!/fill=\"#ffffff\" stroke=\"#052e16\"/.test(mixed)) fail('fails must stay hollow');",
+            "if (!/fill=\"#FBF9F4\" stroke=\"#B23A1D\"/.test(mixed)) fail('fails must stay hollow — card-filled, rust-stroked (specs/29)');",
             "if (!/<rect[^>]*fill-opacity=\"\\.5\"/.test(mixed)) fail('tabled must be the half-tone square');",
             "if (!mixed.includes('other outcomes')) fail('legend must name the third class');",
             "if (!mixed.includes('tabled')) fail('the exact word must ride the twin/tooltip');",
@@ -3160,13 +3170,95 @@ class TestPaper(unittest.TestCase):
     def test_the_caps_and_kinds_match_the_store(self):
         """One cap, one enum, two languages — the reader's constants must
         equal the store's or a paper the panel accepts gets a 422 at share."""
-        from record.papers import CHARTS, NOTE_MAX
+        from record.papers import CHARTS, NOTE_MAX, BS_KINDS, BS_SCOPED, canonical
         m = re.search(r"const PAPER_NOTE_MAX = (\d+);", self.JS)
         self.assertTrue(m and int(m.group(1)) == NOTE_MAX,
                         "PAPER_NOTE_MAX drifted from record.papers.NOTE_MAX")
         m = re.search(r"const PAPER_CHARTS = \[(.+?)\];", self.JS)
         self.assertEqual(tuple(re.findall(r'"(\w+)"', m.group(1))), CHARTS,
                          "PAPER_CHARTS drifted from record.papers.CHARTS")
+        for name, want in (("BS_KINDS", BS_KINDS), ("BS_SCOPED", BS_SCOPED)):
+            m = re.search(r"const %s = \[(.+?)\];" % name, self.JS)
+            self.assertEqual(tuple(re.findall(r'"(\w+)"', m.group(1))), want,
+                             f"{name} drifted from record.papers.{name}")
+        # and the store accepts exactly what the reader would send for each
+        # of the broadsheet's kinds — the portable form, straight into canonical()
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "const p = { title: 't', blocks: [",
+            "  {kind:'lead',pid:'vid1',title:'x'}, {kind:'week'}, {kind:'week',town:'brookline'},",
+            "  {kind:'threads',town:'boston'}, {kind:'strip'}, {kind:'names'}, {kind:'names',town:'boston'},",
+            "  {kind:'names',who:'p-paul-warren',name:'Paul Warren'}, {kind:'search'} ] };",
+            "console.log(JSON.stringify(portablePaper(p)));"])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        port = json.loads(r.stdout)
+        self.assertEqual(len(port["blocks"]), 9)
+        stored = json.loads(canonical(port))
+        self.assertEqual(stored["blocks"], port["blocks"], "the store rewrote what the reader sent")
+        # and every version paperV can mint is one this reader renders
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "const one = [ [{kind:'story',story:'meeting',pid:'v'}], [{kind:'note',text:'n'}],",
+            "  [{kind:'quote',pid:'v',t:1}], [{kind:'reading',pid:'v'}], [{kind:'lead',pid:'v'}], [{kind:'search'}],",
+            "  [{kind:'week'}], [{kind:'threads',town:'boston'}], [{kind:'strip'}], [{kind:'names',who:'p-x'}] ];",
+            "const vs = one.map(blocks => paperV(portablePaper({ title: '', blocks })));",
+            "console.log(JSON.stringify({ vs, ok: vs.every(v => PAPER_VS.includes(v)) }));"])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = json.loads(r.stdout)
+        self.assertEqual(got["vs"], ["1", "2", "3", "4", "5", "5", "5", "5", "5", "5"], got)
+        self.assertTrue(got["ok"], f"paperV mints a version PAPER_VS does not list: {got}")
+
+    def test_the_broadsheet_kinds_are_refs_that_travel_as_v5(self):
+        """specs/29 P1: a lead is (pid); week / threads / strip / names are
+        enums with an optional municipality slug (names: or one name's slug);
+        a search box is nothing but its kind. Each rides the link in its own
+        grammar (l.<pid> · w. k. h. p. bare or t:<town> / w:<who> · s.),
+        lifts the link to v=5, round-trips, and degrades — a mangled part
+        drops alone, never throws (decodeReel's law)."""
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "function fail(m){ console.log('FAIL', m); process.exit(1); }",
+            "const p = { title: 'bs', blocks: [",
+            "  {kind:'lead',pid:'vid1',title:'Select Board',date:'2026-03-10',town:'Brookline'},",
+            "  {kind:'week'}, {kind:'threads',town:'brookline'}, {kind:'strip',town:'Boston MA'},",
+            "  {kind:'names',who:'p-paul-warren',town:'boston',name:'Paul Warren'}, {kind:'search',q:'x'},",
+            "  {kind:'lead',pid:'bad id'}, {kind:'week',town:'a b'}, {kind:'names',who:'x y'} ] };",
+            "const n = normalizePaper(p);",
+            # a scope that is present but malformed DROPS the block — never a
+            # block that said Boston and paints every town (a review catch)
+            "if (n.blocks.length !== 5) fail('a bad lead, a bad town and a bad who drop: ' + JSON.stringify(n.blocks));",
+            "if (n.blocks[0].title !== 'Select Board') fail('the label rides the draft');",
+            "if (n.blocks[3].who !== 'p-paul-warren' || n.blocks[3].town) fail('who wins over town: ' + JSON.stringify(n.blocks[3]));",
+            "if (normalizePaper({ blocks: [{kind:'names',who:'boston'},{kind:'week',town:'Boston'},{kind:'strip',town:''}] }).blocks.length !== 1) fail('a who without its kind letter and an upper-case town drop; an empty town is no town');",
+            "const port = portablePaper(p);",
+            "if (JSON.stringify(port.blocks) !== JSON.stringify([{kind:'lead',pid:'vid1'},{kind:'week'},{kind:'threads',town:'brookline'},{kind:'names',who:'p-paul-warren'},{kind:'search'}])) fail('portable: ' + JSON.stringify(port.blocks));",
+            "const qs = encodePaperQS(p);",
+            "if (!qs.startsWith('v=5')) fail('the broadsheet kinds travel as v=5: ' + qs);",
+            # bare parts are dotless: a link ending in a bare block never ends
+            # in a period a linkifier would trim (a review catch)
+            "if (!qs.endsWith('b=l.vid1,w,k.t%3Abrookline,p.w%3Ap-paul-warren,s')) fail('grammar: ' + qs);",
+            "const d = decodePaper('?' + qs);",
+            "if (JSON.stringify(d.blocks) !== JSON.stringify(port.blocks)) fail('round trip: ' + JSON.stringify(d.blocks));",
+            "if (decodePaper('?v=5&b=w.,k.,h.,p.,s.').blocks.map(b => b.kind).join() !== 'week,threads,strip,names,search') fail('the dotted spelling of a bare part still reads');",
+            "for (const bad of ['l.', 'l.bad%20id', 'l.%E0', 's.x', 'w.x', 'w.t:', 'w.t:a%20b', 'w.t:Boston', 'w.w:p-x', 'k.q:x', 'h.t%3A', 'p.w:', 'p.w:boston', 'p.z:x', 'constructor.x', 'constructor', 'x', 'p.%E0']) {",
+            "  const dd = decodePaper('?v=5&b=' + bad + ',m.vid1');",
+            "  if (dd.blocks.length !== 1 || dd.blocks[0].kind !== 'story') fail('a mangled part must drop alone: ' + bad + ' → ' + JSON.stringify(dd.blocks));",
+            "}",
+            "const j = paperJSON(p);",
+            "if (!j.blocks[0].url.endsWith('/app/m/vid1') || j.blocks[0].title !== 'Select Board') fail('receipt lead: ' + JSON.stringify(j.blocks[0]));",
+            "if (j.blocks[3].who !== 'p-paul-warren' || j.blocks[3].town) fail('receipt names: ' + JSON.stringify(j.blocks[3]));",
+            "if (JSON.stringify(j.blocks[4]).includes('\"q\"')) fail('a search box stores no query');",
+            "if (bsSlug('Kent Street') !== 'kent-street' || bsSlug('  Ünïcode—Straße ') !== 'n-code-stra-e' || bsSlug('!!') !== 'none') fail('bsSlug: ' + bsSlug('  Ünïcode—Straße '));",
+            "if (bsWho('places', 'Kent Street') !== 'l-kent-street' || bsWho('people', 'Paul Warren') !== 'p-paul-warren' || bsWho('organizations', 'BPDA') !== 'o-bpda') fail('bsWho');",
+            "const plain = { title: 't', blocks: [{kind:'reading',pid:'vid1'}] };",
+            "if (!encodePaperQS(plain).startsWith('v=4')) fail('a paper without the broadsheet kinds stays v=4');",
+            "console.log('ok');",
+        ])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0,
+                         f"the broadsheet kinds misbehaved:\n{r.stdout}{r.stderr}")
 
     def test_featured_papers_match_the_js_codec_byte_for_byte(self):
         """specs/21 P3: the press builds featured-paper links in PYTHON
@@ -3207,6 +3299,25 @@ class TestPaper(unittest.TestCase):
                          "the Python link-builder drifted from the JS codec:\n"
                          f"{r.stdout}{r.stderr}")
 
+    def test_the_press_side_link_builder_speaks_the_broadsheet_kinds(self):
+        """specs/29 P1: `_paper_qs` (the press's twin of encodePaperQS) mints
+        the six kinds in the reader's grammar and v=5 — byte for byte — and
+        refuses a kind it does not know rather than dropping it."""
+        blocks = [{"kind": "lead", "pid": "vid1"}, {"kind": "week"}, {"kind": "threads", "town": "brookline"},
+                  {"kind": "strip"}, {"kind": "names", "who": "p-paul-warren"}, {"kind": "names", "town": "boston"},
+                  {"kind": "search"}, {"kind": "story", "story": "issue", "slug": "issue_x"}]
+        qs = emit._paper_qs("the six, pressed", blocks)
+        body = "\n".join([
+            self.PRELUDE, self.helpers(),
+            "const p = { title: 'the six, pressed', blocks: " + json.dumps(blocks) + " };",
+            "console.log(encodePaperQS(p));"])
+        r = self.node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(qs, r.stdout.strip(), "the press's link builder drifted from the reader's codec")
+        self.assertTrue(qs.startswith("v=5&"), qs)
+        with self.assertRaises(ValueError):
+            emit._paper_qs("x", [{"kind": "gallery"}])
+
     def test_a_template_writes_the_draft_and_never_overwrites_without_asking(self):
         """specs/21 P3: a template is a pre-shaped draft, and the overwrite
         rule is load-bearing — a draft that grew between paint and press
@@ -3216,10 +3327,20 @@ class TestPaper(unittest.TestCase):
         body = "\n".join([
             self.PRELUDE, self.helpers(),
             self.lift(r"  function afterAdd\(i, at, focus\) \{.+?\n  \}"),
+            self.lift(r"  const TEMPLATES = \{.+?\n  \};"),
+            self.lift(r"  const BS_MONTHS = .+?;"),
+            self.lift(r"  const bsMonthSpan = .+?; \};"),
+            self.lift(r"  const bsSlugTown = .+?; \};"),
+            self.lift(r"  const TP_MONTH = .+?;"),
+            self.lift(r"  const tpIsMonth = .+?;"),
+            self.lift(r"  const tpMonthRange = months => \{.+?\n  \};"),
+            self.lift(r"  const tpDay = d => \{.+?\n  \};"),
+            self.lift(r"  function bsTopMoments\(m, n\) \{.+?\n  \}"),
+            "const edition = async () => ({ towns: [] });",
             "let PAGE_FOCUS = null; const renderPaperNow = () => {};",
             "let saved = null, confirms = 0, confirmAnswer = false;",
             "const window = { confirm: () => { confirms++; return confirmAnswer; } };",
-            "const getJSON = async () => null;",
+            "let PLANE = null; const getJSON = async () => PLANE;",
             "let cur = { title: '', blocks: [] };",
             "const readPaper = () => normalizePaper(cur);",
             "const savePaper = p => { saved = p; return true; };",
@@ -3241,13 +3362,52 @@ class TestPaper(unittest.TestCase):
             "  saved = null;",
             "  await applyPaperTemplate('issue');",
             "  if (!saved) fail('issue template did not write');",
-            "  if (saved.title !== 'budget-override — how it moved') fail('issue title '+saved.title);",
-            # the planes are dark here (getJSON → null): the story and its
-            # numbers stand on the ref alone; reach, digest, ledger, the
-            # quotes and the reading wait for a timeline (specs/24 §2.2)
-            "  if (saved.blocks[0].slug !== 'budget-override' || saved.blocks[1].chart !== 'numbers'",
-            "      || saved.blocks[1].slug !== 'budget-override' || saved.blocks[2].kind !== 'note'",
-            "      || saved.blocks.length !== 3) fail('issue shape '+JSON.stringify(saved.blocks));",
+            "  if (saved.title !== 'budget-override — what the record said') fail('issue title '+saved.title);",
+            "  if (saved.tpl !== 'issue') fail('the draft remembers its template: ' + JSON.stringify(saved));",
+            # the planes are dark here (getJSON → null): the story stands on
+            # the ref alone as the lead; the timeline, the reel and the
+            # framing wait for a plane; the paragraphs and the search box
+            # are always the writer's (specs/29 board 6)
+            "  if (saved.blocks[0].slug !== 'budget-override' || saved.blocks[0].layout !== 'lead' || saved.blocks[1].kind !== 'note'",
+            "      || saved.blocks[2].kind !== 'search' || saved.blocks.length !== 3) fail('issue shape '+JSON.stringify(saved.blocks));",
+            # the five new templates (specs/29 board 7), planes dark: every
+            # ref stands on its own; nothing is written that a plane would
+            # have to fill; two towns need a record with two
+            "  saved = null; await applyPaperTemplate('vote', { story: 'issue', slug: 'budget-override' });",
+            "  if (!saved || saved.title !== 'budget-override — the vote and its history' || saved.tpl !== 'vote') fail('vote title ' + JSON.stringify(saved));",
+            "  if (saved.blocks.map(b => b.kind + ':' + (b.chart || '')).join() !== 'story:,chart:ledger,search:,note:') fail('vote shape ' + JSON.stringify(saved.blocks));",
+            "  saved = null; await applyPaperTemplate('person', { who: 'p-jane-doe', name: 'Jane Doe' });",
+            "  if (!saved || saved.title !== 'Jane Doe — on the record') fail('person title ' + JSON.stringify(saved));",
+            "  if (saved.blocks.map(b => b.kind).join() !== 'names,search,note' || saved.blocks[0].who !== 'p-jane-doe' || saved.blocks[0].layout !== 'lead') fail('person shape ' + JSON.stringify(saved.blocks));",
+            "  saved = null; await applyPaperTemplate('place', { who: 'l-x' });",
+            "  if (!saved || saved.blocks[0].who !== 'l-x') fail('place shape ' + JSON.stringify(saved));",
+            # a lit plane: the issue template draws the timeline, the reel of
+            # the latest three beads and the framing of the night that said it
+            # most; a vote page over a ledger the plane says is empty refuses
+            "  PLANE = { slug: 'budget-override', name: 'Budget Override', first_seen: '2026-06-16', last_seen: '2026-09-16', ledger: [], timeline: [",
+            "    { pid: 'v1', date: '2026-06-16', title: 'June', beads: [{ t: 100, text: 'a' }] },",
+            "    { pid: 'v2', date: '2026-09-16', title: 'September', beads: [{ t: 3, text: 'b' }, { t: 50, text: 'c' }] } ] };",
+            "  cur = { title: '', blocks: [] }; saved = null; await applyPaperTemplate('issue', { story: 'issue', slug: 'issue_brookline_budget-override' });",
+            "  if (!saved || saved.title !== 'Budget Override — what Brookline said, June to September') fail('lit issue title ' + JSON.stringify(saved && saved.title));",
+            "  if (saved.blocks.map(b => b.kind + ':' + (b.chart || '') + ':' + (b.layout || '')).join() !== 'story::lead,chart:reach:,note::,reel::half,chart:framing:half,search::') fail('lit issue shape ' + JSON.stringify(saved.blocks));",
+            "  if (saved.blocks[3].clips.length !== 2 || saved.blocks[3].clips[0].pid !== 'v1' || saved.blocks[3].clips[1].start !== 0 || saved.blocks[3].clips[1].end !== 43) fail('the reel is the latest beads, clipped from five seconds before to forty after, never below zero: ' + JSON.stringify(saved.blocks[3]));",
+            "  if (saved.blocks[4].pid !== 'v2') fail('the framing is the night with the most beads');",
+            "  saved = null; if (await applyPaperTemplate('vote', { story: 'issue', slug: 'budget-override' }) || saved) fail('a vote page over an empty ledger is refused');",
+            "  PLANE.ledger = [{ pid: 'v2', t: 900, motion: 'to override', outcome: 'passes' }];",
+            "  saved = null; await applyPaperTemplate('vote', { story: 'issue', slug: 'budget-override' });",
+            "  if (!saved || saved.blocks.map(b => b.kind).join() !== 'story,chart,quote,reading,search,note' || saved.blocks[2].t !== 900) fail('lit vote shape ' + JSON.stringify(saved && saved.blocks));",
+            "  PLANE = null;",
+            "  saved = null; if (await applyPaperTemplate('person', {}) || saved) fail('a person template needs a who');",
+            "  saved = null; await applyPaperTemplate('year');",
+            "  if (!saved || saved.title !== 'The year so far') fail('year title ' + JSON.stringify(saved));",
+            "  if (saved.blocks.map(b => b.kind + ':' + (b.chart || '') + ':' + (b.layout || '')).join() !== 'strip::lead,threads::,chart:votes:,names::,search::,note::') fail('year shape ' + JSON.stringify(saved.blocks));",
+            "  saved = null; if (await applyPaperTemplate('towns') || saved) fail('two towns need two towns — none here');",
+            "  saved = null; await applyPaperTemplate('towns', { a: 'Boston', b: 'Brookline' });",
+            "  if (!saved || saved.title !== 'Boston and Brookline, side by side') fail('towns title ' + JSON.stringify(saved));",
+            "  if (saved.blocks.map(b => b.kind + ':' + (b.town || '')).join() !== 'strip:boston,strip:brookline,threads:boston,threads:brookline,names:boston,names:brookline,note:') fail('towns shape ' + JSON.stringify(saved.blocks));",
+            "  if (!saved.blocks.slice(0, 6).every(b => b.layout === 'half')) fail('the pairs are halves');",
+            "  saved = null; if (await applyPaperTemplate('nope') || saved) fail('an unknown template writes nothing');",
+            "  cur = { title: '', blocks: [] };",
             # a title-only draft (named first, shaped second — the on-page
             # editor's order): the name stays, the shape arrives, no question
             "  cur = { title: 'mine', blocks: [] }; saved = null; confirmAnswer = false;",
@@ -3316,7 +3476,7 @@ class TestPaper(unittest.TestCase):
                       "if (!row) return;\n      if (!row.draggable) { e.preventDefault(); return; }",
                       "`in your paper — remove “${name}”`",
                       "`your paper — add “${name}”`",
-                      'aria-label="add here${at',
+                      'aria-label="add a block here${at',
                       'if (m === "studio") schedulePaperRender(); else renderPaperNow();'):
             self.assertIn(token, self.JS, f"{token!r} drifted — a review fold was reverted")
         # the hit list is not a live region; one short status line is
@@ -3773,7 +3933,12 @@ class TestPaper(unittest.TestCase):
                       "function addQuoteRef(", "function addDocRef(", "function addDigestRef(",
                       "function linesSearch(", "function docChooser(", "function segLines(",
                       'data-cz="pquote"',
-                      "const PAPER_VS = [\"1\", \"2\", \"3\"]"):
+                      "const PAPER_VS = [\"1\", \"2\", \"3\", \"4\", \"5\"]",
+                      # specs/29 P1: the broadsheet's kinds, their renders,
+                      # the templates table and the slug twin
+                      "const BS_KINDS = ", "function renderLead(", "function renderWeek(",
+                      "function renderThreads(", "function renderStrip(", "function renderNames(",
+                      "function renderSearchBox(", "const TEMPLATES = ", "const bsSlug = "):
             self.assertIn(token, self.JS, f"{token!r} drifted in app.js")
 
 

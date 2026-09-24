@@ -65,7 +65,9 @@ without it). **Never rebake the public edition from a local corpus.**
   CSS selector with it; `var(--focus-ring)` needs its `var(--state)`
   fallback or the ring silently dies; counted nouns go through `n_of()`.
 - CSS namespaces already minted: `cz-*` (studio), `pb-` (papers), `rt-`
-  (tray), `pf-` (featured), `.featline`, `cz-tpl*` — grep the sheet before
+  (tray), `pf-` (featured), `.featline`, `cz-tpl*` (the templates board and
+  its picker), `cz-blk`/`cz-blocks` (the block shelf), `cz-desk*` (the
+  writing desk), `cz-ed*` (the on-page editor) — grep the sheet before
   minting more. Plus `tp-`/`tq-` (the topic story, pressed and
   live), `sq-` (the search page's story + progress), `rp-` (the reel
   viewer's transport) — specs/25; `mp-` (the meeting page's cut, find,

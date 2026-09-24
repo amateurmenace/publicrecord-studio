@@ -13,6 +13,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from web import charts
+
 from tests.test_web_bake import TestBakeEdition
 
 REPO = Path(__file__).resolve().parents[1]
@@ -453,7 +455,7 @@ class TestBroadsheetTwins(unittest.TestCase):
             lift(r"  function bsMonthX\(months, width\) \{.+?\n  \}"),
             lift(r"  const bsDayShort = [^\n]+"),
             lift(r"  const bsEsc = [^\n]+"),
-            lift(r"  function bsTimeline\(rows, q, width, height\) \{.+?\n  \}"),
+            lift(r"  function bsTimeline\(rows, q, width, height, unit\) \{.+?\n  \}"),
             f"const got = bsTimeline({json.dumps(rows)}, 'budget'); const want = {json.dumps(want)};",
             "if (got !== want) { let i = 0; while (i < got.length && got[i] === want[i]) i++; fail('drift at ' + i + ': ' + got.slice(i, i + 160) + ' vs ' + want.slice(i, i + 160)); }",
             "if (bsTimeline([], 'x') !== '') fail('no rows, no picture');",
@@ -579,6 +581,70 @@ class TestTheBroadsheetPage(unittest.TestCase):
         self.assertIn("if (BS_FOLLOW) { try { BS_FOLLOW(t); }", JS)
         # the search page's story gains the timeline and the reel rows
         self.assertIn("${bsSearchExtras(d, q, idx)}", JS)
+
+
+class TestBroadsheetWriting(unittest.TestCase):
+    """specs/29 P1: the twins the writing half leans on — the name slug the
+    press stamps on analytics.json equals the one the reader mints; the
+    paper's chart palette equals the press's constants; a front page's
+    search box scopes the search page to its own meetings."""
+
+    def test_the_name_slug_twin_holds(self):
+        from web.bake import who_slug, nslug
+        names = [("people", "Paul Warren"), ("places", "Kent Street"), ("organizations", "BPDA"),
+                 ("people", "  Ünïcode—Straße "), ("places", "!!"), ("people", "O'Neil-Smith Jr."), ("places", "Route 9")]
+        body = "\n".join([lift(r"  const bsSlug = .+?;"), lift(r"  const bsWho = .+?;"),
+                          "const N = " + json.dumps(names) + ";",
+                          "console.log(JSON.stringify(N.map(([k, n]) => [bsWho(k, n), bsSlug(n)])));"])
+        r = node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = json.loads(r.stdout)
+        self.assertEqual(got, [[who_slug(k, n), nslug(n)] for k, n in names])
+        # and the pressed plane carries the slug the reader would mint
+        an = json.loads((OUT / "analytics.json").read_text())
+        slugs = [n.get("slug") for n in an.get("names") or []]
+        for n in an.get("names") or []:
+            self.assertEqual(n.get("slug"), who_slug(n["kind"], n["name"]), n)
+        self.assertEqual(len(slugs), len(set(slugs)), "two names slugged alike must be one row")
+        # and the press merges two spellings that slug alike (a review catch)
+        from web import bake as bk
+        self.assertEqual(who_slug("places", "Kent St."), who_slug("places", "Kent St"))
+        self.assertEqual(len(who_slug("places", "x" * 200)), 2 + 96)
+
+    def test_the_paper_palette_is_the_press_s(self):
+        m = re.search(r"const PB = (\{.+?\});", JS)
+        self.assertTrue(m, "PB missing from the reader")
+        pb = json.loads(re.sub(r"(\w+):", r'"\1":', m.group(1)))
+        self.assertEqual(pb, {"ink": charts.INK, "ink2": charts.INK2, "muted": charts.MUTED,
+                              "rule": charts.RULE, "rust": charts.RUST, "card": charts.CARD})
+        # the paper's own charts draw with it — none of the old deep green or slate survives
+        part2 = JS[JS.index("PART 2: SHARING"):JS.index("PART 3: the on-page editor")]
+        for old in ("#052e16", "#475569", "#e2e8f0", "#0f172a", "#ffffff"):
+            self.assertNotIn(old, part2, f"{old} still drawn in a paper's chart")
+
+    def test_a_front_page_s_search_box_scopes_the_search_page(self):
+        body = "\n".join([lift(r"  const scopePids = .+?;"),
+                          "const C = ['vid1,vid2', ' vid1 , vid1 ', 'a b,vid3', '', 'x'.repeat(129) + ',ok', Array.from({length: 70}, (_, i) => 'p' + i).join(',')];",
+                          "console.log(JSON.stringify(C.map(scopePids)));"])
+        r = node(body)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        got = json.loads(r.stdout)
+        self.assertEqual(got[0], ["vid1", "vid2"])
+        self.assertEqual(got[1], ["vid1"])                      # trimmed, deduplicated
+        self.assertEqual(got[2], ["vid3"])                      # a pid that is not one is not a scope
+        self.assertEqual(got[3], [])
+        self.assertEqual(got[4], ["ok"])                        # the ref cap holds
+        self.assertEqual(len(got[5]), 64)                       # a page's worth, no more
+        # the search page reads m=, keeps it on submit, filters the static
+        # hits by it, and says the scope out loud with a way out
+        for token in ('pids: scopePids(p.get("m"))', 'if (SCOPE.pids.length) u.searchParams.set("m", SCOPE.pids.join(","));',
+                      'return inScope(m.town || "", m.body || "") && inPids(m.pid || "");',
+                      # under a page's scope the live path steps aside: the
+                      # index counts every line, the Studio's first eighty do not
+                      'if (SCOPE.pids.length) return false;',
+                      'inScope(m.town || "", m.body || "") && inPids(m.pid)).map(',
+                      "search the whole record</a>", '<input type="hidden" name="m" value="${esc(pids.join(","))}"><input type="hidden" name="town" value="">'):
+            self.assertIn(token, JS, f"{token!r} missing — the front page's search scope drifted")
 
 
 if __name__ == "__main__":

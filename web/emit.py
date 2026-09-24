@@ -1004,6 +1004,9 @@ def _js_euc(s) -> str:
     return quote(str(s), safe="-_.!~*'()")
 
 
+_BS_PART = {"week": "w", "threads": "k", "strip": "h", "names": "p"}   # app.js BS_PART, held equal by the codec twin
+
+
 def _paper_qs(title, blocks) -> str:
     """The Python twin of app.js encodePaperQS, for the block kinds the press
     itself mints — stories and charts. (No reels: reel-shaped things demand
@@ -1027,11 +1030,25 @@ def _paper_qs(title, blocks) -> str:
         elif b["kind"] == "reading":
             parts.append("a." + _js_euc(
                 ("m:" + b["pid"]) if b.get("pid") else ("i:" + b["slug"])))
+        # specs/29 P1: the broadsheet's blocks — l.<pid>; w k h p bare, or
+        # with t:<town> / (names) w:<who>; s — the reader's own grammar
+        elif b["kind"] == "lead":
+            parts.append("l." + _js_euc(b["pid"]))
+        elif b["kind"] == "search":
+            parts.append("s")
+        elif b["kind"] in _BS_PART:
+            scope = (("w:" + b["who"]) if b.get("who") else ("t:" + b["town"]) if b.get("town") else "")
+            parts.append(_BS_PART[b["kind"]] + (("." + _js_euc(scope)) if scope else ""))
+        else:
+            # strict, like the store: a kind this builder does not know is a
+            # link it would mint wrong, never a block silently dropped
+            raise ValueError(f"_paper_qs: unknown block {b!r}")
     v4 = any(b["kind"] == "reading"
              or (b["kind"] == "chart" and (b["chart"] in ("numbers", "shape", "ledger")
                                            or (b["chart"] == "votes" and b.get("pid"))))
              for b in blocks)
-    v = "4" if v4 else "2" if any(b["kind"] in ("chart", "note") for b in blocks) else "1"
+    v = ("5" if any(b["kind"] in ("lead", "search") or b["kind"] in _BS_PART for b in blocks)
+         else "4" if v4 else "2" if any(b["kind"] in ("chart", "note") for b in blocks) else "1")
     qs = "v=" + v
     if title:
         qs += "&t=" + _js_euc(title)
@@ -1143,15 +1160,20 @@ def page_paper(manifest, base, featured=None):
   <section class="paper-page" id="paperpage">
     <a class="back" href="/app/">← the record</a>
     <h1>A paper, edited from the record</h1>
-    <p class="presslede">Everyone gets the record; an editor makes it theirs.
-      A <b>paper</b> is a front page somebody curated — the stories, reels,
-      charts, pull-quotes, filings and what-changed digests of the public
-      record they judged worth your attention, arranged, titled, and noted.
-      Every block but a note points back into the record itself: a
-      pull-quote's words are read off the meeting's own transcript, a filing
-      is the meeting's own document, and a chart or a digest is computed in
-      your browser from the record's own planes. A note is the editor's own
-      words, and it is labeled as exactly that.</p>
+    <p class="presslede">Everyone gets the record; a writer makes a front
+      page of it. A <b>front page</b> is what somebody curated — a lead
+      story, the week, the threads, how they talked, who and where, stories,
+      reels, charts, pull-quotes, filings and what-changed digests of the
+      public record they judged worth your attention, arranged, titled, and
+      written under. Every block but the writer's paragraphs points back into
+      the record itself: a pull-quote's words are read off the meeting's own
+      transcript, a filing is the meeting's own document, and every picture
+      is computed in your browser from the record's own planes. The
+      paragraphs are the writer's own words, labeled as exactly that. Eight
+      templates start one — a meeting, an issue over time, a vote and its
+      history, a person, a place, two towns side by side, the year so far,
+      or a blank broadsheet — each but the blank asking three questions the
+      writer answers.</p>
     <div class="paperbody" id="paperbody">
       <p class="hint">Reading a paper, or editing your own, needs JavaScript:
         a paper lives in the link that brought you here, or in your own
@@ -1908,7 +1930,10 @@ def page_ai(manifest, base):
             moved it, what to watch — with a timestamp beside every claim</td>
           <td>Google Gemini (Flash) — labeled <code>ai:&lt;model&gt;</code>
             beside the text on the meeting page, the front page and in a
-            paper’s reading block</td>
+            paper’s reading block — and, since v2.2.1, the writing desk’s
+            <em>a draft, if you want one</em> card, where the same pressed
+            paragraphs are offered under the model’s name and join a page
+            only when the writer adds them</td>
           <td>our pipeline, at ingest, over public transcript text</td>
           <td>the counted reading stands alone — decisions, questions, names
             and pushback drawn from the transcript by open rules; a draft cut

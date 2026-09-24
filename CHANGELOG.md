@@ -2,6 +2,88 @@
 
 ## unreleased
 
+### Writing in the same style — the studio as the board, six more blocks, five more templates — 2026-09-24 (v2.2.1)
+
+The reading half of the broadsheet shipped as v2.2.0; this release is the
+writing half (specs/29 P1, boards 6–8). Press EDIT on `/app/p` and the
+page is the board: a block shelf down the left — Lead story, Over time,
+This week, Threads, How they talked, Who and where, A reel, A quote, Roll
+calls, In numbers, Your paragraph, Search box — each a press (it joins at
+the end) or a drag into the page; the page itself in the middle, every
+block in a rust dashed frame with a pill that says what it is riding the
+top edge and ↑ ↓ × beside it, *+ add a block here* between them; and the
+writing desk on the right — the facts you can cite (a press puts one at the
+caret of the paragraph you were last in), *a draft, if you want one* (the
+record's own drafted reading of the page's lead meeting, offered under the
+name of the model that wrote it, added as a labeled block or read as
+receipts, never silently yours), and the template's three questions. The
+headline is a Fraunces field in the title row, drafted by the template and
+yours to change; beside it the one line the store keeps true: *stored: the
+title, your notes, and references to the record — nothing else*. Two acts
+sit under it: *Preview as readers see it* (the READ half of the stamp) and
+*Share as a link*. The sidebar rails itself beside the board; › brings the
+tray back.
+
+Six blocks join the store as refs and enums like every kind before them
+(`record/papers.py`): `lead` (one meeting told large — its still, its
+counted lede, the three moments that decided it), `week` (the seven days to
+the record's latest meeting, as cards with their stills, or the latest five
+when the week holds fewer than three — the front page's own rule),
+`threads` (the six widest, as small multiples), `strip` (how they talked —
+one bar per meeting in date order, its eight lens shares side by side),
+`names` (who and where — or one name, by its slug), and `search` (a box that
+searches inside the page's own meetings: the search page reads `m=` and
+says so, with the way out). The four record-wide blocks may name a
+municipality; names may name a who; both are slugs the reader mints the way
+the press does (`bsSlug` / `who_slug`, a node twin holds them equal — the
+names plane now carries its slugs), and a slug the pressing does not hold is
+said so, never drawn. Every one is computed in the reader's browser from
+the record's own planes; the link grammar grows `l.<pid> · w k h p (bare and
+dotless — a link never ends in a period a mail client would trim — or
+`.t:<town>`, and for names `.w:<who>`) · s`, a page carrying one travels as
+`v=5`, and every mangled part drops alone; a scope that is present but
+malformed drops its block rather than widening it to every town.
+
+Eight templates on the empty page (board 7), each what it draws and the
+three questions it asks; a Start opens the picker for what it is about — a
+meeting, a thread, a person, a place (from the names the record keeps
+hearing), two towns (from the pressing's own) — or writes at once. New: *A
+vote and its history*, *A person on the record*, *A place on the record*,
+*Two towns, side by side* (the same strip, threads and names, twice, as
+halves), *The year so far*. Redrawn: *An issue over time* now reads as
+board 6 — the issue as the lead with its counted lede, the timeline of the
+meetings that took it up (the reach chart is the search page's own
+town-coloured dots now), the writer's paragraphs, a reel of its latest
+three moments, how the night that said it most was framed (each lens with
+its drift), the search box; *One meeting* opens with the lead story. A
+template remembers itself in the draft (locally, never in a link) so the
+desk can ask its questions; it still never writes a word of the writer's.
+
+A shared page reads as board 6: a kicker that says what it is made of and
+that *the writer is not named, by design*, the labels (*counted by the
+record · N paragraphs by the writer · reel: N moments, cited*, and *one
+reading drafted by a model, labeled* when there is one), a foot that says
+whose each part is, and the ink door — *Make your own from the same
+receipts* — which copies the page's refs into the reader's own draft
+(asking first when a draft with blocks stands). The paper's charts wear the
+broadsheet's palette now (ink, muted, rule; the failed vote in rust) and the
+studio's tokens point at rust, so no purple survives anywhere.
+
+A shared page's counts say what they are: a mention count summed over each
+meeting's most-said names reads *at least*; a block scoped to a town shows
+no count the plane cannot rescope; the twenty decisions, twenty-four
+questions and ten moments of pushback a plane keeps read `20+`, never as
+counts; a model-named issue is labeled where it stands and in the foot.
+
+Fixed on the way: every `v=4` link the press has pressed since specs/24
+(two of the three *record's own front page* cards on the live front page)
+read as *shared from a newer version* — `PAPER_VS` had never learned "4".
+It lists every version `paperV` can mint now, and a test holds the two
+equal. Tests: the six kinds round-trip the link and the store accepts the
+reader's own portable forms; the five templates under dark planes; the
+slug and palette twins; the search scope. Reviewed the house way before it
+shipped.
+
 ### The civic broadsheet — the record as a front page, the tape as the sun, search as its spine — 2026-09-24 (v2.2.0)
 
 Stephen's verdict on the site was that it was lifeless: too much text down

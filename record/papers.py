@@ -64,6 +64,25 @@ CHARTS = ("votes", "reach", "framing", "topics",
 # block with no layout reads as it always did; any other value is refused —
 # the store holds no layout the reader would have to guess at.
 LAYOUTS = ("lead", "head", "half")
+# The broadsheet's blocks (specs/29 P1) — every one an enum or a ref, like
+# the kinds before them; the reader computes each from the record's own
+# planes at render and stores nothing it could not redraw:
+#   lead    — one meeting told large (its still, its counted lede, the
+#             moments that decided it): {"kind": "lead", "pid": …}
+#   week    — the record's latest week of meetings as cards
+#   threads — the widest threads as small multiples
+#   strip   — how they talked: one lens bar per meeting, in date order
+#   names   — who and where: the names and places the record keeps hearing,
+#             or ONE of them ("who": a name's slug from analytics.json)
+#   search  — a search box readers use over the page's own meetings
+# week, threads, strip and names may name a municipality ("town": the slug
+# the press mints from towns.json — boston, brookline); names may name a
+# town OR a who, never both. A town or a who the pressing does not hold is
+# said so by the reader ("not in this pressing"), never stored as a word
+# the record would not draw — the refs are exact-shaped (_REF) and opaque
+# here, as a pid or an issue slug is.
+BS_KINDS = ("lead", "week", "threads", "strip", "names", "search")
+BS_SCOPED = ("week", "threads", "strip", "names")
 # The C2 kinds (specs/23 C2) — refs only, every one. A pull-quote is a
 # transcript line named by (pid, t): the words are fetched from the pressed
 # tape at render, never stored. A document is a meeting's own filing named
@@ -77,6 +96,12 @@ _DOC_REF = re.compile(r"[A-Za-z0-9_:.-]{1,160}")   # a document id ("doc:budget"
 # PAPER_REF exactly. fullmatch, not match-with-$: "$" would admit a trailing
 # newline, and a strict store must not hold refs the renderer then drops.
 _REF = re.compile(r"[A-Za-z0-9_-]{1,128}")
+# a municipality's slug and a name's (specs/29 P1): exactly what the press
+# mints (web/bake.py nslug — lower-case ascii runs joined by "-", capped at
+# 96; who_slug — the kind's letter, a dash, the same), so the store never
+# holds a scope the reader could not have minted
+_TOWN_REF = re.compile(r"[a-z0-9-]{1,96}")
+_WHO_REF = re.compile(r"[plo]-[a-z0-9-]{1,96}")
 ID_RX = re.compile(r"[0-9a-f]{16}")             # a paper's content address
 
 
@@ -281,8 +306,35 @@ def _block_kind(b, i):
         if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= DIGEST_MAX:
             raise PaperError(f"{what}: a digest's window is 1 to {DIGEST_MAX} appearances")
         return {"kind": "digest", "slug": slug, "n": n}
+    if kind == "lead":
+        _exact_keys(b, {"kind", "pid"}, what)
+        return {"kind": "lead", "pid": _pid(b, what)}
+    if kind == "search":
+        _exact_keys(b, {"kind"}, what)
+        return {"kind": "search"}
+    if kind in BS_SCOPED:
+        # a municipality, when the block names one — and for names, a who;
+        # a block that names both is refused rather than guessed at
+        extra = set(b) - {"layout", "kind"}
+        allowed = {"town", "who"} if kind == "names" else {"town"}
+        if not extra <= allowed:
+            raise PaperError(f"{what}: a {kind} block may carry only "
+                             f"{', '.join(sorted(allowed))} beside its kind "
+                             f"(got {sorted(extra)})")
+        if len(extra) > 1:
+            raise PaperError(f"{what}: a names block names a town or a who, not both")
+        out = {"kind": kind}
+        for key in extra:
+            ref = b.get(key)
+            rx = _TOWN_REF if key == "town" else _WHO_REF
+            if not isinstance(ref, str) or not rx.fullmatch(ref):
+                raise PaperError(f"{what}: not a {'municipality' if key == 'town' else 'name'} slug")
+            out[key] = ref
+        return out
     raise PaperError(f"{what}: unknown kind {kind!r} — this store holds "
-                     "stories, reels, charts, notes, quotes, documents and digests")
+                     "stories, reels, charts, notes, quotes, documents, digests, "
+                     "the record's reading, and the broadsheet's blocks "
+                     f"({', '.join(BS_KINDS)})")
 
 
 def canonical(doc) -> str:

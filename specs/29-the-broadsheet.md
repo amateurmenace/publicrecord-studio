@@ -1,7 +1,8 @@
 # 29 — The civic broadsheet: the record as a front page, search as its spine, writing in the same style
 
-**Status: P0 BUILT + LIVE (2026-09-24, v2.2.0 / r47); P1 and P2 designed, not
-built.** The mockup is a design canvas:
+**Status: P0 BUILT + LIVE (2026-09-24, v2.2.0 / r47); P1 BUILT (2026-09-24,
+v2.2.1 / r48 — the studio as the board, six blocks, five templates); P2
+designed, not built.** The mockup is a design canvas:
 <https://claude.ai/artifact/HgMxn4cApHgdYqu5P1aGJy> (nine boards; private to
 Stephen until shared). This file says what the boards say, so a session can
 build without the canvas, and ends with the prompt that starts that session.
