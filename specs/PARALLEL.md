@@ -157,6 +157,15 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24, ⟦TIME⟧ — **v2.2.5 / r52 is LIVE: no one named beside an issue whom
+  the record does not already name** (tag `v2.2.5` at ⟦TAGAT⟧, the commit the
+  image was built from; the service and all six jobs on r52; the press at
+  `--version 2.2.5`). The chips of v2.2.4 named two people the record does
+  not otherwise aggregate (specs/17, officials-only); a pair holding a
+  proper name now counts only if the names plane or the roll calls already
+  show it (`web/beside.py::names_of`; the names plane is now one function,
+  `web/bake.py::names_plane`, that both surfaces read). Reviewed ⟦REVIEW⟧.
+  r52 / 2.2.5 are spent; next numbers r53 / 2.2.6.
 - 2026-09-24, 15:54Z — **v2.2.4 / r51 is LIVE: said alongside it** (specs/29
   board 6, the spec's last unbuilt line; tag `v2.2.4` at 5e2f62b, the commit
   the image was built from; the service and all six jobs on r51; the press

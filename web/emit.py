@@ -912,8 +912,10 @@ def page_issue(i, manifest, base):
     chips = _charts.beside_chips(i.get("beside") or [], [n["pid"] for n in i["timeline"]], base="/app")
     beside = (f'<section class="card pb-beside-card"><span class="tag">said alongside it — the phrases in the same breath</span>{chips}'
               f'<p class="hint">counted in every line the record filed under this issue and the line either side; '
-              f'a phrase that is only the issue’s own name, or one of its other names, is left out; '
-              f'each opens the record’s search for the phrase within the issue’s own meetings</p></section>'
+              f'its own names are left out, and so is any other name the record does not already list — a name is '
+              f'known by its capitals, so one made only of everyday words can slip through, and a phrase with a word '
+              f'the record has rarely heard is held back too; each opens the record’s search for the phrase within '
+              f'the issue’s own meetings</p></section>'
               if chips else "")
     body = f"""
   <article class="issue">

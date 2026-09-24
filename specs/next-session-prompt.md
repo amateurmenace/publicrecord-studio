@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.4, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.5, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,87 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, ⟦TIME⟧ — v2.2.5 / r52 IS LIVE: no one named beside an issue whom the record does not already name
+
+A fix to v2.2.4, found on the live planes after a session restart: two
+chips named people the record does not otherwise aggregate (specs/17's
+officials-only rule; the press cannot tell an official from a resident at
+public comment). The CHANGELOG entry says what; the shape:
+
+- **`web/beside.py::names_of(meetings, roster, plane)`** → `common`,
+  `carried`, `named`, `unshown`. Each caption line is read by `_SCAN`
+  (words, sentence enders, clause marks). Lower case (or an acronym) is
+  evidence anywhere; a Title-case word counts only when it opens neither a
+  sentence nor a caption line (`HONORIFIC`: a full stop after *Mr.*, *Dr.*,
+  *St.*… ends no sentence). A meeting votes only if its casing means
+  something: ≥ 50 % true lower case and ≥ 0.5 % mid-line capitals that no
+  rule put there (*I'm* and its kin, `CALENDAR` words and the towns do not
+  count toward the gate — a skeptic's catch) — so Boston's ALL-CAPS council
+  captions, all-lower captions and captions that capitalise only each line's
+  first word teach nothing. `common` = lower ≥ 2
+  and 4 · lower ≥ mid-line capitals, plus the towns and `CALENDAR`.
+  `carried` = the bigrams of the names plane's rows and the roll-call
+  names. `named` = pairs written Capital Capital mid-line ≥ 2 times and ≥ 4 ×
+  their lower-case count, minus `carried`, minus pairs ending in
+  `CALENDAR_HEADS` (*Memorial Day*) — a name of everyday words, a reviewer's
+  *Grace Park*. `unshown` = the bigrams of every people entity, minus
+  `carried`, minus pairs the captions write in lower case twice and at
+  least as often as in capitals (*vision zero*, filed as a person — the
+  weighing is a skeptic's catch: without it a person captioned three times
+  as a name and twice in lower case walked out). `beside(..., names=)` drops a pair in
+  `unshown` or `named`, or a pair holding a word not in `common` that is not
+  in `carried`.
+- **`web/bake.py::names_plane(meetings)`** — the names plane's rows (≥ 2
+  meetings by kind, merged by slug, the forty most met), moved verbatim out
+  of `bake_analytics`, which now calls it; `bake_issues` calls it too, with
+  `memory.votes.member_records` for the roster. One list, two readers (a
+  peer's note); a test holds `names_plane(meetings) ==
+  bake_analytics(meetings)["names"]`.
+- **The words**, on both twins (the issue page's hint, the paper block's
+  `pb-say`): *its own names are left out, and so is any other name the
+  record does not already list — a name is known by its capitals, so one
+  made only of everyday words can slip through, and a phrase with a word the
+  record has rarely heard is held back too*. The paper block's empty state
+  says a phrase holding such a name is held back, not that nothing came up
+  twice. The studio label names a meeting's reading as a reading (it read as
+  the meeting).
+- **What it cost, measured on the live record** (the published transcripts
+  rebuilt into lines, all 215 issues): 158 kept, 19 removed, 1 of the 178
+  not rebuilt from the published transcripts — eight people's names and
+  eleven places, events, legal references and mis-captions of *Brookline*
+  the record does not list. Latent costs of `named`: titles and bodies
+  written as names (*state rep*, *world war*, *community college*, *health
+  center*) are held back when the record does not list them. Dates (*july 4th*),
+  acronyms (*cpa funds*, *chapter 30a*) and program names (*complete
+  street*) stay. No name is written here or in the CHANGELOG: the record
+  does not list them, so its own paper trail does not either (a reviewer's
+  catch — the first draft did).
+- **Not changed, on purpose**: the topic story's single co-words (pressed
+  and live, `topic.cowords` ≡ the reader's twin, which must answer alike).
+  A lone word can be a name — a first name comes up beside public comment —
+  but alone it points at no one the way a first and last name do, and the
+  rule would cost the live stories *zoom* and *canva*. If a surname ever
+  reaches a pressed story, the rule goes there too, pressed and live alike.
+  A peer suggested the rule on every co-word surface; the *Who and when*
+  column is the names plane itself, so it already agrees.
+- **Tests**: ⟦TESTS⟧.
+- **Deploy**: r52 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.5`
+  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
+  tag `v2.2.5` at ⟦TAGAT⟧.
+- **Reviewed**: ⟦REVIEW⟧.
+- **Next, in order** (corrected: *housing* has been the second featured
+  word since specs/27; the phone board was built in P0, and a fresh read
+  of the front page at 375 wide against it is still worth an hour): prove
+  the listing path on production with one real shared page; the phone
+  read; the topic as a
+  paper block (a slug, a ref-only kind); a month filter on the search
+  page's list; the press job's gate read from the live pressing's
+  fingerprint; plurals beside an issue (*complete street* / *complete
+  streets*); reel thumbnails on the tray (a third-party load per clip —
+  the covenant's click-to-load line); the source-of-truth question with
+  control-z.
 
 ## 2026-09-24, 15:54Z — v2.2.4 / r51 IS LIVE: said alongside it (specs/29 board 6 — the spec is whole)
 

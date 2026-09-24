@@ -3361,11 +3361,14 @@ class TestPaper(unittest.TestCase):
             "const bsTownName = s => s; const bsWhoName = s => s;",
             self.lift(r"const blockLabel = [\s\S]*?`§ \$\{b\.title \|\| b\.pid\}`;"),
             "console.log(JSON.stringify([blockLabel({kind:'beside',slug:'issue_x',name:'Housing'}), blockLabel({kind:'beside',slug:'issue_x'}),",
-            "  blockLabel({kind:'reading',slug:'issue_x',name:'Housing'}), blockLabel({kind:'story',story:'meeting',pid:'v',title:'T'})]));"])
+            "  blockLabel({kind:'reading',slug:'issue_x',name:'Housing'}), blockLabel({kind:'story',story:'meeting',pid:'v',title:'T'}),",
+            "  blockLabel({kind:'reading',pid:'v',title:'T'})]));"])
         r = self.node(body)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         got = json.loads(r.stdout)
         self.assertEqual(got[:3], ["◇ said alongside — Housing", "◇ said alongside — issue_x", "✎ the record’s reading — Housing"])
+        self.assertEqual(got[4], "✎ the record’s reading — T")                  # a meeting's reading is not the meeting (a reviewer's catch)
+        self.assertNotEqual(got[3], got[4])
         self.assertNotIn("undefined", json.dumps(got))
 
     def test_the_press_side_link_builder_speaks_the_broadsheet_kinds(self):

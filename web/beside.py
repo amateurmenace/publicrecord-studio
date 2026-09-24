@@ -35,6 +35,134 @@ from .charts import ARTIFACTS
 TOP = 8                                 # the plane carries this many (board 6 shows seven)
 _WORD = re.compile(r"[a-z0-9']+")       # memory.issues' own token rule
 _CLAUSE = re.compile(r"[.,;:!?…—–()\[\]\"]+|\s-+\s|-{2,}")   # a phrase never crosses one of these (a hyphen inside a word is not one)
+_TOKEN = re.compile(r"[A-Za-z0-9']+")   # the same boundaries, with the caption's own casing kept
+# a caption line read for its casing: words, the marks that end a sentence,
+# and the marks that end a clause (so a pair never spans one — _CLAUSE's set)
+_SCAN = re.compile(r"[A-Za-z0-9']+|[.?!…]+|[,;:—–()\[\]\"]+|\s-+\s|-{2,}")
+# a full stop after one of these ends no sentence ("Mr. Quillon" — the name
+# after it is written with a capital mid-sentence, which is the evidence)
+HONORIFIC = frozenset("mr mrs ms mx dr st jr sr prof rev hon gov sen rep lt sgt capt col gen mt ft ave vs no".split())
+# capitalised by the calendar's rule, never a name: a deadline ("July 4th")
+# is one of the most useful things said beside an issue
+CALENDAR = frozenset("""january february march april may june july august september october november
+    december jan feb mar apr jun jul aug sep sept oct nov dec monday tuesday wednesday thursday friday
+    saturday sunday""".split())
+# a pair that ends in one of these names a day on the calendar, never a person
+# ("Memorial Day", "Heritage Month") — the named-pair rule lets it pass
+CALENDAR_HEADS = frozenset("day days week month eve".split())
+
+
+def _bigrams(seqs: Iterable[Sequence[str]]) -> set:
+    """Every contiguous pair inside a set of token sequences."""
+    return {f"{s[i]} {s[i + 1]}" for s in seqs for i in range(len(s) - 1)}
+
+
+def names_of(meetings: Iterable[dict], roster: Iterable[str] = (), plane: Iterable[dict] = ()) -> dict:
+    """What the phrases beside an issue may name (specs/17: officials-only
+    aggregation — the record never counts a private citizen's name across
+    its meetings).
+
+    `common` — the record's ordinary words, learned from its own captions:
+    a word written in lower case (or as an acronym — "CPA", "DPW" name
+    bodies and programs, never a person) at least twice, anywhere in a
+    line, and at least a quarter as often as it is capitalised mid-sentence
+    (a capital that opens a sentence is the sentence's, not the word's; a
+    full stop after "Mr." or "Dr." opens none), in the transcripts whose
+    casing carries meaning (Boston's council captions are ALL CAPS and an
+    unpunctuated auto-caption may be all lower case; neither says anything
+    about names, so neither votes); plus every town the record holds and
+    the calendar's words. A word that is not ordinary is part of a proper
+    name — a person, a place, a body.
+    `named` — the pairs the captions write Capital Capital mid-sentence at
+    least twice and four times as often as in lower case: a name even when
+    both of its words are everyday words.
+    `carried` — the pairs inside a name the record already shows: the names
+    plane (`plane`, web/bake.py names_plane — the same forty rows the "Who
+    and where" block reads) and every name the roll calls read (officials,
+    by construction).
+    `unshown` — the pairs inside any person's name the analyzer found that
+    the names plane does not show: a name made of ordinary words ("Bill
+    Green") is still a person's name when the analyzer says so."""
+    lower: Dict[str, int] = {}
+    title: Dict[str, int] = {}
+    tt: Dict[str, int] = {}      # a pair written Capital Capital mid-sentence
+    ll: Dict[str, int] = {}      # …and in lower case
+    towns: set = set()
+    people: set = set()
+    for m in meetings:
+        if not isinstance(m, dict):
+            continue
+        towns.update(_WORD.findall(str(m.get("town") or "").lower()))
+        an = m.get("analysis") if isinstance(m.get("analysis"), dict) else {}
+        ents = an.get("entities") if isinstance(an.get("entities"), dict) else {}
+        for e in (ents.get("people") or []):
+            toks = tuple(_WORD.findall(str(e.get("name") or "").lower())) if isinstance(e, dict) else ()
+            if toks:
+                people.add(toks)
+        # one meeting's casing, counted apart, and kept only if it carries meaning
+        lo: Dict[str, int] = {}
+        ti: Dict[str, int] = {}
+        mtt: Dict[str, int] = {}
+        mll: Dict[str, int] = {}
+        n = n_lower = n_mid_title = 0
+        towns_m = set(_WORD.findall(str(m.get("town") or "").lower())) | towns
+        start = True                 # the meeting opens a sentence; a caption line may continue one
+        for s in (m.get("segments") or []):
+            text = str(s.get("text") or "") if isinstance(s, dict) else ""
+            prev = None              # (word, lower-case?, title-case?, opened a sentence or a line?) — the pair's first half
+            line_first = True        # a caption line's first word may be capitalised by the captioner, not by a name
+            for mt in _SCAN.finditer(text):
+                w = mt.group(0)
+                if not (w[0].isalnum() or w[0] == "'"):
+                    if w[0] in ".?!…" and not (w == "." and prev and prev[0].lower() in HONORIFIC):
+                        start = True
+                    prev = None      # a pair never spans a mark
+                    continue
+                n += 1
+                is_lower = w.islower()
+                is_lo = is_lower or (len(w) >= 2 and w.isupper())     # an acronym is ordinary evidence too
+                is_ti = not is_lo and w[:1].isupper() and any(c.islower() for c in w[1:])
+                lw = w.lower()
+                initial = start or line_first
+                n_lower += is_lower
+                if is_lo:
+                    lo[lw] = lo.get(lw, 0) + 1                        # lower case is evidence wherever it stands
+                elif is_ti and not initial:
+                    ti[lw] = ti.get(lw, 0) + 1                        # a capital counts only mid-sentence, mid-line
+                    # …and says the casing means something only if no rule put it
+                    # there: "I'm", a month, a town are capitalised by every
+                    # captioner, even one who writes names in lower case (a skeptic's catch)
+                    if not (lw.startswith("i'") or lw in CALENDAR or lw in towns_m):
+                        n_mid_title += 1
+                if prev is not None:
+                    pair = f"{prev[0].lower()} {lw}"
+                    if prev[1] and is_lower:
+                        mll[pair] = mll.get(pair, 0) + 1
+                    elif prev[2] and is_ti and not prev[3]:
+                        mtt[pair] = mtt.get(pair, 0) + 1
+                prev = (w, is_lower, is_ti, initial)
+                start = line_first = False
+        if n and n_lower >= 0.5 * n and n_mid_title >= 0.005 * n:
+            for src, dst in ((lo, lower), (ti, title), (mtt, tt), (mll, ll)):
+                for k, v in src.items():
+                    dst[k] = dst.get(k, 0) + v
+    common = {w for w, k in lower.items() if k >= 2 and 4 * k >= title.get(w, 0)} | towns | CALENDAR
+    shown = [tuple(_WORD.findall(str(r.get("name") or "").lower())) for r in (plane or []) if isinstance(r, dict)]
+    shown += [tuple(_WORD.findall(str(nm or "").lower())) for nm in (roster or [])]
+    carried = _bigrams(shown)
+    # a pair the captions write Capital Capital mid-sentence, twice at least
+    # and four times as often as in lower case, is a name even when both its
+    # words are everyday words ("Grace Park", "Mark Hall" — a reviewer's
+    # catch); a pair they write in lower case twice is no one's name, whatever
+    # the analyzer filed it under ("vision zero" as a person)
+    named = {p for p, k in tt.items() if k >= 2 and k >= 4 * ll.get(p, 0) and p.split()[-1] not in CALENDAR_HEADS}
+    # …written in lower case at least as often as in capitals, and twice: the
+    # captions' own verdict outweighs the analyzer's filing (a skeptic's catch —
+    # without the weighing, a person captioned three times as a name and twice
+    # in lower case walked out of the backstop)
+    vouched = {p for p, k in ll.items() if k >= 2 and k >= tt.get(p, 0)}
+    return {"common": common, "carried": carried, "named": named - carried,
+            "unshown": _bigrams(people) - carried - vouched}
 
 
 def own_words(issue: dict) -> dict:
@@ -102,10 +230,14 @@ def _pairs(clause: str, own_phrases: set) -> List[str]:
 
 
 def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
-           top: int = TOP, prepared: Optional[dict] = None) -> List[dict]:
+           top: int = TOP, prepared: Optional[dict] = None, names: Optional[dict] = None) -> List[dict]:
     """[{phrase, n, meetings}] — the phrases said beside the issue, over every
     bead's line and its neighbours, each line counted once; `own` is
     own_words(issue) (a bare set of tokens is read as the name's tokens).
+    `names` is names_of(the press's meetings, the roll calls' names, the
+    names plane): with it, a pair holding a proper name counts only if the
+    record already shows that name, and a person the names plane does not
+    show never counts.
     `prepared`, when handed in, caches a meeting's sorted lines across the
     issues of one press."""
     if not isinstance(own, dict):
@@ -137,6 +269,12 @@ def beside(timeline: Sequence[dict], meetings_by_id: Dict[str, dict], own,
                     # the issue's own name said apart from itself: a pair that is one of
                     # its names, or made only of the name's words ("trust fund" alone)
                     if p in own_phrases or all(w in own_tokens for w in ws):
+                        continue
+                    # officials-only aggregation (specs/17): a proper name the
+                    # record does not already show is never counted beside an
+                    # issue — nor is any person the names plane does not show
+                    if names is not None and (p in names["unshown"] or p in names.get("named", ()) or (
+                            any(w not in names["common"] for w in ws) and p not in names["carried"])):
                         continue
                     if any(_stopish(w) or w in ARTIFACTS for w in ws) or p in ARTIFACTS:
                         continue

@@ -2,6 +2,53 @@
 
 ## unreleased
 
+### No one named beside an issue whom the record does not already name — 2026-09-24 (v2.2.5)
+
+The morning after *said alongside it* went live, two of its chips named
+people the record does not otherwise aggregate. The press cannot tell an
+official from a resident speaking at public comment, and the record's
+standing rule (specs/17: officials-only aggregation; no person pages for
+private citizens) is that it never counts a private citizen's name across
+its meetings.
+
+So the phrases beside an issue now hold back every name the press can
+recognise that the record does not already list. It learns the record's
+ordinary words from its own captions: a word written in lower case, or as an
+acronym, anywhere in a line, at least twice and at least a quarter as often
+as it is capitalised mid-sentence and mid-line (a capital that opens a
+sentence or a caption line is the captioner's, and a full stop after *Mr.*
+opens no sentence), in the transcripts whose casing means something —
+Boston's council captions are ALL CAPS, an unpunctuated caption may be all
+lower case, and a captioner who capitalises only each line's first word — or
+only the words every captioner capitalises, *I'm*, a month, a town — says
+nothing about names; none of those votes. The towns and the calendar are
+ordinary too, since a deadline like *July 4th* is one of the most useful
+things said beside an issue. A pair holding any other word holds a proper
+name; so does a pair the captions write Capital Capital mid-sentence far
+more often than in lower case, even when both its words are everyday words
+(a day on the calendar, *Memorial Day*, excepted). Either is counted only if
+the record already shows that name — in its names plane (the same forty rows
+the *Who and where* block reads, now one function both surfaces call) or its
+roll calls. And a person the analyzer found is never counted unless the names
+plane or the roll calls show them, save a pair the captions themselves write
+in lower case twice and at least as often as in capitals, which is no one's
+name whatever the analyzer filed it under.
+
+The rule knows a name by its capitals, so it can miss one made only of
+everyday words in a transcript whose casing says nothing, and it holds back
+a phrase with a word the record has rarely heard; the issue page and the
+paper's block say both, in a sentence. Measured on the live record's own
+transcripts, it keeps 158 chips and removes 19 — eight people's names, and
+eleven places, events, legal references and mis-captions the record does not
+list — with one chip of the 178 not rebuilt from the published transcripts.
+Titles and bodies written as names (*State Rep*, *Community College*) are
+held back too when the record does not list them; that is the rule's cost.
+
+The single words beside a searched word (the topic story, pressed and
+live) are unchanged. A lone word can be a name — a first name comes up
+beside public comment — but alone it points at no one the way a first and
+last name do, and the rule would cost the live stories *zoom* and *canva*.
+
 ### Said alongside it — the phrases in the same breath as an issue — 2026-09-24 (v2.2.4)
 
 The last line of specs/29 left unbuilt: board 6 gave the issue-over-time

@@ -103,6 +103,163 @@ class TestCounting(unittest.TestCase):
         self.assertEqual(beside.beside(timeline, meetings, set(), prepared=prepared), got)
 
 
+def _meeting(pid, lines, town="Brookline", people=()):
+    return {"pid": pid, "id": pid, "town": town,
+            "segments": [{"start": i * 5.0, "text": t} for i, t in enumerate(lines)],
+            "analysis": {"entities": {"people": [{"name": p, "count": 1, "t": 0} for p in people]}}}
+
+
+# a mixed-case transcript: ordinary words said in lower case, names capitalised mid-sentence
+CASED = ["Good evening. We talked about the free cash and the budget tonight.",
+         "Joe Quillon said the free cash covers the budget, and Paul Warren agreed.",
+         "The board heard from Joe Quillon again about free cash and the budget.",
+         "Paul Warren moved it, and the budget passed with free cash.",
+         "We will talk about the police budget in Brookline next week."]
+
+
+class TestNames(unittest.TestCase):
+    """Officials-only aggregation (specs/17): the phrases beside an issue name
+    no one the record does not already show — learned from the record's own
+    captions, so an ALL-CAPS council caption and an all-lower-case one are
+    covered as well as a mixed-case one."""
+
+    def test_ordinary_words_are_learned_from_captions_whose_casing_means_something(self):
+        shout = _meeting("b", ["WE HEARD FROM MARK TOLLET ABOUT THE FREE CASH.", "MARK TOLLET SPOKE AGAIN."], town="Boston")
+        hush = _meeting("c", ["mark tollet said quillon and tollet and quillon again", "tollet quillon tollet quillon"], town="Boston")
+        names = beside.names_of([_meeting("a", CASED), shout, hush])
+        for w in ("free", "cash", "budget", "brookline", "boston"):
+            self.assertIn(w, names["common"], w)                 # said in lower case twice or more — or a town the record holds
+        self.assertNotIn("police", names["common"])              # said once: too little to learn from, so it is not vouched for
+        # the calendar and acronyms are capitalised by rule, never a name; a word written in lower
+        # case at least a quarter as often as it is capitalised is ordinary ("street", not "Beacon")
+        cal = _meeting("d", ["The CPA funds are due July 4th and the CPA board meets on Monday.",
+                             "We walked Beacon Street and Harvard Street and Kent Street and Pond Street,",
+                             "and the street was closed, the street was quiet, and the CPA said so."])
+        names = beside.names_of([cal])
+        for w in ("cpa", "july", "monday", "street"):
+            self.assertIn(w, names["common"], w)
+        self.assertNotIn("beacon", names["common"])
+        # a transcript that is ALL CAPS but for a stray capitalised word never votes: its shouting is not "acronyms"
+        loud = _meeting("e", ["WE HEARD FROM MARK TOLLET ABOUT FREE CASH, Tollet said.", "MARK TOLLET AGAIN ON FREE CASH."] * 20)
+        self.assertNotIn("tollet", beside.names_of([loud])["common"])
+        self.assertNotIn("mark", beside.names_of([loud])["common"])
+        for w in ("quillon", "warren", "paul", "joe", "tollet", "mark"):
+            self.assertNotIn(w, names["common"], w)              # capitalised mid-sentence, or never heard where casing speaks
+
+    def test_a_name_the_record_does_not_show_is_never_counted(self):
+        m = _meeting("a", CASED, people=["Joe Quillon", "Paul Warren"])
+        meetings = {"a": m}
+        timeline = [{"meeting_id": "a", "pid": "a", "beads": [{"t": 5.0}, {"t": 15.0}]}]    # lines 0-4
+        free = beside.beside(timeline, meetings, set())
+        self.assertIn("joe quillon", [g["phrase"] for g in free])                          # without the rule, the name is counted
+        plane = [{"name": "Paul Warren", "kind": "people"}]                              # the names plane shows Paul Warren only
+        names = beside.names_of([m], roster=["Bernard Greene"], plane=plane)
+        got = [g["phrase"] for g in beside.beside(timeline, meetings, set(), names=names)]
+        self.assertNotIn("joe quillon", got)                                               # not shown: never counted
+        self.assertIn("paul warren", got)                                                # shown: counted
+        self.assertIn("free cash", got)                                                  # ordinary words: counted
+        # a roll-call name is an official by construction
+        names = beside.names_of([m], roster=["Joe Quillon"], plane=[])
+        got = [g["phrase"] for g in beside.beside(timeline, meetings, set(), names=names)]
+        self.assertIn("joe quillon", got); self.assertNotIn("paul warren", got)
+
+    def test_all_caps_and_a_person_made_of_ordinary_words(self):
+        # Boston's council captions are ALL CAPS: the casing says nothing, the vocabulary still does
+        shout = _meeting("b", ["WE HEARD FROM MARK TOLLET ABOUT FREE CASH.", "MARK TOLLET ON FREE CASH AGAIN.",
+                               "THANK YOU, MARK TOLLET."], town="Boston")
+        names = beside.names_of([_meeting("a", CASED), shout], plane=[])
+        got = [g["phrase"] for g in beside.beside([{"meeting_id": "b", "pid": "b", "beads": [{"t": 5.0}]}], {"b": shout}, set(), names=names)]
+        self.assertIn("free cash", got); self.assertNotIn("mark tollet", got)
+        # a person the analyzer found whose name is made of ordinary words: still a person's name
+        plain = _meeting("d", ["the free cash and bill green spoke", "bill green and the free cash again",
+                               "free cash for the budget and bill green"], people=["Bill Green"])
+        names = beside.names_of([_meeting("a", CASED + ["the bill was green and the bill passed, green again"]), plain], plane=[])
+        self.assertIn("bill", names["common"]); self.assertIn("green", names["common"])
+        got = [g["phrase"] for g in beside.beside([{"meeting_id": "d", "pid": "d", "beads": [{"t": 5.0}]}], {"d": plain}, set(), names=names)]
+        self.assertIn("free cash", got); self.assertNotIn("bill green", got)
+        # …unless the names plane shows them
+        names = beside.names_of([plain], plane=[{"name": "Bill Green", "kind": "people"}])
+        self.assertNotIn("bill green", names["unshown"])
+
+    def test_a_name_of_everyday_words_is_known_by_its_capitals(self):
+        """A reviewer's catch: "Grace Park" is two everyday words, and still a
+        name — the captions write it Capital Capital mid-sentence, twice and
+        four times as often as in lower case, so it is held back unless the
+        record lists it; while a pair the captions write in lower case is no
+        one's name, whatever the analyzer filed it under."""
+        lines = ["We thank Grace Park for her work on the free cash plan tonight.",
+                 "Then Grace Park spoke again about the free cash and the park and the grace period.",
+                 "the park was open and grace was shown, the park again and grace again"]
+        m = _meeting("g", lines, people=["Vision Zero"])
+        names = beside.names_of([m])
+        self.assertIn("grace", names["common"]); self.assertIn("park", names["common"])
+        self.assertIn("grace park", names["named"])
+        beads = [{"meeting_id": "g", "pid": "g", "beads": [{"t": 0}, {"t": 5}]}]
+        self.assertIn("grace park", [g["phrase"] for g in beside.beside(beads, {"g": m}, set())])          # counted without the rule
+        got = [g["phrase"] for g in beside.beside(beads, {"g": m}, set(), names=names)]
+        self.assertNotIn("grace park", got); self.assertIn("free cash", got)
+        self.assertNotIn("grace park", beside.names_of([m], plane=[{"name": "Grace Park", "kind": "places"}])["named"])
+        # the analyzer filed "Vision Zero" under people; the captions write it in lower case twice: no one's name
+        v = _meeting("v", lines + ["the vision zero plan and the vision zero map"], people=["Vision Zero"])
+        self.assertNotIn("vision zero", beside.names_of([v])["unshown"])
+        self.assertIn("vision zero", beside.names_of([m])["unshown"])                     # …not vouched for without it
+        # a person the analyzer found, captioned three times as a name and twice in lower case: still held back
+        hope = _meeting("h", lines + ["We heard from Hope Wood today, and then Hope Wood again, and Hope Wood once more.",
+                                      "the hope wood said and hope wood again"], people=["Hope Wood"])
+        names = beside.names_of([hope])
+        self.assertIn("hope wood", names["unshown"])
+        # a day on the calendar is never a person, even written Capital Capital
+        day = _meeting("d", lines + ["We honor Memorial Day, and Memorial Day again, the memorial and the day."])
+        self.assertNotIn("memorial day", beside.names_of([day])["named"])
+
+    def test_what_counts_as_a_capital(self):
+        """Lower case is evidence wherever it stands; a capital only
+        mid-sentence and mid-line; a full stop after "Mr." ends no sentence;
+        and a caption that capitalises only each line's first word says
+        nothing about names (a reviewer's catch: it once taught them)."""
+        c = _meeting("c", ["We will begin.", "commence construction by July 4th, the Select Board said.", "Then we commence the work,"])
+        self.assertIn("commence", beside.names_of([c])["common"])            # lower case at a line's start still counts
+        # ten capitals after "Mr." against two in lower case: not ordinary (4 × 2 < 10)
+        h = _meeting("h", ["We heard from Mr. Quillon tonight, and the budget passed."] * 10 + ["the quillon plan and the quillon map"])
+        self.assertNotIn("quillon", beside.names_of([h])["common"])
+        # capitals only at each line's start, names in lower case: the gate stays shut, nothing is learned
+        shy = _meeting("s", [f"Joe quillon said the free cash was fine {i}" for i in range(20)])
+        self.assertEqual(beside.names_of([shy])["common"] - beside.CALENDAR, {"brookline"})
+        # …nor does "I'm" mid-line, a month or a town: every captioner capitalises those (a skeptic's catch)
+        chatty = _meeting("t", [f"Joe quillon said I'm sure the free cash in Brookline was fine in July {i}" for i in range(20)])
+        self.assertEqual(beside.names_of([chatty])["common"] - beside.CALENDAR, {"brookline"})
+
+    def test_the_press_hands_the_rule_the_names_plane_and_the_roll_calls(self):
+        """The issue stage reads the same forty names the names plane shows
+        (web/bake.py names_plane) and the corpus's roll-call names: a name
+        said twice beside an issue that neither shows is never counted,
+        while ordinary phrases beside it are."""
+        from memory.store import Corpus
+        from web import bake
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); db = root / "corpus.db"
+            TestBakeEdition._seed(db)
+            c = Corpus(str(db))
+            try:
+                from record.press import _no_sidecars
+                (root / "out").mkdir()
+                b = bake.Bake(c, root / "out", "1.0.0", _no_sidecars)
+                meetings = b.bake_meetings()
+                said = ["Good evening, the free cash and Joe Quillon on the override.",
+                        "Joe Quillon said the free cash covers the override, and we agreed.",
+                        "The free cash again, with Joe Quillon, before the vote."]
+                for m in meetings:
+                    for i, s in enumerate(m["segments"]):
+                        s["text"] = said[i % 3] + " " + s["text"]
+                issues = b.bake_issues({m["id"]: m for m in meetings})
+                got = [w["phrase"] for i in issues for w in i["beside"]]
+                self.assertIn("free cash", got)
+                self.assertNotIn("joe quillon", got)
+                self.assertEqual(bake.names_plane(meetings), b.bake_analytics(meetings)["names"])   # one list, two readers
+            finally:
+                c.close()
+
+
 class TestChips(unittest.TestCase):
     def test_the_chips_link_each_phrase_into_the_issue_s_own_meetings(self):
         html = charts.beside_chips([{"phrase": "free cash", "n": 3, "meetings": 2}, {"phrase": "town's & budget", "n": 2, "meetings": 1}], ["p1", "p2"])
@@ -142,7 +299,7 @@ class TestStoreAndPlane(unittest.TestCase):
         page = emit.page_issue(doc, manifest, "https://x.org")
         self.assertIn(charts.beside_chips(doc["beside"], ["vid1"], base="/app"), page)
         self.assertIn("said alongside it — the phrases in the same breath", page)
-        self.assertIn("one of its other names, is left out", page)
+        self.assertIn("its own names are left out, and so is any other name the record does not already list — a name is known by its capitals", page)
         bare = emit.page_issue({**doc, "beside": []}, manifest, "https://x.org")
         self.assertNotIn("pb-chips", bare); self.assertNotIn("said alongside it", bare)
 

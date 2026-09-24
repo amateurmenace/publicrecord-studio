@@ -503,6 +503,47 @@ _EXTRACTIVE_DELTA = re.compile(r"“.+?” returned.*?\. That is \d+ appearances
 # the bake
 # --------------------------------------------------------------------------
 
+def names_plane(meetings) -> list:
+    """The names plane (analytics.json `names`): every name the analyzer
+    found — a person, a place, a body — in two meetings or more, one row
+    per slug, the forty most met. One function, so the phrases beside an
+    issue (web/beside.py names_of) name exactly what this plane shows
+    (specs/17: officials-only aggregation; a peer's note: the surfaces
+    that name people read one list)."""
+    # names (people/places/orgs) appearing across ≥2 meetings — officials
+    # + public bodies recur; a one-meeting mention doesn't make the record
+    name_hits = {}
+    for m in meetings:
+        ents = m["analysis"].get("entities") or {}
+        for kind in ("people", "places", "organizations"):
+            for e in (ents.get(kind) or []):
+                key = (kind, e["name"].lower())
+                r = name_hits.setdefault(key, {"name": e["name"], "kind": kind,
+                                               "count": 0, "meetings": []})
+                r["count"] += e.get("count", 0)
+                r["meetings"].append({"pid": m["pid"], "date": m["date"],
+                                      "t": e.get("t", 0)})
+    # the names block's ref (specs/29 P1) — and one row per slug, BEFORE
+    # the two-meeting filter and the cut: two spellings that slug alike
+    # ("Kent St." / "Kent St") are one name to the reader, so they are
+    # one row here, counts summed, meetings joined — and a name said once
+    # under each spelling is a name said twice (a review catch: the
+    # reader's find() reached only the first; a skeptic's: the merge ran
+    # after the sort and left the list out of order)
+    by_slug = {}
+    for r in name_hits.values():
+        r["slug"] = who_slug(r["kind"], r["name"])
+        m = by_slug.get(r["slug"])
+        if m is None:
+            by_slug[r["slug"]] = r
+            continue
+        m["count"] += r["count"]
+        seen = {x["pid"] for x in m["meetings"]}
+        m["meetings"].extend(x for x in r["meetings"] if x["pid"] not in seen)
+    return sorted((r for r in by_slug.values() if len(r["meetings"]) >= 2),
+                  key=lambda r: (-len(r["meetings"]), -r["count"]))[:40]
+
+
 class Bake:
     def __init__(self, corpus, out: Path, version: str, media, stills=None, shared=None, today=None, listed_before=None):
         self.c = corpus
@@ -729,6 +770,12 @@ class Bake:
         issues = self.c.list_issues(status="active", limit=500)
         full = []
         prepared = {}   # a meeting's sorted lines, once per press, for the phrases beside each issue
+        # what those phrases may name (specs/17, officials-only): the record's
+        # ordinary words, the names it already carries, the roll calls' names
+        from memory import votes as _votes
+        ms = list(meetings_by_id.values())
+        names = _beside.names_of(ms, [r.get("name") or "" for r in _votes.member_records(self.c, "")],
+                                 names_plane(ms))
         for it in issues:
             issue = self.c.get_issue(it["id"])
             nodes = self.c.issue_appearances(it["id"])
@@ -770,7 +817,7 @@ class Bake:
             ledger.sort(key=lambda v: (v["date"], v["t"]))
             # said alongside it (specs/29 board 6): the phrases in the same
             # breath, counted from the beads' lines — web/beside.py
-            said = _beside.beside(timeline, meetings_by_id, _beside.own_words(issue), prepared=prepared)
+            said = _beside.beside(timeline, meetings_by_id, _beside.own_words(issue), prepared=prepared, names=names)
             doc = {
                 "id": issue["id"], "slug": islug(issue["id"]),
                 "name": issue["name"], "name_origin": issue.get("name_origin", ""),
@@ -1069,38 +1116,7 @@ class Bake:
                                       "t": t.get("t", 0)})
         topics = sorted(topic_hits.values(),
                         key=lambda r: (-len(r["meetings"]), -r["count"]))[:40]
-        # names (people/places/orgs) appearing across ≥2 meetings — officials
-        # + public bodies recur; a one-meeting mention doesn't make the record
-        name_hits = {}
-        for m in meetings:
-            ents = m["analysis"].get("entities") or {}
-            for kind in ("people", "places", "organizations"):
-                for e in (ents.get(kind) or []):
-                    key = (kind, e["name"].lower())
-                    r = name_hits.setdefault(key, {"name": e["name"], "kind": kind,
-                                                   "count": 0, "meetings": []})
-                    r["count"] += e.get("count", 0)
-                    r["meetings"].append({"pid": m["pid"], "date": m["date"],
-                                          "t": e.get("t", 0)})
-        # the names block's ref (specs/29 P1) — and one row per slug, BEFORE
-        # the two-meeting filter and the cut: two spellings that slug alike
-        # ("Kent St." / "Kent St") are one name to the reader, so they are
-        # one row here, counts summed, meetings joined — and a name said once
-        # under each spelling is a name said twice (a review catch: the
-        # reader's find() reached only the first; a skeptic's: the merge ran
-        # after the sort and left the list out of order)
-        by_slug = {}
-        for r in name_hits.values():
-            r["slug"] = who_slug(r["kind"], r["name"])
-            m = by_slug.get(r["slug"])
-            if m is None:
-                by_slug[r["slug"]] = r
-                continue
-            m["count"] += r["count"]
-            seen = {x["pid"] for x in m["meetings"]}
-            m["meetings"].extend(x for x in r["meetings"] if x["pid"] not in seen)
-        names = sorted((r for r in by_slug.values() if len(r["meetings"]) >= 2),
-                       key=lambda r: (-len(r["meetings"]), -r["count"]))[:40]
+        names = names_plane(meetings)
         doc = {"lens_order": lens_order, "lens_color": lens_color,
                "framing": fmatrix, "topics": topics, "names": names,
                "n_meetings": len(meetings)}
