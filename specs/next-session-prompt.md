@@ -168,7 +168,7 @@ says what shipped; the shape, for whoever touches it next:
   `SCOPE.pids` filters `sqHits` (read off SCOPE itself, so the twins run),
   `staticSearch`, `liveSearch`; the submit keeps `m=`; `#sq-scoped` says the
   scope with the way out; the widen button clears it.
-- **Tests**: {N_TESTS}. New: the six kinds round-trip and degrade; the
+- **Tests**: 859 (110 PG-backed skip without a DSN). New: the six kinds round-trip and degrade; the
   store accepts the reader's forms; every version paperV mints is readable;
   the five templates under dark planes and with two towns; the slug and
   palette twins; the search scope (`scopePids`, the pins). The resolver's
@@ -176,7 +176,15 @@ says what shipped; the shape, for whoever touches it next:
 - **Deploy**: r48 on the service ({REV}) and all six jobs; the press at
   `--version 2.2.1` ({PRESS}); Pages {PAGES}; `sw.js` key `{SWKEY}`; tag
   `v2.2.1` at {TAG}.
-- **Reviewed**: {REVIEW}.
+- **Reviewed**: four lenses (the store and codec; the reader's renders and
+  editor; the boards, CSS and accessibility; editorial honesty and the
+  covenant) — 59 findings, 55 folded, four noted; then two skeptics on the
+  folds (five and ten regressions, all folded: a bare part that lost its
+  layout index, a scoped search said to be a Studio outage, the desk adding
+  its paragraph through a railed panel, a scroll trap in the collapsed
+  column, dead print rules, the names merged after the cut); then a third
+  on the second folds (five, folded: the search box's promise on pages that
+  cite no meeting, a scoped note that outlived its scope).
 - **Notes for P2 and after**: the read page's kicker says *shared as a link
   · the writer is not named* for the record's own pressed pages too — the
   featured links carry no press marker; the gallery (P2) should seat the

@@ -1365,8 +1365,9 @@ table.twin a{color:var(--accent)}
    see them, and a page with JS off never enters a mode at all.
 
    The studio's tokens point at the paper's own rust (#B23A1D — the one
-   colour of writing, specs/29); a guard test (tests/test_web_bake.py)
-   still forbids the retired purples everywhere: rust for surfaces and
+   colour of writing, specs/29); the retired purples, should they return,
+   are admitted by the guard test (tests/test_web_bake.py) only under
+   html.cz-m-studio and never in :root: rust for surfaces and
    borders — and, since specs/29, rust (#B23A1D) for both: the one colour of
    writing on the broadsheet. No fuchsia, ever.
    Flat vector throughout — the quiet properties take no drop shadow (branding.md),
@@ -1821,7 +1822,7 @@ html.cz-m-studio .cz-edtop .cz-edtitle:focus{border-color:var(--rust)}
 html.cz-m-studio .cz-edtop .cz-edtitle::placeholder{font-weight:400;color:var(--ink-2)}
 html.cz-m-studio .cz-tplmore,html.cz-m-studio .cz-edtop>.cz-edtpl{grid-column:1;min-width:0}
 html.cz-m-studio .cz-tplmore[open]{grid-column:1/-1}
-html.cz-m-studio .cz-tplmore[open]~.cz-edtitle,html.cz-m-studio .cz-tplmore[open]~.cz-edpill-head{grid-column:1/3}
+@media (min-width:1241px){html.cz-m-studio .cz-tplmore[open]~.cz-edtitle,html.cz-m-studio .cz-tplmore[open]~.cz-edpill-head{grid-column:1/3}}
 html.cz-m-studio .cz-tplmore summary{list-style:none;cursor:pointer}
 html.cz-m-studio .cz-tplmore summary::-webkit-details-marker{display:none}
 html.cz-m-studio .cz-edtpl{font-family:var(--font-mono);font-size:12px;color:var(--ink-2);white-space:nowrap}

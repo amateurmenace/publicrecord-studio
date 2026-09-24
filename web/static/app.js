@@ -4171,11 +4171,12 @@
     const p = readPaper();
     const i = insertBlock(p, { kind: "note", text: "" }, at);
     if (i < 0) {
-      toast("your paper is full — a paper holds " + PAPER_MAX_BLOCKS + " blocks"); return; }
+      toast("your paper is full — a paper holds " + PAPER_MAX_BLOCKS + " blocks"); return -1; }
     if (!savePaper(p)) {
-      toast("this browser blocks storage — your paper can’t be kept here"); return; }
+      toast("this browser blocks storage — your paper can’t be kept here"); return -1; }
     // focus lands in the fresh field — the panel's, or the page's own (A3)
     afterAdd(i, at, { act: "note", i });
+    return i;   // the index it landed at, or -1 — a caller's toast must not outrun a refusal
   }
   /* a chart joins as an enum + a ref; the label that rides along comes from
      the plane the open page already fetched (or one honest fetch), so the
@@ -5464,7 +5465,7 @@
       <span class="kicker" id="pb-search-k${(aux.searchN = (aux.searchN || 0) + 1)}">search inside this front page’s meetings</span>
       <span class="pb-searchrow"><input name="q" type="search" autocomplete="off" aria-labelledby="pb-search-k${aux.searchN}" placeholder="${n ? `a word said in ${n === 1 ? "this meeting" : `these ${bsNumberWords(n)} meetings`}` : "a word said on the record"}">
         ${n ? `<input type="hidden" name="m" value="${esc(pids.join(","))}"><input type="hidden" name="town" value="">` : ""}<button type="submit" class="btn">Find</button></span>
-      <span class="pb-chartsrc">${n ? (all.length > n ? `the first ${n} of ${nOf(all.length, "meeting", "meetings")} this page cites` : `${nOf(n, "meeting", "meetings")} this page cites`) : "the whole record"} · searched from the edition’s own index, in your browser — a page’s scope never reaches the record’s server</span>
+      <span class="pb-chartsrc">${n ? (all.length > n ? `the first ${n} of ${nOf(all.length, "meeting", "meetings")} this page cites` : `${nOf(n, "meeting", "meetings")} this page cites`) : "the whole record"} · ${n ? "searched from the edition’s own index, in your browser — a page’s scope never reaches the record’s server" : "searched from the edition’s own index; when the record’s server answers, it sees the words you typed and nothing about you"}</span>
     </form>`;
   }
   /* ---- the chart blocks (specs/21 P2) --------------------------------------
@@ -6261,7 +6262,7 @@
   function focusAsk(i) {
     const el = $("#paperbody"); if (!el) return;
     const tas = $$(".cz-ednote", el);
-    if (!tas.length) { addNoteToPaper(readPaper().blocks.length); toast("a paragraph added — press the question again to make it the prompt"); return; }
+    if (!tas.length) { if (addNoteToPaper(readPaper().blocks.length) >= 0) toast("a paragraph added — press the question again to make it the prompt"); return; }
     const ta = tas.find(t => !t.value.trim()) || tas[tas.length - 1];
     const asks = ED_ASKS.length ? ED_ASKS : DESK_PROMPTS;
     if (asks[i]) ta.placeholder = `${asks[i]} — your own words`;
@@ -6271,7 +6272,7 @@
     const el = $("#paperbody"); if (!el) return;
     const tas = $$(".cz-ednote", el);
     const ta = tas.find(t => +t.dataset.i === DESK_NOTE) || tas.find(t => !t.value.trim()) || tas[tas.length - 1];
-    if (!ta) { addNoteToPaper(readPaper().blocks.length); toast("a paragraph added — press the fact again to cite it there"); return; }
+    if (!ta) { if (addNoteToPaper(readPaper().blocks.length) >= 0) toast("a paragraph added — press the fact again to cite it there"); return; }
     const text = btn.dataset.czfact || "", s = ta.selectionStart, e = ta.selectionEnd;
     const before = ta.value.slice(0, s), after = ta.value.slice(e);
     const ins = (before && !/\s$/.test(before) ? " " : "") + text + (after && !/^\s/.test(after) ? " " : "");
@@ -7554,7 +7555,9 @@
     toast(added ? `${tpN(added, "clip")} on your tray${of} — ${next.length} in all; open the studio to re-cut, or ▶ play` : "every one of these was on your tray already");
   }
 
+  let SQ_NOTE0 = null;   // the pressed search note, to restore when a front page's scope is widened
   async function search() {
+    SQ_NOTE0 = ($("#search-note") || {}).textContent;
     // resolve the scope here rather than trusting initScope to have landed
     // first — both await the same fetch, and a search that silently ignored
     // the reader's town would be the worst of the two failures
@@ -7890,6 +7893,7 @@
         if (ts) ts.value = ""; if (bs) bs.value = "";
         SCOPE = { ...SCOPE, town: "", body: "", pids: [] };
         const sc = $("#sq-scoped"); if (sc) sc.remove();
+        if (SQ_NOTE0 != null) saySearchIsStatic(SQ_NOTE0);   // the scoped sentence must not outlive the scope
         runSearch(q);
       };
       return;
