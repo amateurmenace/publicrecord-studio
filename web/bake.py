@@ -504,7 +504,7 @@ _EXTRACTIVE_DELTA = re.compile(r"“.+?” returned.*?\. That is \d+ appearances
 # --------------------------------------------------------------------------
 
 class Bake:
-    def __init__(self, corpus, out: Path, version: str, media, stills=None):
+    def __init__(self, corpus, out: Path, version: str, media, stills=None, shared=None, today=None):
         self.c = corpus
         self.out = out
         self.version = version
@@ -515,6 +515,9 @@ class Bake:
         # every page that would show one shows the town's colour instead
         self.stills = stills
         self.have_stills = {}      # pid -> {"poster": bool, "frames": [1, 2, 3]}
+        self.shared = list(shared or [])   # the share store's rows (specs/29 P2) — the press hands them in
+        self.today = today                 # the pressing's day for the front pages' words; None = today
+        self.shared_hash = ""              # a digest of the listed pages — the worker's key changes with the list
 
     def note(self, label, gz):
         self.budgets.append((label, gz))
@@ -1286,6 +1289,7 @@ class Bake:
         manifest = {
             "schema": SCHEMA_VERSION, "version": self.version,
             "corpus_hash": h.hexdigest()[:16], "edition_date": edition_date,
+            "shared_hash": self.shared_hash,
             "counts": stats["counts"],
         }
         # Only when there is one, so a desk pressing's manifest is byte-for-byte
@@ -1298,6 +1302,28 @@ class Bake:
         return manifest
 
     # -- report -----------------------------------------------------------
+    # -- the front pages (specs/29 P2): readers' shared pages as cards ------
+    def bake_frontpages(self, meetings, issues):
+        """The share store's pages as cards (web/gallery.py) — the press
+        hands the store's rows in (`shared`); the desk bake has none and
+        presses the record's own alone. Returns the readers' cards, newest
+        first; a stored page that is not a page makes no card."""
+        import datetime as _dt
+        import hashlib
+        from . import gallery
+        cards = gallery.readers_cards(self.shared, meetings, issues, self.have_stills, "/app",
+                                      today=self.today or _dt.date.today())
+        # the listed set, digested: the service worker's cache key carries it,
+        # so a page taken down (or newly listed) on a quiet week still reaches
+        # returning readers (a review catch: the key knew the corpus alone)
+        self.shared_hash = hashlib.sha256(",".join(c["id"] for c in cards).encode()).hexdigest()[:8] if cards else ""
+        if self.shared:
+            print(f"  front pages: {len(cards)} of {len(self.shared)} shared page(s) listed")
+            # the steward's morning glance is the review step — the newest, by title
+            for c in cards[:5]:
+                print(f"    · {c['title'][:80]} — {c['kind'].lower()}, shared {c['when'] or 'on an unknown day'}")
+        return cards
+
     def report(self):
         total = sum(gz for _, gz in self.budgets)
         biggest = max(self.budgets, key=lambda kv: kv[1]) if self.budgets else ("", 0)
@@ -1318,7 +1344,7 @@ class Bake:
 
 
 def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
-         api: str = "", stills=None) -> dict:
+         api: str = "", stills=None, shared=None, today=None) -> dict:
     """Press the desk's edition. `stills` is a record.stills.Stills (the
     picture desk) or None: the desk presses no stills unless asked (a test
     bake must never touch the network), and every page that would show one
@@ -1340,7 +1366,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     out.mkdir(parents=True, exist_ok=True)
 
     corpus = Corpus(corpus_db) if corpus_db else Corpus()
-    b = Bake(corpus, out, version, media_dir, stills=stills)
+    b = Bake(corpus, out, version, media_dir, stills=stills, shared=shared, today=today)
 
     print("pressing the edition…")
     # the pictures first (specs/29 §P0.2), so every plane can say whether
@@ -1358,6 +1384,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     analytics = b.bake_analytics(meetings)
     topics = b.bake_topics(meetings)
     graph = b.bake_graph(issues)
+    frontpages = b.bake_frontpages(meetings, issues)
     b.bake_urls(meetings)
     idx = b.bake_search(meetings)
     b.bake_feeds(meetings, issues, stats, site_base)
@@ -1368,7 +1395,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
                     towns=towns, tombstones=tombstones, kits=kits, topics=topics,
-                    stills=b.have_stills)
+                    stills=b.have_stills, frontpages=frontpages)
 
     if stills:
         print(f"  stills: {len(b.have_stills)} meeting(s) with pictures — {stills.note()}")

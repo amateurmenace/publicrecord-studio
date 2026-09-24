@@ -2,6 +2,36 @@
 
 ## unreleased
 
+### The front pages, listed — the gallery — 2026-09-24 (v2.2.2)
+
+Board 9, the last of specs/29's three deploys. The record presses its own
+front pages every night; readers press theirs whenever they like and share
+them as links — and a short link was always a share, so the press now lists
+what the share store holds beside the record's own. `/app/front-pages/` is
+the gallery: one card design for both kinds — the first still, whose page
+it is (*The record's front page* · *A reader's front page*), the title,
+what it is made of (*made from 3 meetings · 1 issue · an issue, a timeline,
+a reel of 2 clips, 1 paragraph*), and when (*pressed nightly* · *shared as a
+link · 4 days ago · no name, by design*). Nobody signs, because the record
+keeps no reader identity; a front page is judged by its receipts. The
+filters — Everything · The record's own · Readers' · each town · This week
+· Issues over time · One meeting — are anchors the reader's script narrows
+the grid by; with the script off every card stands. The front page's strip
+seats the newest reader's page beside the record's own and points at the
+gallery; the *Yours* door stands in both.
+
+The press reads the store's `p/` prefix (the newest four hundred, their
+canonical bytes parsed the way the reader parses a link — a stored blob
+that is not a page makes no card, never a failed press) and says in its
+log how many it listed, or that the store could not be listed tonight and
+the record's own stand alone. A page's kind is the reader's own judgement
+(`web/gallery.py::kind_of` ≡ `bsMadeFrom`; a node twin holds them equal).
+Taking a page down stays the steward's act and is one move — the object
+out of `p/` into `taken/` (`record/OPERATING.md` §5): the next press drops
+the card, the short link answers with the reader's existing sentence, and
+no new words were written for it. The editor says what the short link now
+does, in the panel, the share row and the desk's covenant line.
+
 ### Writing in the same style — the studio as the board, six more blocks, five more templates — 2026-09-24 (v2.2.1)
 
 The reading half of the broadsheet shipped as v2.2.0; this release is the

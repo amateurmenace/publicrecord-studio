@@ -126,7 +126,7 @@ NAV = [("home", "Read the record", "/app/"),
        ("search", "A word over time", "/app/s"),
        ("officials", "The votes", "/app/officials"),
        ("graph", "Threads", "/app/graph"),
-       ("paper", "Front pages", "/app/p"),
+       ("paper", "Front pages", "/app/front-pages/"),
        ("glossary", "The glossary", "/app/glossary/")]
 WRITE = ("write", "Write your own", "/app/p#edit")
 
@@ -343,28 +343,19 @@ def river_section(meetings: Sequence[dict], analytics: dict, base: str = "/app")
 </section>'''
 
 
-def frontpages_section(featured: Sequence[dict], meetings: Sequence[dict], stills: Optional[dict], base: str = "/app") -> str:
+def frontpages_section(featured: Sequence[dict], meetings: Sequence[dict], stills: Optional[dict], base: str = "/app",
+                       shared: Optional[Sequence[dict]] = None) -> str:
     """The front pages the press built (specs/21 P3), as cards with a still
-    where the paper is one meeting's — and the ink door into writing. P2
-    seats readers' shared pages beside them."""
-    by_pid = {str(m.get("pid")): m for m in meetings}
-    cards = []
-    for f in (featured or []):
-        pid = str(f.get("pid") or "")
-        m = by_pid.get(pid)
-        town = str(f.get("town") or (m.get("town") if m else "") or "")
-        src = still_src(stills, pid, 0, base) if pid else ""
-        pic = (f'<img src="{esc(src)}" alt="" loading="lazy" width="480" height="270">' if src
-               else f'<span class="bs-nostill" style="background:{charts.town_light(town) if town else charts.RULE}"></span>')
-        cards.append(f'<a class="bs-fpcard" href="{base}/p?{esc(f["qs"])}" style="--town:{town_color(town) if town else charts.INK}">{pic}'
-                     f'<span class="bs-fpbody"><span class="bs-fpkick">The record’s front page</span><b>{esc(f["title"])}</b>'
-                     f'<span class="bs-fpsub">{esc(f["sub"])}</span><span class="bs-fpfoot">pressed nightly</span></span></a>')
-    door = (f'<a class="bs-fpdoor" href="{base}/p#edit"><span class="bs-fpkick">Yours</span><b>Write your own front page</b>'
-            f'<span>The record draws the charts and the reel and drafts a labeled reading; you write what it means. No account — your page lives in the link.</span>'
-            f'<span class="bs-fpgo">Start from a template →</span></a>')
+    where the paper is one meeting's, the newest reader's page beside them
+    (specs/29 P2), and the ink door into writing — web/gallery.py makes the
+    cards, the same ones the gallery page lists."""
+    from . import gallery
+    own = gallery.own_cards(featured or [], meetings, stills, base)
+    readers = gallery.strip_cards(shared or [])   # the newest reader's page that is a day old
+    cards = "".join(gallery.card_html(c) for c in own) + "".join(gallery.card_html(c) for c in readers)
     return f'''<section class="bs-frontpages" id="frontpages">
-  {section_head("Front pages", "the record’s own, and readers’", "all front pages →", f"{base}/p")}
-  <div class="bs-fpgrid">{"".join(cards)}{door}</div>
+  {section_head("Front pages", "the record’s own, and readers’", "all front pages →", f"{base}/front-pages/")}
+  <div class="bs-fpgrid">{cards}{gallery.door_html(base)}</div>
 </section>'''
 
 
@@ -476,7 +467,7 @@ def tell_section(lead: Optional[dict], stats: dict, base: str = "/app") -> str:
 def page_body(meetings: Sequence[dict], issues: Sequence[dict], stats: dict, base: str = "/app",
               featured: Optional[Sequence[dict]] = None, analytics: Optional[dict] = None,
               topics: Optional[Sequence[dict]] = None, stills: Optional[dict] = None,
-              bodies_html: str = "") -> str:
+              bodies_html: str = "", shared: Optional[Sequence[dict]] = None) -> str:
     """The front page's body, in the order of board 1 — the masthead and the
     spine are the shell's (emit.masthead), the footer the shell's too."""
     ms = sorted(meetings, key=lambda m: (str(m.get("date") or ""), str(m.get("pid"))), reverse=True)
@@ -494,7 +485,7 @@ def page_body(meetings: Sequence[dict], issues: Sequence[dict], stats: dict, bas
     parts.append(year_section(meetings, votes, analytics or {}, stills, base))
     parts.append(columns_section(meetings, analytics or {}, issues, stills, base))
     parts.append(river_section(meetings, analytics or {}, base))
-    parts.append(frontpages_section(featured or [], meetings, stills, base))
+    parts.append(frontpages_section(featured or [], meetings, stills, base, shared=shared))
     parts.append(week_section(meetings, stills, bodies_html, base))
     parts.append(threads_section(analytics or {}, issues, topics or [], meetings, base, stats=stats))
     parts.append(tell_section(lead, stats, base))

@@ -35,6 +35,7 @@ and the address goes honestly 404.
 from __future__ import annotations
 
 import hashlib
+import datetime as _dt
 import json
 import math
 import re
@@ -103,6 +104,7 @@ _REF = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _TOWN_REF = re.compile(r"[a-z0-9-]{1,96}")
 _WHO_REF = re.compile(r"[plo]-[a-z0-9-]{1,96}")
 ID_RX = re.compile(r"[0-9a-f]{16}")             # a paper's content address
+LIST_MAX = 400                                  # the newest pages a press lists (web/gallery.py MAX_LISTED)
 
 
 class PaperError(ValueError):
@@ -391,12 +393,27 @@ class MemPapers:
 
     def __init__(self):
         self._d = {}
+        self._when = {}
+        self.taken = set()   # ids a steward took down — the bucket's taken/ prefix
 
     def put_new(self, pid: str, data: bytes) -> None:
-        self._d.setdefault(pid, data)
+        if pid in self.taken:
+            return          # taken down stays down: the same bytes do not come back
+        if pid not in self._d:
+            self._d[pid] = data
+            # a creation time the tests can reason about, newest last
+            self._when[pid] = f"2026-01-01T00:00:{len(self._when) % 60:02d}+00:00"
 
     def get(self, pid: str):
         return self._d.get(pid)
+
+    def list_all(self, limit: int = LIST_MAX):
+        """The store's pages, newest first, for the press's front pages
+        (specs/29 P2) — the test seam's twin of GcsPapers.list_all: id,
+        bytes, created."""
+        rows = [{"id": k, "data": v, "created": self._when.get(k)} for k, v in self._d.items()]
+        rows.reverse()
+        return rows[:limit]
 
 
 class GcsPapers:
@@ -417,6 +434,11 @@ class GcsPapers:
 
     def put_new(self, pid: str, data: bytes) -> None:
         from google.api_core.exceptions import PreconditionFailed
+        # a page a steward took down (moved to taken/) stays down: the same
+        # bytes POSTed again write nothing, and the short link keeps saying
+        # the store holds nothing there (a review catch: one move must be one)
+        if self._b().blob(f"taken/{pid}.json").exists():
+            return
         blob = self._b().blob(f"p/{pid}.json")
         try:
             blob.upload_from_string(data, content_type="application/json",
@@ -431,3 +453,26 @@ class GcsPapers:
             return blob.download_as_bytes()
         except NotFound:
             return None
+
+    def list_all(self, limit: int = LIST_MAX):
+        """The store's pages, newest first, capped — what the press lists as
+        readers' front pages (specs/29 P2). Under `p/` only: a page a
+        steward moved out of that prefix (record/OPERATING.md §5, the
+        takedown act) is not listed, and its short link says the store
+        holds nothing there. Best effort per object — one unreadable blob is
+        one missing card, never a failed press."""
+        client = self._b().client
+        blobs = [b for b in client.list_blobs(self._name, prefix="p/")
+                 if b.name.endswith(".json") and ID_RX.fullmatch(b.name[len("p/"):-len(".json")])]
+        floor = _dt.datetime.min.replace(tzinfo=_dt.timezone.utc)
+        blobs.sort(key=lambda b: b.time_created or floor, reverse=True)
+        out = []
+        for b in blobs[:limit]:
+            pid = b.name[len("p/"):-len(".json")]
+            try:
+                data = b.download_as_bytes()
+            except Exception:
+                continue
+            out.append({"id": pid, "data": data,
+                        "created": b.time_created.isoformat() if b.time_created else None})
+        return out

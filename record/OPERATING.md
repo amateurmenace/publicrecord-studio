@@ -223,7 +223,7 @@ Three things happen at night, and each stands on the one before:
 |---|---|---|
 | 03:00 | `record-poll` | polls every live town's channels; files rule-matched candidates as submissions |
 | 03:30 | `record-pipeline` | ingests every `approved` submission — captions via the watch page, then `yt-dlp`, then the community caption service (the highlighter's public transcript engine, which fetches through a residential proxy: from Cloud Run the watch page is walled and only the relay answers — verified 2026-09-23, 7,842 cues in 5.7 s) |
-| 04:30 | the nightly-edition workflow | presses from the cloud and carries the edition to the Pages repo — once its three secrets exist (below) |
+| 04:30 | the nightly-edition workflow | presses from the cloud and carries the edition to the Pages repo — once its three secrets exist (below). Two schedule slots (04:30 and 05:30 ET, one run at a time — GitHub's 04:30 cron did not fire on its first morning, 2026-09-24); a morning with no scheduled run in the log means dispatch it by hand: `gh workflow run "nightly edition"` |
 | 05:45 | `record-embed` | drains the meaning-vector backlog — every segment still without a vector, under the spend cap — including what the pipeline's per-meeting budget left behind (below) |
 
 Until 2026-09-23 the middle step never ran: `approved` was only ever written
@@ -543,6 +543,53 @@ line — readers fall back to full links and `paper.json` files, losing only
 the shortness. The bucket is not the edition bucket on purpose: the edition
 is the record's own pressing; the papers are readers' documents, and the two
 must never sync, sweep, or bill as one thing.
+
+### The front pages the press lists (specs/29 P2)
+
+The press lists readers' shared pages beside the record's own on `/app/`
+and `/app/front-pages/`: every object under `p/` in the share bucket
+(`RECORD_PAPERS_BUCKET` — the same content-addressed store the reader's
+*short link* writes to) becomes a card: its title, what it is made of, its
+first still, the day it was shared. Nobody is named; the store holds no
+author to name. A store that cannot be listed costs the readers' cards for
+that pressing and nothing else (the log says so: `front pages: the share
+store could not be listed`); a press job without the variable says
+`front pages: no share store configured`. **The job needs the variable the
+service has** (and it runs the same service account, which already reads
+and writes the bucket):
+
+```bash
+gcloud run jobs update record-press --region=us-east1 \
+  --update-env-vars=RECORD_PAPERS_BUCKET=publicrecord-papers
+```
+
+Three brakes, none a new stored field: only pages minted on or after
+2026-09-24 are listed (the day the button began to say it lists the page —
+`web/gallery.py::LISTED_SINCE`; Stephen may move it); at most twelve pages
+from any one day (a flood buries a day, not the store); and the front page's
+strip seats a reader's page only once it is a day old, so the gallery — and
+the press log, which prints the newest five titles each night — comes
+first. The store moving is a reason to press: its listing is folded into
+the pressing's fingerprint, so a night with no new meeting and one new
+shared page still presses, and the service worker's key carries a digest of
+the listed set, so returning readers get the new list.
+
+**Taking a page down is the steward's act, and it is one move:**
+
+```bash
+gsutil mv gs://$RECORD_PAPERS_BUCKET/p/<id>.json gs://$RECORD_PAPERS_BUCKET/taken/<id>.json
+```
+
+Then press, so the card leaves the live pages today rather than at the
+next scheduled run: `gh workflow run "nightly edition"` (returning readers
+get the new pages when the worker's key changes, which the press makes it
+do). The page's short link answers with the reader's existing sentence — *no
+paper answers at this address … or the paper was taken down* — and the
+store refuses the same bytes again (`put_new` looks under `taken/` first),
+so a re-share cannot undo the move. The record keeps the bytes under
+`taken/` for its own account and serves them to no one; the words a reader
+sees are the ones already pressed, and changing them — like a reader-facing
+takedown request — is Stephen's call, not a steward's.
 
 ## 6. When something is broken
 

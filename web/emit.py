@@ -448,7 +448,7 @@ def page_topic(t, issues, manifest, base, analytics=None):
 
 
 def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None, topics=None,
-              stills=None):
+              stills=None, frontpages=None):
     """The front page — the civic broadsheet (specs/29 P0).
 
     In the order of board 1: the masthead with the municipality switch and
@@ -464,7 +464,7 @@ def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=
     from . import broadsheet as _bs
     body = _bs.page_body(meetings, issues, stats, base="/app", featured=featured,
                          analytics=analytics, topics=topics, stills=stills,
-                         bodies_html=body_strip())
+                         bodies_html=body_strip(), shared=frontpages)
     c = stats["counts"]
     return shell("The Public Record — publicrecord.studio",
                  f"{c['meetings']} meetings, {c['hours']} hours, {c['issues']} issues "
@@ -1068,13 +1068,13 @@ def featured_papers(meetings, issues, stats):
     record itself holds."""
     out = []
     if any(m.get("votes") for m in meetings):
+        blocks = [{"kind": "chart", "chart": "votes"},
+                  {"kind": "chart", "chart": "framing"}]
         out.append({
             "title": "the roll calls, watched",
             "sub": "every roll call on the record, dot by dot — and how the "
                    "talk around them was framed",
-            "qs": _paper_qs("the roll calls, watched",
-                            [{"kind": "chart", "chart": "votes"},
-                             {"kind": "chart", "chart": "framing"}]),
+            "qs": _paper_qs("the roll calls, watched", blocks), "blocks": blocks,
         })
     loud = (stats or {}).get("loud") or []
     if loud:
@@ -1089,34 +1089,50 @@ def featured_papers(meetings, issues, stats):
                "meetings: its numbers, its reach, every roll call along the "
                "way, and the record's reading") if n > 1 else \
               "one issue, tracked from its first appearance — its reach, its ledger, its reading"
+        blocks = [{"kind": "story", "story": "issue", "slug": i["slug"]},
+                  {"kind": "chart", "chart": "numbers", "slug": i["slug"]},
+                  {"kind": "chart", "chart": "reach", "slug": i["slug"]},
+                  {"kind": "chart", "chart": "ledger", "slug": i["slug"]},
+                  {"kind": "reading", "slug": i["slug"]}]
         out.append({
             "title": title,
             "sub": sub,
-            "qs": _paper_qs(title,
-                            [{"kind": "story", "story": "issue", "slug": i["slug"]},
-                             {"kind": "chart", "chart": "numbers", "slug": i["slug"]},
-                             {"kind": "chart", "chart": "reach", "slug": i["slug"]},
-                             {"kind": "chart", "chart": "ledger", "slug": i["slug"]},
-                             {"kind": "reading", "slug": i["slug"]}]),
+            "qs": _paper_qs(title, blocks), "blocks": blocks,
         })
     ms = sorted(meetings, key=lambda m: (m.get("date") or ""), reverse=True)
     if ms:
         m = ms[0]
+        blocks = [{"kind": "story", "story": "meeting", "pid": m["pid"]},
+                  {"kind": "chart", "chart": "numbers", "pid": m["pid"]},
+                  {"kind": "chart", "chart": "shape", "pid": m["pid"]},
+                  {"kind": "chart", "chart": "framing", "pid": m["pid"]},
+                  {"kind": "reading", "pid": m["pid"]},
+                  {"kind": "chart", "chart": "topics"}]
         out.append({
             "title": "the latest meeting, covered",
             "pid": m["pid"], "town": m.get("town") or "",
             "sub": f'{m.get("title") or m["pid"]} — as a story: its numbers, '
                    "its shape, its framing, the record's reading, and what "
                    "keeps coming back record-wide",
-            "qs": _paper_qs("the latest meeting, covered",
-                            [{"kind": "story", "story": "meeting", "pid": m["pid"]},
-                             {"kind": "chart", "chart": "numbers", "pid": m["pid"]},
-                             {"kind": "chart", "chart": "shape", "pid": m["pid"]},
-                             {"kind": "chart", "chart": "framing", "pid": m["pid"]},
-                             {"kind": "reading", "pid": m["pid"]},
-                             {"kind": "chart", "chart": "topics"}]),
+            "qs": _paper_qs("the latest meeting, covered", blocks), "blocks": blocks,
         })
     return out
+
+
+def page_frontpages(featured, frontpages, meetings, manifest, base, stills=None, towns=None):
+    """The front pages (specs/29 P2, board 9): the record's own, pressed
+    nightly, and readers' shared pages beside them — one card design for
+    both, unsigned by design, judged by receipts; the filters are anchors
+    the reader's script narrows the grid by, and the pressed page shows
+    every card. web/gallery.py makes the cards and lays the page out."""
+    from . import gallery as _g
+    own = _g.own_cards(featured or [], meetings, stills or {}, "/app")
+    body = _g.page_body(own, frontpages or [], (towns or {}).get("towns") or [], "/app")
+    n = len(own) + len(frontpages or [])
+    return shell("Front pages — publicrecord.studio",
+                 f"{n} front pages of the public record — the record's own, pressed nightly, "
+                 "and readers' shared pages beside them, each judged by its receipts.",
+                 f"{base}/app/front-pages/", body, "paper", manifest, version=manifest["version"])
 
 
 def page_paper(manifest, base, featured=None):
@@ -2251,7 +2267,11 @@ def _write_pwa(out: Path, manifest):
     # pressing (corpus change) OR a new release (statics/pages change, which
     # always bumps the version) supersedes the old cache, so a returning reader
     # never sees a stale shell after an edition ships.
-    cache = f"cz-record-{manifest.get('version','0')}-{manifest.get('corpus_hash','0')}"
+    # the key names the corpus AND the listed front pages (specs/29 P2): a
+    # page taken down or newly listed on a quiet week must reach returning
+    # readers, and a cache-first shell changes only when its key does
+    cache = f"cz-record-{manifest.get('version','0')}-{manifest.get('corpus_hash','0')}" + (
+        f"-{manifest['shared_hash']}" if manifest.get("shared_hash") else "")
     v = esc(manifest.get("version", "0"))
     # Stub URLs precache in their TRAILING-SLASH canonical form: the host
     # serves the bare form as a 301, addAll would store the redirected
@@ -2264,7 +2284,7 @@ def _write_pwa(out: Path, manifest):
         "/app/", f"/app/app.css?v={manifest.get('version','0')}",
         f"/app/app.js?v={manifest.get('version','0')}", "/app/favicon.svg",
         "/app/manifest.json", "/app/stats.json", "/app/s/", "/app/watching/",
-        "/app/officials/", "/app/p/", "/app/r/", "/app/ai/",
+        "/app/officials/", "/app/p/", "/app/front-pages/", "/app/r/", "/app/ai/",
         # the editor's add-search reads these two (specs/23 A3) — small, and
         # with them in the shell a paper can be assembled with the host gone
         "/app/search/meta.json", "/app/issues/index.json",
@@ -2313,7 +2333,7 @@ self.addEventListener('fetch', e => {{
 
 def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
                analytics=None, graph=None, towns=None, tombstones=None,
-               kits=None, topics=None, stills=None):
+               kits=None, topics=None, stills=None, frontpages=None):
     v = manifest["version"]
     # before a single stub renders: the chrome needs to know what it may offer
     set_edition(towns)
@@ -2328,7 +2348,8 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     featured = featured_papers(meetings, issues, stats)
     (out / "index.html").write_text(
         page_home(meetings, issues, stats, manifest, base, featured=featured,
-                  analytics=analytics, topics=topics, stills=stills or {}),
+                  analytics=analytics, topics=topics, stills=stills or {},
+                  frontpages=frontpages),
         encoding="utf-8")
     # a word, over time — each featured topic story at an address of its own
     for t in (topics or []):
@@ -2370,6 +2391,12 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     (out / "p" / "index.html").parent.mkdir(parents=True, exist_ok=True)
     (out / "p" / "index.html").write_text(
         page_paper(manifest, base, featured=featured), encoding="utf-8")
+    # the front pages (specs/29 P2, board 9): the record's own and readers'
+    # shared pages, listed — the same featured list, and the store's rows
+    (out / "front-pages" / "index.html").parent.mkdir(parents=True, exist_ok=True)
+    (out / "front-pages" / "index.html").write_text(
+        page_frontpages(featured, frontpages or [], meetings, manifest, base,
+                        stills=stills or {}, towns=towns), encoding="utf-8")
     # Our AI Constitution — when a model touches the record, whose it is,
     # where it runs, and what stands without it; linked from every footer.
     # /app/constitution is its shareable spelling (a slim redirect); the

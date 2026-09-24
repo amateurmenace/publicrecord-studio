@@ -165,7 +165,7 @@ def _no_sidecars(tool: str) -> Path:
 
 
 def press(corpus, out_dir: str, version: str = "",
-          site_base: str = "", api: str = "", stills=None) -> dict:
+          site_base: str = "", api: str = "", stills=None, shared=None) -> dict:
     """Press the specs/16 edition out of a store — here, a `PgCorpus`.
 
     This is `web.bake.bake()` with its two desk-shaped assumptions replaced:
@@ -211,9 +211,9 @@ def press(corpus, out_dir: str, version: str = "",
     # corpus this edition was pressed from; taking it afterwards would name a
     # corpus that may have moved during the press and quietly certify an
     # edition as fresher than it is.
-    fingerprint = corpus_fingerprint(corpus)
+    fingerprint = corpus_fingerprint(corpus) + shared_digest(shared)
 
-    b = _bake.Bake(corpus, out, version, _no_sidecars, stills=stills)
+    b = _bake.Bake(corpus, out, version, _no_sidecars, stills=stills, shared=shared)
 
     print("pressing the edition…")
     # the pictures first (specs/29 §P0.2): the poster and three frames of
@@ -242,6 +242,7 @@ def press(corpus, out_dir: str, version: str = "",
     # the transcripts; a stage in web/bake.py is a stage here too
     topics = b.bake_topics(meetings)
     graph = b.bake_graph(issues)
+    frontpages = b.bake_frontpages(meetings, issues)
     b.bake_urls(meetings)
     idx = b.bake_search(meetings)
     b.bake_feeds(meetings, issues, stats, site_base)
@@ -251,7 +252,7 @@ def press(corpus, out_dir: str, version: str = "",
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
                     towns=towns, tombstones=tombstones, kits=kits, topics=topics,
-                    stills=b.have_stills)
+                    stills=b.have_stills, frontpages=frontpages)
 
     pressing = _write_pressing(out, manifest, fingerprint)
 
@@ -420,7 +421,17 @@ def corpus_fingerprint(corpus) -> str:
     return h.hexdigest()[:16]
 
 
-def needs_press(corpus, manifest_path: str) -> bool:
+def shared_digest(shared) -> str:
+    """The share store's listing, digested onto the fingerprint (specs/29
+    P2): a night with no new meeting and one new shared page — or one taken
+    down — is a night the edition changes, so it presses. Empty when the
+    press has no store to list, so a desk edition's fingerprint is untouched."""
+    import hashlib
+    rows = sorted(f"{r.get('id')}|{r.get('created') or ''}" for r in (shared or []) if isinstance(r, dict))
+    return ("|s" + hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()[:12]) if rows else ""
+
+
+def needs_press(corpus, manifest_path: str, shared=None) -> bool:
     """Would a press produce something different from what is already there?
 
     `manifest_path` may point at either the edition's `manifest.json` or its
@@ -440,7 +451,7 @@ def needs_press(corpus, manifest_path: str) -> bool:
                  or "")
     if not fp:
         return True
-    return fp != corpus_fingerprint(corpus)
+    return fp != corpus_fingerprint(corpus) + shared_digest(shared)
 
 
 def _read_json(p: Path) -> Optional[dict]:
@@ -658,8 +669,23 @@ def main(argv=None):
 
     corpus = PgCorpus()
     try:
+        # the front pages (specs/29 P2): what the share store holds, listed
+        # BEFORE the gate — the store moving is a reason to press — and
+        # pressed beside the record's own; a store that cannot be listed
+        # tonight costs the readers' cards, never the press
+        shared = None
+        if not settings.papers_bucket:
+            print("  front pages: no share store configured (RECORD_PAPERS_BUCKET) — the record's own alone")
+        else:
+            from .papers import GcsPapers
+            try:
+                shared = GcsPapers(settings.papers_bucket).list_all()
+                print(f"  front pages: {len(shared)} shared page(s) in gs://{settings.papers_bucket}")
+            except Exception as exc:   # the bucket, its auth, the network — said, not raised
+                print(f"  front pages: the share store could not be listed "
+                      f"({type(exc).__name__}: {str(exc)[:120]}) — the record's own alone tonight")
         manifest_path = str(Path(out_dir) / PRESSING)
-        if not args.force and not needs_press(corpus, manifest_path):
+        if not args.force and not needs_press(corpus, manifest_path, shared=shared):
             print(f"the record has not moved since the last pressing "
                   f"({corpus_fingerprint(corpus)}) — nothing to press")
             return 0
@@ -675,7 +701,7 @@ def main(argv=None):
                 print(f"  stills: seeded {seed['copied']} of {seed['listed']} from gs://{bucket}"
                       + (f" — the seed failed: {seed['error']}" if seed["error"] else ""))
         report = press(corpus, out_dir, args.version, args.base, api=args.api,
-                       stills=stills)
+                       stills=stills, shared=shared)
     finally:
         corpus.close()
 
