@@ -414,11 +414,6 @@ class TestPaperEndpoints(unittest.TestCase):
         stored = json.loads(self.mem.get(pid))
         self.assertEqual(set(stored), {"schema", "title", "blocks"})
 
-
-if __name__ == "__main__":
-    unittest.main()
-
-
     def test_a_taken_page_offered_again_is_refused_at_the_door(self):
         """A steward's takedown (record/OPERATING.md §5) moves the object
         under taken/; the same bytes POSTed again are not stored and the
@@ -435,6 +430,11 @@ if __name__ == "__main__":
         self.assertEqual(gone.status_code, 404)
         self.assertEqual(gone.json()["error"], again.json()["error"])     # one sentence, the read path's
         self.assertIsNone(self.mem.get(pid))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
 
 class TestTwoPathsKinds(unittest.TestCase):
     """specs/24: the two paths' kinds are refs and enums like every kind

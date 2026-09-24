@@ -1320,8 +1320,8 @@ class Bake:
         # and each card's day-relative bits with it, so the night the strip
         # seats a page, or a card leaves this week, changes the key too (a
         # skeptic's catch: gallery.age_bits, the gate's shared_digest alike)
-        self.shared_hash = (hashlib.sha256(",".join(f"{c['id']}:{int(bool(c['week']))}{int(bool(c['seasoned']))}" for c in cards).encode())
-                            .hexdigest()[:8] if cards else "")
+        self.shared_hash = (hashlib.sha256(",".join(f"{c['id']}:{int(bool(c['week']))}{int(bool(c['seasoned']))}{int(bool(c.get('dated')))}"
+                                                    for c in cards).encode()).hexdigest()[:8] if cards else "")
         if self.shared:
             print(f"  front pages: {len(cards)} of {len(self.shared)} shared page(s) listed")
             # the steward's morning glance is the review step — the newest, by title

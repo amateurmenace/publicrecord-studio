@@ -326,14 +326,19 @@ class TestGalleryPress(unittest.TestCase):
         from web import bake
         from record.press import shared_digest
         day = dt.timedelta(days=1)
-        self.assertEqual(gallery.age_bits(TODAY, TODAY), (True, False))
-        self.assertEqual(gallery.age_bits(TODAY - day, TODAY), (True, True))
-        self.assertEqual(gallery.age_bits(TODAY - 7 * day, TODAY), (False, True))
-        self.assertEqual(gallery.age_bits(TODAY + day, TODAY), (False, False))
-        self.assertEqual(gallery.age_bits(None, TODAY), (False, False))
+        self.assertEqual(gallery.age_bits(TODAY, TODAY), (True, False, False))
+        self.assertEqual(gallery.age_bits(TODAY - day, TODAY), (True, True, False))
+        self.assertEqual(gallery.age_bits(TODAY - 7 * day, TODAY), (False, True, False))
+        self.assertEqual(gallery.age_bits(TODAY + day, TODAY), (False, False, False))
+        self.assertEqual(gallery.age_bits(None, TODAY), (False, False, False))
+        self.assertEqual(gallery.age_bits(dt.date(2026, 12, 20), dt.date(2027, 1, 1)), (False, True, True))   # the year is said
         self.assertNotEqual(shared_digest(SHARED, TODAY), shared_digest(SHARED, TODAY + day))   # a page shared TODAY turns a day old
-        old = [{"id": "c" * 16, "created": "2026-09-01T00:00:00+00:00", "data": b"{}"}]
-        self.assertEqual(shared_digest(old, TODAY), shared_digest(old, TODAY + day))            # nothing would change: quiet
+        self.assertEqual(shared_digest(SHARED, TODAY + 8 * day), shared_digest(SHARED, TODAY + 9 * day))   # both past every flip: quiet
+        old = [{"id": "c" * 16, "created": "2026-09-20T00:00:00+00:00", "data": b"{}"}]        # before LISTED_SINCE: never listed
+        for d in (dt.date(2026, 9, 20), dt.date(2026, 9, 21), dt.date(2026, 9, 27), dt.date(2027, 1, 1)):
+            self.assertEqual(shared_digest(old, d), shared_digest(old, dt.date(2026, 9, 30)))   # its flips move nothing
+        dec = [{"id": "d" * 16, "created": "2026-12-20T00:00:00+00:00", "data": b"{}"}]
+        self.assertNotEqual(shared_digest(dec, dt.date(2026, 12, 31)), shared_digest(dec, dt.date(2027, 1, 1)))   # New Year: "December 20, 2026"
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); db = root / "corpus.db"
             TestBakeEdition._seed(db)

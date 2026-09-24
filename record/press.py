@@ -425,13 +425,17 @@ def corpus_fingerprint(corpus) -> str:
 def shared_digest(shared, today=None) -> str:
     """The share store's listing, digested onto the fingerprint (specs/29
     P2): a night with no new meeting and one new shared page — or one taken
-    down — is a night the edition changes, so it presses. Each row carries
-    its day-relative bits for `today` too (web/gallery.py age_bits: this
-    week, a day old), so the night a listed page turns a day old — the strip
-    may seat it — or leaves this week is a night that presses, and a quiet
-    night after that is quiet again (a skeptic's catch: the strip moved
-    behind a gate that never saw a day pass). Empty when the press has no
-    store to list, so a desk edition's fingerprint is untouched."""
+    down — is a night the edition changes, so it presses. A row the press
+    would list (minted on or after the gallery's LISTED_SINCE) carries its
+    day-relative bits for `today` too (web/gallery.py age_bits: this week,
+    a day old, the year said), so the night a listed page turns a day old —
+    the strip may seat it — leaves this week, or sees the year turn is a
+    night that presses, and a quiet night after that is quiet again; a row
+    the press never lists brings its id and day alone, so its old flips
+    move nothing (two skeptics' catches: the strip moved behind a gate that
+    never saw a day pass, then a gate that saw days for pages it never
+    showed). Empty when the press has no store to list, so a desk edition's
+    fingerprint is untouched."""
     import hashlib
     from web import gallery as _gallery
     today = today or _dt.date.today()
@@ -439,8 +443,11 @@ def shared_digest(shared, today=None) -> str:
     for r in (shared or []):
         if not isinstance(r, dict):
             continue
-        week, seasoned = _gallery.age_bits(_gallery._day(r.get("created")), today)
-        rows.append(f"{r.get('id')}|{r.get('created') or ''}|{int(week)}{int(seasoned)}")
+        d = _gallery._day(r.get("created"))
+        bits = ""
+        if d and d >= _gallery.LISTED_SINCE:
+            bits = "|" + "".join(str(int(b)) for b in _gallery.age_bits(d, today))
+        rows.append(f"{r.get('id')}|{r.get('created') or ''}{bits}")
     rows.sort()
     return ("|s" + hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()[:12]) if rows else ""
 
