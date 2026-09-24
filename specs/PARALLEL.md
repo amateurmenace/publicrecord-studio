@@ -157,6 +157,17 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24, 22:44Z — **v2.2.8 / r55 is LIVE: the list follows its count; a phrase
+  said both ways shows once; a phone fetches only the pictures it shows**
+  (tag `v2.2.8` at fe0b2e5, the commit the image was built from; the service
+  and all six jobs on r55; the press at `--version 2.2.8`). The search
+  page's list follows its range and says what is painted; a retired
+  search draws nothing and never switches the Studio off; a phrase beside
+  an issue in both numbers (or the possessive) shows once, and an issue's
+  own names are left out in every form; the year strip's stills wait until
+  the strip is seen. Reviewed through two passes and two re-reviews of the
+  folds (seven, six, five, five — folded). r55 / 2.2.8 are spent; next
+  numbers r56 / 2.2.9.
 - 2026-09-24, 21:00Z — **v2.2.7 / r54 is LIVE: every reel row pictures its meeting**
   (tag `v2.2.7` at e60c48c, the commit the image was built from; the service
   and all six jobs on r54; the press at `--version 2.2.7`). A paper's reel

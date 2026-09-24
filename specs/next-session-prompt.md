@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.7, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.8, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,87 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, 22:44Z — v2.2.8 / r55 IS LIVE: the list follows its count; a phrase said both ways shows once; a phone fetches only what it shows
+
+Three items from the list, none touching a stored field (the topic story
+as a paper block still waits on Stephen's sign-off — a new stored kind).
+The shape:
+
+- **The search list follows its stretch** (`app.js`): `sqStory`'s `draw()`
+  calls `listFor(since, hits)` before it can return early — a stretch
+  paints `sqStretchList(idx, hits, since, marks, q)` (the counted lines,
+  newest first, eighty shown, each by `sqItem`, the static list's own line
+  renderer; `sqHits` now carries each line's `id`); the whole record puts
+  back `run.list`, the list the search first answered (the Studio's,
+  closest first, on the live edition). `.sq-count` says the painted list:
+  a stretch's lines ("(the words alone, as counted above)" on the live
+  edition), the Studio's closest, or the index's newest.
+- **A search is a run** (`SQ_NOW`): `runSearch` makes one and threads it
+  through `staticSearch` / `liveSearch` / `sqStoryFor` / `sqStory`; a
+  retired run draws no list, no story, and its story's range buttons take
+  no press; emptying the box retires it. **`askStudio`**: a failure sets
+  `API_DOWN` only when it is the newest request sent (`API_SEQ`), and a
+  success newer than every settled one (`API_SETTLED`) clears it — so a
+  retired search's timeout, landing before or after a newer search's live
+  answer, never switches a healthy Studio off; every static search on a
+  Studio edition says the Studio is not answering. A stretch whose lines
+  are all untowned names them ("the N lines that say it … are from
+  meetings with no town recorded"), never pointing at a list that may be
+  the Studio's or the newest eighty.
+- **Said both ways, shown once** (`web/beside.py`): `_other(w)` (a word's
+  other number and its possessive; -es only after a hiss or an o; never an
+  empty form) and
+  `_numbers(p)` (any one word changed) — candidates matched only against
+  what was counted. A phrase in both forms keeps the one ranked higher,
+  with ITS OWN count (never a sum: the chip's search reads words exactly);
+  the issue's own phrases and tokens are extended with their forms inside
+  `beside()` (`own_words()` unchanged). Over the live record five issues
+  change, each losing its own name or a doubled form (complete-streets,
+  vision-zero, town-council-office, federal-government-involvement,
+  brooklyn-historical-society). Not folded: plurals the search cannot open
+  together — a chip is one form's count.
+- **The year's stills wait to be seen** (`broadsheet.year_section` writes
+  the inline strip's `<image>`s as `data-href`; the picture file keeps
+  `href`; `app.js::bsYearStills` sets them once `.bs-year-svg` has client
+  rects, on the 720px media change, or on `beforeprint`, and removes an
+  image whose still errors). Every tape draws its town-light rect and day
+  under the still (`charts.year_tapes`). Known: paper does not wait for a
+  late still; with the script off a desk shows the colour tiles.
+- **Tests**: 1013 (110 PG-backed skip without a DSN) — the stretch list
+  and `sqItem` lifted and run; the run token, the note rule and the stale
+  range press pinned; `askStudio`'s newest-settles rule executed with gated
+  fetches; the both-ways fold, the forms and the own-name rule over
+  fixtures; `bsYearStills` run over fakes (hidden, a turn, paper, an error).
+  Measured in headless Chrome: phone 0 of the strip's stills fetched, desk
+  all, phone-then-wide all, a phone's print; the list at every stretch on
+  the desk and live paths. **The live path, locally**: bake with
+  `api="http://localhost:8331"` (the `--api` flag) and serve, on 8331, a
+  few lines of Python that answer `/api/search` by proxying the public
+  Studio with `Access-Control-Allow-Origin: *` — a query starting "slow"
+  held 3 s, one starting "hang" held 8 s then a 504 (past the reader's
+  6 s bell) — which is how every race above was reproduced.
+- **Deploy**: r55 (image `sha256:faae8fea…`, built from fe0b2e5) on the service
+  (revision record-api-00047-4jr) and all six jobs; the press at `--version 2.2.8`
+  (execution record-press-68xfq, 22:41Z, by the nightly-edition workflow, run
+  36068794714); Pages fae1e7c; `sw.js` key `cz-record-2.2.8-9eb9be490f17df4c`;
+  tag `v2.2.8` at fe0b2e5. Verified live: the front page's 28 year stills wait
+  (`data-href`), the picture file keeps 28; the five issues' chips as measured;
+  the search page's list follows its range against the public Studio.
+- **Reviewed**: two adversarial passes (seven and six found, folded), the
+  folds re-reviewed (five found, folded), those re-reviewed again (five
+  found — a half-done singular, a retired timeout landing BEFORE the newer
+  answer, -o plurals, "below" over eighty, an empty form — folded and
+  re-measured with the reviewers' own probes: `rev8r/a1.mjs`,
+  `rev8s/f1.mjs`, `rev8s/u2.mjs`, `rev8s/synth.py`, all in the scratchpad
+  of the session that built it). The branch was rebuilt as three commits,
+  each green alone, before it landed.
+- **What is left**: Stephen's — the topic story as a paper block (a new
+  stored kind, his sign-off), one real shared page to prove the gallery's
+  listing path, the control-z source-of-truth question. The desk's — the
+  press job gated on the live pressing's fingerprint (a quiet night
+  presses nothing new); pictures on the studio panel's reel list and the
+  reel viewer's list; a phone's print that waits for late stills.
 
 ## 2026-09-24, 21:00Z — v2.2.7 / r54 IS LIVE: every reel row pictures its meeting
 
