@@ -1072,14 +1072,15 @@ class Bake:
                     r["count"] += e.get("count", 0)
                     r["meetings"].append({"pid": m["pid"], "date": m["date"],
                                           "t": e.get("t", 0)})
-        names = sorted((r for r in name_hits.values() if len(r["meetings"]) >= 2),
-                       key=lambda r: (-len(r["meetings"]), -r["count"]))[:40]
-        # the names block's ref (specs/29 P1) — and one row per slug: two
-        # spellings that slug alike ("Kent St." / "Kent St") are one name to
-        # the reader, so they are one row here, counts summed, meetings joined
-        # (a review catch: the reader's find() reached only the first)
+        # the names block's ref (specs/29 P1) — and one row per slug, BEFORE
+        # the two-meeting filter and the cut: two spellings that slug alike
+        # ("Kent St." / "Kent St") are one name to the reader, so they are
+        # one row here, counts summed, meetings joined — and a name said once
+        # under each spelling is a name said twice (a review catch: the
+        # reader's find() reached only the first; a skeptic's: the merge ran
+        # after the sort and left the list out of order)
         by_slug = {}
-        for r in names:
+        for r in name_hits.values():
             r["slug"] = who_slug(r["kind"], r["name"])
             m = by_slug.get(r["slug"])
             if m is None:
@@ -1088,7 +1089,8 @@ class Bake:
             m["count"] += r["count"]
             seen = {x["pid"] for x in m["meetings"]}
             m["meetings"].extend(x for x in r["meetings"] if x["pid"] not in seen)
-        names = list(by_slug.values())
+        names = sorted((r for r in by_slug.values() if len(r["meetings"]) >= 2),
+                       key=lambda r: (-len(r["meetings"]), -r["count"]))[:40]
         doc = {"lens_order": lens_order, "lens_color": lens_color,
                "framing": fmatrix, "topics": topics, "names": names,
                "n_meetings": len(meetings)}

@@ -40,10 +40,13 @@ without it). **Never rebake the public edition from a local corpus.**
   search are ADDITIVE; every decoder follows decodeReel's law (malformed →
   fewer blocks, never a throw). No cookies, no analytics, no reader
   identity, ever.
-- **Palette**: publicrecord takes **zero fuchsia**. Studio hues (`#a855f7`,
-  `#7c3aed`, `#22c55e`) exist only under `html.cz-m-studio`; a rendered,
-  shared, or baked paper carries none of them. The pressed pages are
-  byte-clean of studio markup (script-built, never baked).
+- **Palette**: publicrecord takes **zero fuchsia**. The studio wears the
+  paper's own rust (`#B23A1D`) since specs/29 P1; the purples it once wore
+  (`#a855f7`, `#7c3aed`, `#22c55e`) are retired and the guard tests forbid
+  them everywhere — any studio-only accent that ever returns sits under
+  `html.cz-m-studio` and nowhere else; a rendered, shared, or baked paper
+  carries no studio markup or hue. The pressed pages are byte-clean of
+  studio markup (script-built, never baked).
 - **The store is strict, not corrective**: free text stored = the title +
   notes ONLY (length-capped, control-chars refused); everything else is
   exact-shaped refs; canonical bytes are decided SERVER-side only

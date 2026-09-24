@@ -6168,7 +6168,7 @@
      placeholder — the facts and the questions live on the desk beside it */
   const edNote = (b, i) => { const asks = ED_ASKS.length ? ED_ASKS : DESK_PROMPTS;
     return `<div class="pb-note cz-ednotewrap">
-      <span class="kicker">your paragraph — what it means</span>
+      <span class="kicker">what it means — the writer</span>
       <textarea class="cz-ednote" data-i="${i}" rows="5" maxlength="${PAPER_NOTE_MAX}"
         placeholder="${esc(asks[i % asks.length])} — your own words; a [1:46:50] in brackets is a receipt"
         aria-label="paragraph ${i + 1} — your own words">${esc(b.text)}</textarea>

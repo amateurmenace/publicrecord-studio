@@ -313,12 +313,17 @@ class TestBakeEdition(unittest.TestCase):
                               "url_canon": f"youtube:{mid}", "duration": 60,
                               "n_segments": len(segs), "status": "live",
                               "summary": "A budget override was discussed.",
+                              # a place named once in each meeting under two
+                              # spellings — the press merges them (specs/29 P1)
                               "analysis_json": json.dumps({"decisions": [
-                                  {"t": 12.0, "text": "override passes", "outcome": "passed"}]})})
+                                  {"t": 12.0, "text": "override passes", "outcome": "passed"}],
+                                  "entities": {"places": [{"name": "Kent St." if mid == "vid1" else "Kent St",
+                                                           "count": 3 if mid == "vid1" else 2, "t": 20.0}]}})})
         # vid2 carries the reading's draft — a model's paragraphs under its
         # own name (specs/24 §4); vid1 carries none, and its plane says so
         c.upsert_meeting({"id": "vid2", "analysis_json": json.dumps({
             "decisions": [{"t": 12.0, "text": "override passes", "outcome": "passed"}],
+            "entities": {"places": [{"name": "Kent St", "count": 2, "t": 20.0}]},
             "draft": {"text": "The override carried at [0:12] on a 3-0 vote.\n\nWatch the fall budget.",
                       "origin": "ai:gemini-2.0-flash"}})})
         # a cross-meeting issue by hand (both meetings share "budget override")
@@ -696,13 +701,13 @@ class TestBakeEdition(unittest.TestCase):
         cream, oxblood, amber, or the lens hues may survive in the pressed
         stylesheet — not even as an unused variable (specs/20 §4, the law).
 
-        The studio-mode amendment (specs/21 §6.1) is the one bounded exception:
-        the two purples it uses — #a855f7 (surfaces/borders) and #7c3aed (text at
-        AA) — may appear, but ONLY inside a rule scoped to html.cz-m-studio, so
-        they light the editor's own chrome and can never reach the paper, the
-        preview, or the shared masthead. Fuchsia is still forbidden everywhere —
-        the amendment admitted purple, it did not repeal the fuchsia line.
-        Comments are stripped first so a note does not count."""
+        The studio-mode amendment (specs/21 §6.1) once admitted two purples —
+        #a855f7 (surfaces/borders) and #7c3aed (text at AA) — inside rules
+        scoped to html.cz-m-studio; specs/29 P1 retired them for the paper's
+        own rust, so today the loop below finds none, and stands as the guard
+        against their return: should either come back, it may sit only under
+        html.cz-m-studio. Fuchsia is forbidden everywhere. Comments are
+        stripped first so a note does not count."""
         css = (self.out / "app.css").read_text()
         css = re.sub(r"/\*.*?\*/", "", css, flags=re.S).lower()
         FORBIDDEN = [
@@ -3181,6 +3186,12 @@ class TestPaper(unittest.TestCase):
             m = re.search(r"const %s = \[(.+?)\];" % name, self.JS)
             self.assertEqual(tuple(re.findall(r'"(\w+)"', m.group(1))), want,
                              f"{name} drifted from record.papers.{name}")
+        # the two scope shapes, one pattern each in both languages
+        from record.papers import _TOWN_REF, _WHO_REF
+        m = re.search(r"const BS_TOWN_REF = /\^(.+?)\$/, BS_WHO_REF = /\^(.+?)\$/;", self.JS)
+        self.assertTrue(m, "the scope patterns moved in app.js")
+        self.assertEqual(m.group(1), _TOWN_REF.pattern, "BS_TOWN_REF drifted from record.papers._TOWN_REF")
+        self.assertEqual(m.group(2), _WHO_REF.pattern, "BS_WHO_REF drifted from record.papers._WHO_REF")
         # and the store accepts exactly what the reader would send for each
         # of the broadsheet's kinds — the portable form, straight into canonical()
         body = "\n".join([

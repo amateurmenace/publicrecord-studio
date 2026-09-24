@@ -592,20 +592,31 @@ class TestBroadsheetWriting(unittest.TestCase):
     def test_the_name_slug_twin_holds(self):
         from web.bake import who_slug, nslug
         names = [("people", "Paul Warren"), ("places", "Kent Street"), ("organizations", "BPDA"),
-                 ("people", "  Ünïcode—Straße "), ("places", "!!"), ("people", "O'Neil-Smith Jr."), ("places", "Route 9")]
+                 ("people", "  Ünïcode—Straße "), ("places", "!!"), ("people", "O'Neil-Smith Jr."), ("places", "Route 9"),
+                 ("places", "x" * 200)]   # the cap, both sides
         body = "\n".join([lift(r"  const bsSlug = .+?;"), lift(r"  const bsWho = .+?;"),
                           "const N = " + json.dumps(names) + ";",
                           "console.log(JSON.stringify(N.map(([k, n]) => [bsWho(k, n), bsSlug(n)])));"])
         r = node(body)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         got = json.loads(r.stdout)
-        self.assertEqual(got, [[who_slug(k, n), nslug(n)] for k, n in names])
+        # the reader caps every slug at 96 (bsSlug); the press caps a who in
+        # who_slug and leaves nslug whole for towns and bodies — the twin
+        # compares like with like
+        self.assertEqual(got, [[who_slug(k, n), nslug(n)[:96]] for k, n in names])
         # and the pressed plane carries the slug the reader would mint
         an = json.loads((OUT / "analytics.json").read_text())
         slugs = [n.get("slug") for n in an.get("names") or []]
         for n in an.get("names") or []:
             self.assertEqual(n.get("slug"), who_slug(n["kind"], n["name"]), n)
         self.assertEqual(len(slugs), len(set(slugs)), "two names slugged alike must be one row")
+        # the fixture names Kent St. (vid1) and Kent St (vid2): one row, the
+        # counts summed, both meetings — and it passed the two-meeting filter
+        # only because the merge ran first
+        kent = [n for n in an.get("names") or [] if n.get("slug") == "l-kent-st"]
+        self.assertEqual(len(kent), 1, an.get("names"))
+        self.assertEqual(kent[0]["count"], 5)
+        self.assertEqual(sorted(x["pid"] for x in kent[0]["meetings"]), ["vid1", "vid2"])
         # and the press merges two spellings that slug alike (a review catch)
         from web import bake as bk
         self.assertEqual(who_slug("places", "Kent St."), who_slug("places", "Kent St"))
