@@ -279,6 +279,9 @@ def create_app(corpus=None, papers=None) -> FastAPI:
     # when a taken page is offered again (its words are Stephen's, so no new ones)
     NO_PAPER = ("no paper at this address — it may never have been shared, "
                 "the id may have lost a character, or it was taken down")
+    # …and the share's own sentence when a taken page is offered again — a
+    # write screen's words, not the read path's (specs/29, decided 2026-09-24)
+    TAKEN_AGAIN = "a steward took this page down, so the record will not hold it again"
 
     @app.post("/api/papers")
     async def paper_put(request: Request):
@@ -327,9 +330,9 @@ def create_app(corpus=None, papers=None) -> FastAPI:
         except paperlib.PaperTaken:
             # a steward took this page down (record/OPERATING.md §5): the store
             # will not hold it again, and a share must not answer 200 with a
-            # link that only says so when followed — 410, the read path's own
-            # sentence, and the reader's full link still carries the page
-            return JSONResponse({"error": NO_PAPER}, status_code=410)
+            # link that only says so when followed — 410, said at the door,
+            # and the reader's full link still carries the page
+            return JSONResponse({"error": TAKEN_AGAIN}, status_code=410)
         except Exception as exc:
             return JSONResponse(
                 {"error": f"the share store is unreachable ({exc.__class__.__name__})"

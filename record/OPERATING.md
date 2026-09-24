@@ -586,11 +586,28 @@ get the new pages when the worker's key changes, which the press makes it
 do). The page's short link answers with the reader's existing sentence — *no
 paper answers at this address … or the paper was taken down* — and the
 store refuses the same bytes again (`put_new` looks under `taken/` first, and
-the share answers 410 with the read path's own sentence — no link that 404s),
-so a re-share cannot undo the move. The record keeps the bytes under
-`taken/` for its own account and serves them to no one; the words a reader
-sees are the ones already pressed, and changing them — like a reader-facing
-takedown request — is Stephen's call, not a steward's.
+the share answers 410: *a steward took this page down, so the record will
+not hold it again* — and the editor copies the full link in the short one's
+place), so a re-share cannot undo the move. The record keeps the bytes under `taken/` for its own account
+and serves them to no one.
+
+**The request reaches you from the page itself.** Every stored page's foot
+carries *Want this page taken down? Ask the steward* — a `mailto:` to the
+address the record already publishes for corrections (`STEWARD_EMAIL` in
+`app.js`), subject *take down front page <id>*, the page's link in the
+body. The page says plainly that the record keeps no address for the
+reader, so no reply comes: a steward reads the ask, and a page taken down
+is gone at the next night's press — you decide, and the page promises
+nothing else. **The morning glance is the review step:** the press log
+names the newest listed titles each night, the gallery shows them the same
+night, and the front page's strip seats a reader's page only after a
+night's press has already listed it (`web/gallery.py::SEASONED_DAYS` = 2 by
+the calendar — a page shared after one morning's press is first listed by
+the next and cannot lead the same night) and only when it cites the record:
+a held meeting or issue, or a block drawn from the whole of it. That night
+is your window, and the one move above is the whole act. (The stance, the words and the reach of the
+listing threshold were Stephen's open decisions after v2.2.2; he handed
+them over on 2026-09-24 and they were decided as written here.)
 
 ## 6. When something is broken
 

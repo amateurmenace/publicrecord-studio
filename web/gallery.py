@@ -43,6 +43,8 @@ from .charts import esc, n_of, still_src
 MAX_LISTED = 400          # a press lists this many of the newest shared pages (record/papers.py LIST_MAX)
 PER_DAY = 12              # …and this many from any one day
 STRIP_READERS = 1         # readers' pages on the front page's strip (board 1)
+SEASONED_DAYS = 2         # …seated only once a night's press has already listed them (two days by the calendar)
+WIDE_KINDS = ("chart", "week", "threads", "strip", "names", "search")   # blocks drawn from the whole record
 WEEK_DAYS = 7
 LISTED_SINCE = _dt.date(2026, 9, 24)   # the day "⚡ short link" began to say "lists it on the front pages"
 SCHEMA = "publicrecord.paper/1"
@@ -189,9 +191,12 @@ def when_words(created, today: _dt.date) -> str:
 
 
 def age_bits(d: Optional[_dt.date], today: _dt.date) -> Tuple[bool, bool, bool]:
-    """A card's three day-relative facts — (this week, a day old at least,
-    the year said: when_words names it once it is not today's) — the only
-    things about a listed page that change with nobody touching the store.
+    """A card's three day-relative facts — (this week; seasoned: a night's
+    press has already listed it, which by the calendar is two days, since a
+    page shared after one morning's press is first listed by the next at
+    age one and must not be seated by that same press; the year said:
+    when_words names it once it is not today's) — the only things about a
+    listed page that change with nobody touching the store.
     The press's gate and the worker's key both fold them in (record/press.py
     shared_digest, web/bake.py shared_hash), so the night the strip may seat
     a page, a card leaves this week, or the year turns is a night that
@@ -200,7 +205,7 @@ def age_bits(d: Optional[_dt.date], today: _dt.date) -> Tuple[bool, bool, bool]:
     if not d:
         return False, False, False
     age = (today - d).days
-    return 0 <= age < WEEK_DAYS, age >= 1, d.year != today.year
+    return 0 <= age < WEEK_DAYS, age >= SEASONED_DAYS, d.year != today.year
 
 
 def _town_of_slug(slug: str) -> str:
@@ -261,10 +266,14 @@ def card_of(paper: dict, pid: str, created, meetings_by_pid: Dict[str, dict], is
     made = [n_of(len(held), "meeting")] if held else []
     if held_slugs:
         made.append(n_of(len(held_slugs), "issue"))
+    # a page cites the record when it names a meeting or issue the pressing
+    # holds, or draws on the whole of it (the roll calls, the year, the
+    # threads); a title over paragraphs alone does not
+    cites = bool(held or held_slugs or any(isinstance(b, dict) and b.get("kind") in WIDE_KINDS for b in blocks))
     d = _day(created)
     week, seasoned, dated = age_bits(d, today)
     return {"id": pid, "href": f"{base}/p?p={pid}", "title": title[:200], "kind": kind_of(blocks),
-            "made": " · ".join(made), "what": what_of(blocks), "when": when_words(created, today),
+            "made": " · ".join(made), "cites": cites, "what": what_of(blocks), "when": when_words(created, today),
             "towns": towns, "town": towns[0] if len(towns) == 1 else "", "still": still, "by": "readers",
             "day": d.isoformat() if d else "",
             # this week, a day old at least (the strip seats a page only after
@@ -312,9 +321,14 @@ def readers_cards(shared: Optional[Sequence[dict]], meetings: Sequence[dict], is
 
 
 def strip_cards(readers: Sequence[dict]) -> List[dict]:
-    """The readers' page(s) the front page's strip seats: the newest that is
-    at least a day old."""
-    return [c for c in (readers or []) if c.get("seasoned")][:STRIP_READERS]
+    """The readers' page(s) the front page's strip seats: the newest that a
+    night's press has already listed (`seasoned`) AND that cites the record
+    (`cites`: a held meeting or issue, or a block drawn from the whole of
+    it). The night in the gallery is the steward's window — the press log
+    and the gallery name the page before the front page does, and one move
+    takes it down (specs/29, the moderation stance decided 2026-09-24); a
+    title over paragraphs alone is listed, never led with."""
+    return [c for c in (readers or []) if c.get("seasoned") and c.get("cites")][:STRIP_READERS]
 
 
 def own_cards(featured: Sequence[dict], meetings: Sequence[dict], stills, base: str = "/app") -> List[dict]:
@@ -336,7 +350,7 @@ def own_cards(featured: Sequence[dict], meetings: Sequence[dict], stills, base: 
                     "made": n_of(len(pids), "meeting") if pids else "",
                     "what": str(f.get("sub") or ""), "when": "", "towns": [town] if town else [], "town": town,
                     "still": still_src(stills, pid, 0, base) if pid else "", "by": "own", "day": "",
-                    "week": True, "seasoned": True, "dated": False})
+                    "week": True, "seasoned": True, "dated": False, "cites": True})
     return out
 
 
@@ -392,7 +406,7 @@ def page_body(own: Sequence[dict], readers: Sequence[dict], towns: Sequence[dict
     return f'''<section class="bs-gallery" id="frontpages">
   <div class="bs-gallery-head">
     <h1>Front pages</h1>
-    <p class="bs-gallery-lede">The record presses its own every night. Readers press theirs whenever they like and share them as links. Nobody signs — the record keeps no names — so a front page is judged by its receipts: every chart, reel and bracket points back into the tape.</p>
+    <p class="bs-gallery-lede">The record presses its own every night. Readers press theirs whenever they like and share them as links. Nobody signs — the record keeps no names — so a front page is judged by its receipts: every chart, reel and bracket points back into the tape. The ask to take a reader’s page down is on the page itself; a steward decides.</p>
     <nav class="bs-filters" aria-label="which front pages" hidden>{"".join(filters)}<span class="bs-filter-note">newest first</span></nav>
   </div>
   <p class="bs-gallery-count" id="bs-gallery-count" role="status" data-all="{esc(count)}">{esc(count)}</p>

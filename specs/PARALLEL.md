@@ -157,6 +157,19 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24, ⟦TIME⟧ — **v2.2.3 / r50 is LIVE: the decisions made** (specs/29,
+  after P2; tag `v2.2.3` at ⟦TAGAT⟧, the commit the image was built from; the
+  service and all six jobs on r50; the press at `--version 2.2.3`). Stephen
+  handed over the four open decisions: the listing threshold stays; the
+  takedown ask is on every stored page (a mail to the steward's published
+  address; no reply and no outcome promised — a steward reads it and
+  decides) and a taken page offered again gets the share's own 410 sentence
+  with the full link copied in its place; the strip seats only a page a
+  night's press has already listed and that cites the record — that night
+  is the steward's window; the board copy stands as built. Also: the press marks
+  its own links `by=press` and the page says so, and the 1024 overflow with
+  the panel open is gone. Reviewed ⟦REVIEW⟧. r50 / 2.2.3 are spent; next
+  numbers r51 / 2.2.4.
 - 2026-09-24, 11:23Z — **v2.2.2 / r49 is LIVE: the front pages, listed** (specs/29
   P2; tag `v2.2.2` at 629302a, the commit the image was built from; the
   service and all six jobs on r49; the press at `--version 2.2.2`, and

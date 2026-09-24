@@ -425,10 +425,10 @@ class TestPaperEndpoints(unittest.TestCase):
         self.mem.taken.add(pid); del self.mem._d[pid]
         again = self.client.post("/api/papers", json=portable())
         self.assertEqual(again.status_code, 410)
-        self.assertIn("taken down", again.json()["error"])
+        self.assertIn("took this page down", again.json()["error"])        # the share's own sentence (decided 2026-09-24); the editor copies the full link
         gone = self.client.get(f"/api/papers/{pid}")
         self.assertEqual(gone.status_code, 404)
-        self.assertEqual(gone.json()["error"], again.json()["error"])     # one sentence, the read path's
+        self.assertIn("taken down", gone.json()["error"])                  # the read path keeps its sentence
         self.assertIsNone(self.mem.get(pid))
 
 

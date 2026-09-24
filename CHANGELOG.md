@@ -2,6 +2,42 @@
 
 ## unreleased
 
+### The decisions made — the takedown ask on the page, the strip's rule, the record's own named — 2026-09-24 (v2.2.3)
+
+After v2.2.2 four questions were Stephen's; he handed them over on
+2026-09-24, and this release is the answers. **The listing threshold
+stays** at 2026-09-24: the three pages shared before the button said it
+lists them were never offered a listing, and stay unlisted. **The takedown
+ask is on the page itself**: every stored page's foot carries *Want this
+page taken down? Ask the steward* — a mail to the address the record
+already publishes for corrections, the page's link in the body — and says
+plainly that the record keeps no address for the reader, so no reply
+comes: a steward reads the ask, and a page taken down is gone at the next
+night's press. A taken page offered again is refused at the door with the
+share's own sentence — *a steward took this page down, so the record will
+not hold it again* — and the editor copies the full link in the short one's
+place, as its other refusals do. **The moderation stance**: a reader's page reaches the front page's strip
+only after a night's press has already listed it in the gallery (two days
+by the calendar — a page shared after one morning's press is first listed
+by the next, and must not lead the same night), and only when it cites the
+record: a meeting or issue the pressing holds, or a block drawn from the
+whole of it. That night in the gallery, named in the press log too, is the
+steward's window, and one move takes a page down; a title over paragraphs
+alone is listed, never led with. **The board copy stands
+as built**: where the planes lack what a board promised, the built words
+tell the truth, and the boards are behind the build on those lines.
+
+Two things noted after P1 are put right with them. The record's own front
+pages said *shared as a link · the writer is not named* like anyone's: the
+press marks its own links now (`by=press` — a link's marker, never a block
+or a stored field, and not a byline anyone can type: the page says *the
+record's own, pressed nightly · no byline — the counts are the tape's* only
+for a link the stub itself pressed that carries no writer's paragraph; any
+other link wearing the marker reads as one somebody shared). And the front page with the
+editor's panel open at 1024 ran nine pixels past the edge on the money
+rows and sixty on a chart's twin table; the rows let their meta drop to a
+second line and wrap there, and the tables' cells break long words.
+
 ### The front pages, listed — the gallery — 2026-09-24 (v2.2.2)
 
 Board 9, the last of specs/29's three deploys. The record presses its own

@@ -286,6 +286,24 @@ class TestGalleryPress(unittest.TestCase):
         sw = (OUT / "sw.js").read_text()
         self.assertIn('"/app/front-pages/"', sw)
 
+    def test_the_strip_seats_only_a_page_that_cites_the_record(self):
+        """The moderation stance (decided 2026-09-24): the day a page waits is
+        the steward's window, and the strip seats only a page made from
+        something the record holds — a seasoned page that cites nothing is
+        listed in the gallery but never leads the front page."""
+        bare = {"id": "1" * 16, "seasoned": True, "cites": False, "title": "shout"}
+        cites = {"id": "2" * 16, "seasoned": True, "cites": True, "title": "a night"}
+        fresh = {"id": "3" * 16, "seasoned": False, "cites": True, "title": "today"}
+        self.assertEqual([c["id"] for c in gallery.strip_cards([fresh, bare, cites])], ["2" * 16])
+        self.assertEqual(gallery.strip_cards([fresh, bare]), [])
+        # cites, from the bytes: a held meeting, a record-wide block, or neither
+        mk = lambda blocks: gallery.card_of({"schema": gallery.SCHEMA, "title": "t", "blocks": blocks}, "4" * 16,
+                                            "2026-09-20T00:00:00+00:00", {"vid1": {"pid": "vid1", "town": "Boston"}}, {}, {}, "/app", TODAY)
+        self.assertTrue(mk([{"kind": "story", "story": "meeting", "pid": "vid1"}])["cites"])
+        self.assertTrue(mk([{"kind": "chart", "chart": "votes"}])["cites"])                       # drawn from the whole record
+        self.assertFalse(mk([{"kind": "note", "text": "a shout"}])["cites"])                       # a title over paragraphs
+        self.assertFalse(mk([{"kind": "story", "story": "meeting", "pid": "gone"}])["cites"])     # names nothing this pressing holds
+
     def test_two_presses_of_one_store_are_identical_and_a_moved_store_presses(self):
         from web import bake
         from record.press import needs_press, shared_digest
@@ -312,7 +330,7 @@ class TestGalleryPress(unittest.TestCase):
                 p.write_text(json.dumps({"fingerprint": corpus_fingerprint(c) + shared_digest(SHARED, TODAY)}))
                 self.assertFalse(needs_press(c, str(p), shared=SHARED, today=TODAY))
                 self.assertTrue(needs_press(c, str(p), shared=SHARED[:-1], today=TODAY))
-                self.assertTrue(needs_press(c, str(p), shared=SHARED, today=TODAY + dt.timedelta(days=1)))   # a page turns a day old
+                self.assertTrue(needs_press(c, str(p), shared=SHARED, today=TODAY + dt.timedelta(days=2)))   # a page turns seasoned
                 self.assertTrue(needs_press(c, str(p), today=TODAY))
             finally:
                 c.close()
@@ -327,12 +345,13 @@ class TestGalleryPress(unittest.TestCase):
         from record.press import shared_digest
         day = dt.timedelta(days=1)
         self.assertEqual(gallery.age_bits(TODAY, TODAY), (True, False, False))
-        self.assertEqual(gallery.age_bits(TODAY - day, TODAY), (True, True, False))
+        self.assertEqual(gallery.age_bits(TODAY - day, TODAY), (True, False, False))       # first listed at age one: not yet seated
+        self.assertEqual(gallery.age_bits(TODAY - 2 * day, TODAY), (True, True, False))    # a press has listed it: seasoned
         self.assertEqual(gallery.age_bits(TODAY - 7 * day, TODAY), (False, True, False))
         self.assertEqual(gallery.age_bits(TODAY + day, TODAY), (False, False, False))
         self.assertEqual(gallery.age_bits(None, TODAY), (False, False, False))
         self.assertEqual(gallery.age_bits(dt.date(2026, 12, 20), dt.date(2027, 1, 1)), (False, True, True))   # the year is said
-        self.assertNotEqual(shared_digest(SHARED, TODAY), shared_digest(SHARED, TODAY + day))   # a page shared TODAY turns a day old
+        self.assertNotEqual(shared_digest(SHARED, TODAY + day), shared_digest(SHARED, TODAY + 2 * day))   # a page shared TODAY turns seasoned
         self.assertEqual(shared_digest(SHARED, TODAY + 8 * day), shared_digest(SHARED, TODAY + 9 * day))   # both past every flip: quiet
         old = [{"id": "c" * 16, "created": "2026-09-20T00:00:00+00:00", "data": b"{}"}]        # before LISTED_SINCE: never listed
         for d in (dt.date(2026, 9, 20), dt.date(2026, 9, 21), dt.date(2026, 9, 27), dt.date(2027, 1, 1)):
@@ -343,7 +362,7 @@ class TestGalleryPress(unittest.TestCase):
             root = Path(tmp); db = root / "corpus.db"
             TestBakeEdition._seed(db)
             bake.bake(str(db), str(root / "a"), "1.0.0", "https://x.org", shared=SHARED, today=TODAY)
-            bake.bake(str(db), str(root / "b"), "1.0.0", "https://x.org", shared=SHARED, today=TODAY + day)
+            bake.bake(str(db), str(root / "b"), "1.0.0", "https://x.org", shared=SHARED, today=TODAY + 2 * day)
             key = lambda d: re.search(r"cz-record-[\w.-]+", (root / d / "sw.js").read_text()).group(0)
             self.assertNotEqual(key("a"), key("b"))                                                   # the worker's key moves with the day
             self.assertNotEqual((root / "a" / "index.html").read_bytes(), (root / "b" / "index.html").read_bytes())   # the strip seats the newer page
@@ -354,7 +373,9 @@ class TestGalleryPress(unittest.TestCase):
     def test_the_share_hint_says_what_a_short_link_does(self):
         for token in ("⚡ short link — on the front pages after tonight’s press",
                       "A short link lists your page among the record’s front pages after the next nightly press, unsigned; a steward can take it down.",
-                      "function bsGallery(", "nav.hidden = false;", 'window.addEventListener("hashchange", fromHash);'):
+                      "function bsGallery(", "nav.hidden = false;", 'window.addEventListener("hashchange", fromHash);',
+                      'const take = from === "stored"', "a steward reads the ask, and a page taken down is gone at the next night’s press",
+                      'minted.includes(`${BASE}/p${location.search}`)', 'if (r.status === 410) { copyText(paperShareURL(p), said + " — full link copied instead"); return; }'):
             self.assertIn(token, JS)
         self.assertIn("bsSpine(); bsScore(); bsYear(); bsRiver(); bsGallery();", JS)
 

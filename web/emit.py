@@ -1057,6 +1057,13 @@ def _paper_qs(title, blocks) -> str:
     return qs
 
 
+# the press's own front pages carry this on their links (specs/29, decided
+# 2026-09-24): the reader's decodePaper reads it as `by`, and the page says
+# "the record's own, pressed nightly" instead of "shared as a link · the
+# writer is not named". Never a block, never stored — a link's marker only.
+PRESS_BY = "&by=press"
+
+
 def featured_papers(meetings, issues, stats):
     """The front door's examples (specs/21 P3, settled with Stephen
     2026-07-22): two or three papers built at press time from the record's
@@ -1074,7 +1081,7 @@ def featured_papers(meetings, issues, stats):
             "title": "the roll calls, watched",
             "sub": "every roll call on the record, dot by dot — and how the "
                    "talk around them was framed",
-            "qs": _paper_qs("the roll calls, watched", blocks), "blocks": blocks,
+            "qs": _paper_qs("the roll calls, watched", blocks) + PRESS_BY, "blocks": blocks,
         })
     loud = (stats or {}).get("loud") or []
     if loud:
@@ -1097,7 +1104,7 @@ def featured_papers(meetings, issues, stats):
         out.append({
             "title": title,
             "sub": sub,
-            "qs": _paper_qs(title, blocks), "blocks": blocks,
+            "qs": _paper_qs(title, blocks) + PRESS_BY, "blocks": blocks,
         })
     ms = sorted(meetings, key=lambda m: (m.get("date") or ""), reverse=True)
     if ms:
@@ -1114,7 +1121,7 @@ def featured_papers(meetings, issues, stats):
             "sub": f'{m.get("title") or m["pid"]} — as a story: its numbers, '
                    "its shape, its framing, the record's reading, and what "
                    "keeps coming back record-wide",
-            "qs": _paper_qs("the latest meeting, covered", blocks), "blocks": blocks,
+            "qs": _paper_qs("the latest meeting, covered", blocks) + PRESS_BY, "blocks": blocks,
         })
     return out
 

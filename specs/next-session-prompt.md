@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.2, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.3, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -94,6 +94,60 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
+## 2026-09-24, ⟦TIME⟧ — v2.2.3 / r50 IS LIVE: the decisions made (specs/29, after P2)
+
+Stephen handed over the four open decisions ("make the decisions you think
+are best in order to move on and continue building"); this release is the
+answers and two P1 leftovers. The CHANGELOG entry says what; the shape:
+
+- **The decisions**: (1) `LISTED_SINCE` stays 2026-09-24 — the three July
+  pages were shared before the button promised a listing, and stay
+  unlisted. (2) The takedown ask is on every stored page, foot or
+  no foot (`app.js`, the paper render, `.pb-take`, appended after either
+  branch — a title-only page most of all), and carries a `mailto:` to
+  `STEWARD_EMAIL` (the address the record already publishes for
+  corrections), subject *take down front page <id>*, the page's link in the
+  body, and says the record keeps no address for the reader, so no reply
+  comes: a steward reads the ask and decides (a peer's note: never promise
+  a reply nobody can send; a reviewer's: never promise the outcome either).
+  A taken page offered again gets the share's own 410 sentence
+  (`record/app.py` `TAKEN_AGAIN`) and the editor copies the full link in
+  its place; the read path keeps `NO_PAPER`. (3) The moderation stance: the night in the
+  gallery is the steward's window — `seasoned` is `SEASONED_DAYS` = 2 by
+  the calendar, because a page shared after one morning's press is first
+  listed by the next at age one and would have been seated by that same
+  press (a reviewer's catch: the window did not exist); `strip_cards` seats
+  only a seasoned page that `cites` the record (a held meeting or issue, or
+  a `WIDE_KINDS` block); OPERATING §5 names the morning glance as the
+  review step. (4) The board copy stands as
+  built; the boards are behind the build on the lines P1's notes list.
+- **The record's own, named**: `web/emit.py::PRESS_BY` (`&by=press`) rides
+  on the three featured links; `decodePaper` reads `by`; the read page's
+  `from` is `press` only for a link the stub's own `#pfeat` pressed that
+  carries no `note` (a marker anyone can type is not a byline), and the
+  kicker and `.pfrom` say the record's own, pressed nightly · no byline —
+  the counts are the tape's (the labels beneath still count a model's
+  parts). The codec twin strips the marker before comparing
+  and asserts it is there. Never a block, never stored.
+- **The overflow**: `.bs-moneyrow` wraps (`flex-wrap`; the meta
+  `margin-left:auto` and `white-space:normal`, so a meta wider than the row
+  itself wraps inside), `table.twin` cells (the charts' twins on the front
+  page) `overflow-wrap:anywhere`; measured in the pane at 1024 with the
+  panel open and at 1400 without.
+- **Tests**: ⟦TESTS⟧.
+- **Deploy**: r50 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.3`
+  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
+  tag `v2.2.3` at ⟦TAGAT⟧.
+- **Reviewed**: ⟦REVIEW⟧.
+- **Next, in order**: prove the listing path on production with one real
+  page (share one; tonight's press lists it, tomorrow's seats it on the
+  strip, the worker key gains its suffix); *said alongside it* (board 6)
+  still wants a pressed field — the topic story's machinery over an
+  issue's mentions; then the older list below (a second featured word, the
+  specs/25 §4 and specs/26 §4 follow-ons, a phone read of the front page,
+  the source-of-truth question with control-z that CLAUDE.md still flags).
+
 ## 2026-09-24, 11:23Z — v2.2.2 / r49 IS LIVE: the front pages, listed (specs/29 P2)
 
 The gallery (board 9), the last of specs/29's three deploys — specs/29 is
@@ -188,7 +242,8 @@ touches it next:
   reader's card routes to the API's `/app/p?p=<id>` as every short link
   does, so the gallery's own cards are static and its readers' pages are
   not.
-- **Stephen's, before or after**: (1) `LISTED_SINCE` — list the pages
+- **Stephen's, before or after** (decided 2026-09-24 by delegation — the
+  section above): (1) `LISTED_SINCE` — list the pages
   shared before 2026-09-24 too, or not; (2) the takedown request's words —
   there is no reader-facing *ask for this to come down* link because the
   words are his, and a taken page offered again is refused with the read
