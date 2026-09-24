@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.5, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.6, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -94,6 +94,78 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
+## 2026-09-24, ⟦TIME⟧ — v2.2.6 / r53 IS LIVE: the front page on a phone, as board 3 draws it
+
+The phone read the last session's list put first. The CHANGELOG entry says
+what; the shape, for whoever touches it next:
+
+- **Where it lives**: one `@media screen and (max-width:720px)` block in
+  `web/static/app.web.css`, just before `@media print` — screen only,
+  because an A4 page is 718 px wide and must print the wide forms (a
+  review catch). The plain `@media (max-width:720px)` block still holds
+  the layout rules paper may share (the nameplate's column, the stacked
+  filmstrip for print).
+- **The masthead**: `web/broadsheet.py::nameplate(manifest, towns,
+  spine_html)` emits wordmark, spine, switch in that order;
+  `web/emit.py::masthead` passes the spine in. Wide, `.bs-nameplate` is a
+  grid (the switch at column 2, row 1; the spine spanning row 2) whose two
+  columns share the row in the ratio of their natural widths — 1.62 : 1 for
+  a two-town switch, 2.8 : 1 for one (`:has(.bs-muni.one)`) — as main's flex
+  row shared it: the masthead measures main's height at every desktop width
+  from 721 to 1440 (a skeptic's catch: an `auto` column squeezed the
+  wordmark). Narrow, a flex column in page order. In print the spine hides
+  and the nameplate keeps its 18 px bottom gap.
+- **Tonight**: `.bs-tonight .bs-scorecard` omitted — the front page's alone:
+  a meeting page's `.bs-scorecard` is its jump bar and stays (a skeptic's
+  catch: the first rule hid it on every phone); `#bs-hero` with
+  `#bs-playfrom`, the now-at card and the money rows stay. The filmstrip is
+  a flex row of 78 %-wide frames with scroll snapping, padded so a frame's
+  focus ring and lit halo are not clipped.
+- **The river**: its `<text>` and `.bs-rjoinline` (the two-town dashed
+  line, now classed in `charts.lens_river`) hidden; `.bs-iso` neutralised
+  so a river isolated wide and turned narrow shows every band; a
+  `.bs-onphone` line under it says where the lenses are named.
+- **The year**: `charts.year_phone(months, tapes, lit, windowed)` — board
+  3's month-by-month dots (a column per month, dots stacked six high and two
+  wide, the count in `INK2` above, the height fitted to the tallest month),
+  pressed inside `.bs-year` after the wide strip; `bsYear` lights `.bs-ydot`
+  by pid and lets a pick go when the screen crosses 720 px (`matchMedia`).
+  The sub and the download swap with it (`.bs-onwide` / `.bs-onphone`,
+  `pictures/year-by-month.svg`). `year_tapes(..., windowed=)` — both
+  pictures' labels name the twelve-month window (a review catch: they
+  always said "the record"). `section_head(..., hid=)` — the year's
+  `aria-labelledby` names a heading that exists.
+- **Measured** (the desk corpus, the pane): at 375 the order is wordmark ·
+  search · switch, the score omitted, the filmstrip one frame tall, the page
+  about a thousand pixels shorter; at 360 the year's labels 10.55 px; at
+  320 no sideways scroll (the search input's `min-width:0`); at 1024 and
+  1440 the desktop masthead, score, filmstrip and year as before.
+- **Not done**: the hidden tape strip's stills still download on a phone
+  (an SVG `<image>` inside `display:none` is fetched); there is no CSS-only
+  fix — a follow-up could press the phone picture without the strip or
+  load the stills lazily.
+- **Tests**: 1007 (110 PG-backed skip without a DSN). In
+  `tests/test_web_broadsheet.py`: the phone year picture (the same meetings
+  and dims as the tapes, the height, a month of fourteen), every phone rule
+  in the screen-only block and nowhere else, no bare `.bs-scorecard` hide,
+  the print nameplate's gap, the words and downloads that swap, both
+  pictures naming the window, the heading id, the page order wordmark ·
+  search · switch, the two-town river's join line. Measured beyond the
+  suite with a headless-Chrome harness: masthead heights against main at
+  thirteen widths, a meeting page's jump bar at 390 and 720, A4 and Letter
+  prints, the filmstrip's focus ring.
+- **Deploy**: r53 (image `⟦IMG⟧`, built from ⟦TAGAT⟧) on the service
+  (revision ⟦REV⟧) and all six jobs; the press at `--version 2.2.6`
+  (execution ⟦EXEC⟧, ⟦PRESSTIME⟧); Pages ⟦PAGES⟧; `sw.js` key `⟦SWKEY⟧`;
+  tag `v2.2.6` at ⟦TAGAT⟧.
+- **Reviewed**: one adversarial pass (ten findings, nine folded — the
+  hidden strip's stills still download on a phone, noted above), then a
+  skeptic on the folds (five, folded: the meeting page's jump bar hidden on
+  phones, the desktop masthead squeezed from 721 to about 1000 px and on
+  Letter paper, print's lost gap, the clipped focus ring, the phone's
+  thirty-pixel gap), with a peer's two board-3 notes (the spine second;
+  tonight's score omitted) folded in between.
+
 ## 2026-09-24, 18:53Z — v2.2.5 / r52 IS LIVE: no one named beside an issue whom the record does not already name
 
 A fix to v2.2.4, found on the live planes after a session restart: two
@@ -186,7 +258,7 @@ public comment). The CHANGELOG entry says what; the shape:
   word since specs/27; the phone board was built in P0, and a fresh read
   of the front page at 375 wide against it is still worth an hour): prove
   the listing path on production with one real shared page; the phone
-  read; the topic as a
+  read (done in v2.2.6, above); the topic as a
   paper block (a slug, a ref-only kind); a month filter on the search
   page's list; the press job's gate read from the live pressing's
   fingerprint; plurals beside an issue (*complete street* / *complete

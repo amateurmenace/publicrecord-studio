@@ -157,6 +157,15 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24, ⟦TIME⟧ — **v2.2.6 / r53 is LIVE: the front page on a phone, as board 3
+  draws it** (tag `v2.2.6` at ⟦TAGAT⟧, the commit the image was built from;
+  the service and all six jobs on r53; the press at `--version 2.2.6`). On a
+  phone's screen only: the search second in the page itself, tonight's
+  score omitted with the still and the now-at card kept, the filmstrip a
+  swipe row, the river static, the year as board 3's month-by-month dots;
+  paper keeps the wide forms. Reviewed through one pass and a skeptic (ten
+  and five, folded). r53 / 2.2.6 are spent;
+  next numbers r54 / 2.2.7.
 - 2026-09-24, 18:53Z — **v2.2.5 / r52 is LIVE: no one named beside an issue whom
   the record does not already name** (tag `v2.2.5` at 3195099, the commit the
   image was built from; the service and all six jobs on r52; the press at

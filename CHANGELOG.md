@@ -2,6 +2,34 @@
 
 ## unreleased
 
+### The front page on a phone, as board 3 draws it — 2026-09-24 (v2.2.6)
+
+The spec asks the phone to stack the front page in the same order, the
+search second and the river static. Read at 375 wide, the page had no
+sideways scroll but two of its pictures had shrunk past reading and one
+section stacked a thousand pixels of frames. On a phone's screen now:
+
+- **The search is second.** The wordmark, the search, then the municipality
+  switch — in that order in the page itself, so a screen reader and a
+  keyboard meet them as the phone shows them; wide, the switch still sits at
+  the wordmark's right with the search spanning beneath.
+- **Tonight's tape keeps its still and its Play-from chip**, and the now-at
+  card carries the night; the score's eight lanes, which cannot be read at
+  that width, are omitted there (board 3; a peer's note). The three frames
+  from inside the night are a row to swipe.
+- **The river is static.** Its lens labels, dates and dashed line would be
+  specks stretched to nothing, so the bands stand alone — still a link to
+  the full page — with a line beneath saying a band opens the page where
+  each lens is named.
+- **The year is board 3's own picture**: a column per month, a dot per
+  meeting in its town's colour, the month's count above, lit by the same
+  chapter buttons; the section's words and its download describe the
+  picture on screen.
+
+All of it is a screen's alone: an A4 page is 718 pixels wide, and paper keeps
+the labelled river, the strip of tapes and the score. Desktop is unchanged.
+The search input may shrink now, so nothing scrolls sideways at 320.
+
 ### No one named beside an issue whom the record does not already name — 2026-09-24 (v2.2.5)
 
 The morning after *said alongside it* went live, two of its chips named
