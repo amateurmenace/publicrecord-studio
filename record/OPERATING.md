@@ -207,6 +207,7 @@ Three things happen at night, and each stands on the one before:
 | 03:00 | `record-poll` | polls every live town's channels; files rule-matched candidates as submissions |
 | 03:30 | `record-pipeline` | ingests every `approved` submission — captions via the watch page, then `yt-dlp`, then the community caption service (the highlighter's public transcript engine, which fetches through a residential proxy: from Cloud Run the watch page is walled and only the relay answers — verified 2026-09-23, 7,842 cues in 5.7 s) |
 | 04:30 | the nightly-edition workflow | presses from the cloud and carries the edition to the Pages repo — once its three secrets exist (below) |
+| 05:45 | `record-embed` | drains the meaning-vector backlog — every segment still without a vector, under the spend cap — including what the pipeline's per-meeting budget left behind (below) |
 
 Until 2026-09-23 the middle step never ran: `approved` was only ever written
 by a click in the console, and the queue was unattended. Two things change
@@ -249,6 +250,44 @@ at ingest it asks `videos.list` for a meeting's exact title, posting day and
 length, because the caption relay brings words and nothing else and the
 watch page is walled from the cloud. Without the key the feed's title and
 the day read from it (`record/pipeline.py::plan_from_submission`) stand in.
+
+**The embedding budget.** A landed meeting spends `RECORD_EMBED_BUDGET_S`
+seconds (default 120; `0` = no budget) on its meaning vectors inside the
+pipeline and no longer — the clock bounds each request too (sixty seconds)
+and the retry ladder stands down past it. The first night with every switch on (2026-09-23)
+landed one meeting and sat silent for an hour: the embedding endpoint had
+slowed from a batch of a hundred every seven seconds to one every one to
+four minutes, a 6,187-segment meeting could not finish inside the job's
+hour, and a dozen approved tapes behind it were never reached. The meeting
+is on the record before the clock starts; the log says what the budget
+left (`⏱ … meaning-search is behind for N segment(s)`), and `record-embed`
+drains it nightly at 05:45 ET, after the pipeline's hour and its one retry:
+
+```bash
+gcloud scheduler jobs create http record-nightly-embed --location=us-east1 \
+  --schedule="45 5 * * *" --time-zone="America/New_York" \
+  --uri="https://run.googleapis.com/v2/projects/publicrecord-studio/locations/us-east1/jobs/record-embed:run" \
+  --http-method=POST \
+  --oauth-service-account-email=907309358085-compute@developer.gserviceaccount.com \
+  --attempt-deadline=1800s
+```
+
+Two embedders running at once (a pipeline and a backfill, or two pipelines)
+share the same throttled endpoint and both crawl — the 05:45 slot is after
+the pipeline's worst case on purpose. The pace is readable in the `spend`
+ledger (one row per batch, `added_at` apart).
+
+A job killed by its timeout mid-ingest leaves its submission at `queued`
+and its meeting shell at `transcribing` or `analyzing`. Cloud Run retries
+the task once, at once — too soon for that row to look abandoned — so the
+retry lands the rest of the queue and the *next night's* drain reclaims the
+submission (`reclaim_stale`)
+and the dedupe no longer counts a shell untouched for an hour as on the
+record (`memory.ingest.stale_in_flight`, a bound only the pipeline passes —
+the desk's on-device jobs run for hours), so the tape is asked for again
+rather than stranded; the retry stage picks up a stale shell of the last
+week the same way. The hour is `memory.ingest.STALE_IN_FLIGHT_S`, and it is
+the job's own `--task-timeout=3600` (INFRA §8): raise one, raise both.
 
 **The model lane on the hosted pipeline.** `czcore.llm` reads
 `GEMINI_API_KEY`; the pipeline carries `RECORD_GEMINI_KEY` and bridges it

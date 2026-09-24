@@ -229,6 +229,7 @@ Squarespace; point it here instead.
 
 ```bash
 gcloud run jobs create record-pipeline \
+    --task-timeout=3600 --max-retries=1 \
     --image=us-east1-docker.pkg.dev/community-ai-record/record/api:1 \
     --region=us-east1 \
     --add-cloudsql-instances=publicrecord-studio:us-east1:record-pg \

@@ -53,6 +53,20 @@ class Settings:
     spend_cap_usd: float = field(default_factory=lambda: float(
         _env("RECORD_SPEND_CAP_USD", "100") or 100))
 
+    # -- the ingest's embedding budget -------------------------------------
+    # How long one freshly landed meeting may spend on its meaning vectors
+    # inside the nightly pipeline, in seconds. The embedding endpoint can slow
+    # to a batch a minute and worse — on 2026-09-23 a 6,187-segment meeting
+    # sat silent in this stage for an hour until the job's timeout ended it,
+    # with a dozen approved tapes waiting behind it. The meeting is on the
+    # record before this clock starts; what the budget leaves undone is
+    # `record-embed`'s backlog, and meaning-search catches up on its next
+    # backfill. Two minutes: at the healthy pace that is a whole hour of tape,
+    # and thirteen approved meetings still fit one job's hour when it is not.
+    # 0 means no budget: embed the whole meeting, however long.
+    embed_budget_s: float = field(default_factory=lambda: float(
+        _env("RECORD_EMBED_BUDGET_S", "120") or 120))
+
     # -- the neural half ---------------------------------------------------
     # Absent by design: with no key publicrecord still runs, search still works,
     # and the reader is told which half is missing rather than shown a blank.

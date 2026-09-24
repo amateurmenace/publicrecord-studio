@@ -2,6 +2,21 @@
 
 ## unreleased
 
+### The night lands every tape — 2026-09-23 (v2.1.20)
+
+The first night with every switch on landed one meeting and then sat
+silent for an hour: the embedding endpoint had slowed to a batch a minute,
+one meeting's meaning vectors took longer than the job's hour, and a dozen
+approved tapes behind it were never reached. A landed meeting now spends a
+budget on its vectors (`RECORD_EMBED_BUDGET_S`, two minutes) and no longer
+— it is on the record before that clock starts, the log names what is
+left, and `record-embed`, now scheduled nightly, drains the backlog under
+the spend cap. A job killed mid-ingest no longer strands its submission:
+the next drain reclaims what a dead job left `queued`, and a shell nobody
+has touched for an hour is not "already on the record". The nightly edition workflow was proven end to end (the
+federated sign-in, the press from the cloud, the bucket sync); it no longer
+commits a night whose only change is the press's own timestamp. 631 tests.
+
 ### A parked tape is asked again — 2026-09-23 (v2.1.19)
 
 Brookline's meetings are live streams, and a live stream's auto captions

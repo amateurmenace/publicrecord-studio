@@ -157,6 +157,19 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-23 (last) — **v2.1.20 / r43 is LIVE**: a landed meeting spends a
+  two-minute budget on its meaning vectors inside the pipeline
+  (`RECORD_EMBED_BUDGET_S`), and `record-embed` is scheduled nightly at
+  05:45 ET to drain the rest; the nightly-edition workflow proved its
+  federated sign-in, press and bucket sync, and now ignores a night whose
+  only change is the press's timestamp. A job killed mid-ingest no longer
+  strands its submission or its parked tape (`reclaim_stale`; a stale
+  in-flight shell is not a dedupe hit for the pipeline; the retry stage
+  picks up a stale shell of the week). The standing rule approved thirteen
+  waiting tapes on its first poll. 631 tests. Still Stephen's: `PAGES_TOKEN` needs
+  *Contents: read and write* on `amateurmenace/publicrecord` (the push was
+  refused, 403). Another session holds `topic-story` (specs/25) uncommitted
+  in the main checkout — rebase it on main before its deploy.
 - 2026-09-23 (later still) — **v2.1.19 / r42 is LIVE**: the nightly drain asks
   again for every meeting that parked without words in the last week — a
   live stream's auto captions arrive hours after it ends, and Brookline's

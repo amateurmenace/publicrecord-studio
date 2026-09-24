@@ -95,6 +95,9 @@ TASK_QUERY = "RETRIEVAL_QUERY"
 # dead endpoint until morning.
 _BACKOFF = (1.0, 4.0, 10.0)
 
+# One request may take this long and no longer (the SDK counts milliseconds).
+REQUEST_TIMEOUT_MS = 60_000
+
 # Codes that will fail identically on the next attempt: a bad key, a forbidden
 # project, a malformed request. Retrying these buys nothing but latency.
 _PERMANENT = {400, 401, 403, 404, 413}
@@ -135,7 +138,12 @@ def _client():
     that a module-level import never touches the network or the environment."""
     global _CLIENT
     if _CLIENT is None and available():
-        _CLIENT = genai.Client(api_key=settings.gemini_key)
+        # A request that never answers would otherwise hold a nightly job
+        # until its timeout: the SDK's default is no timeout at all. Sixty
+        # seconds is twenty times a healthy batch (milliseconds, per the SDK).
+        _CLIENT = genai.Client(
+            api_key=settings.gemini_key,
+            http_options=genai_types.HttpOptions(timeout=REQUEST_TIMEOUT_MS))
     return _CLIENT
 
 
@@ -192,16 +200,24 @@ def _call(texts: Sequence[str], task: str) -> _Vecs:
     return vecs
 
 
-def _attempt(texts: Sequence[str], task: str) -> Optional[_Vecs]:
+def _out_of_time(deadline: float) -> bool:
+    return bool(deadline) and time.monotonic() >= deadline
+
+
+def _attempt(texts: Sequence[str], task: str,
+             deadline: float = 0.0) -> Optional[_Vecs]:
     """The ladder. Returns the vectors, or None when the call could not be
     made at all — the caller distinguishes "no vector for this text" from "no
-    answer for any of them", because only the second is worth stopping for."""
+    answer for any of them", because only the second is worth stopping for.
+    Past `deadline` (a `time.monotonic()` instant) there is no next rung: the
+    failure is reported and the caller decides, without another sleep."""
     for i in range(len(_BACKOFF) + 1):
         try:
             return _call(texts, task)
         except Exception as e:               # deliberately everything
-            if _permanent(e) or i == len(_BACKOFF):
-                print(f"  embed failed ({_reason(e)}) for {len(texts)} text(s)")
+            if _permanent(e) or i == len(_BACKOFF) or _out_of_time(deadline):
+                print(f"  embed failed ({_reason(e)}) for {len(texts)} text(s)"
+                      + (" — out of time, not retried" if _out_of_time(deadline) else ""))
                 return None
             time.sleep(_BACKOFF[i])
     return None
@@ -273,7 +289,7 @@ def _log_spend(corpus, units: int, purpose: str, town: str = "",
 # -- the public seam -------------------------------------------------------
 
 def embed_batch(texts: List[str], purpose: str = "embed", town: str = "",
-                corpus=None, target: str = "") -> _Vecs:
+                corpus=None, target: str = "", deadline: float = 0.0) -> _Vecs:
     """Vectors for many texts at once — the ingest path.
 
     Returns a list the same length as `texts`, position for position, each
@@ -284,7 +300,13 @@ def embed_batch(texts: List[str], purpose: str = "embed", town: str = "",
 
     A plain list rather than an array because the caller writes it through an
     explicit `::vector` cast; the query path below has a different consumer
-    and hands back a different shape for a reason given there."""
+    and hands back a different shape for a reason given there.
+
+    `deadline` bounds the work, not just the loop around it: past it a dead
+    batch is not retried as singletons (a hundred texts through a four-rung
+    ladder is twenty-five minutes of sleeping), and the chunks still unsent
+    come back None for the next run. The caller reads its own clock to know
+    that is what happened."""
     out: _Vecs = [None] * len(texts)
     if not texts or not available():
         return out
@@ -292,15 +314,20 @@ def embed_batch(texts: List[str], purpose: str = "embed", town: str = "",
     # they embed to nothing useful, and the segment table has plenty of them.
     live = [(i, _clip(t)) for i, t in enumerate(texts) if str(t or "").strip()]
     for start in range(0, len(live), BATCH_MAX):
+        if _out_of_time(deadline):
+            break
         chunk = live[start:start + BATCH_MAX]
-        vecs = _attempt([t for _, t in chunk], TASK_DOCUMENT)
-        if vecs is None and len(chunk) > 1:
+        vecs = _attempt([t for _, t in chunk], TASK_DOCUMENT, deadline)
+        if vecs is None and len(chunk) > 1 and not _out_of_time(deadline):
             # One text the API will not accept must not cost the other
             # ninety-nine their vectors, so a dead batch is retried as
             # singletons before it is believed.
             vecs = []
             for _, t in chunk:
-                one = _attempt([t], TASK_DOCUMENT)
+                if _out_of_time(deadline):
+                    vecs.append(None)
+                    continue
+                one = _attempt([t], TASK_DOCUMENT, deadline)
                 vecs.append(one[0] if one else None)
         if vecs is None:
             continue
@@ -338,7 +365,7 @@ def embed_query(q: str, corpus=None, town: str = ""):
 
 def backfill(corpus, town: str = "", limit: int = 0,
              verbose: bool = True, cap_usd: float = 0.0,
-             meeting_id: str = "") -> dict:
+             meeting_id: str = "", deadline: float = 0.0) -> dict:
     """Fill `segments.emb_neural` wherever it is NULL, in batches.
 
     Returns `{"embedded", "skipped", "failed", "available"}`. When the
@@ -357,11 +384,21 @@ def backfill(corpus, town: str = "", limit: int = 0,
     meeting into a corpus with an embedding backlog embeds the entire town —
     correct, capped, and hours long, so the nightly job times out every night
     on work that was never its business. The backlog belongs to `record-embed`;
-    a freshly ingested meeting belongs to the stage that ingested it."""
+    a freshly ingested meeting belongs to the stage that ingested it.
+
+    `deadline` is a `time.monotonic()` instant, and it is the ingest's clock
+    rather than the ledger's: the pipeline hands each landed meeting a budget
+    (`settings.embed_budget_s`) because the endpoint can slow to a batch a
+    minute and a nightly job that waits on it lands nothing else. It is
+    checked between batches, so one batch in flight is the most it overruns;
+    a stop reports `stopped_at_deadline` and `behind` — the segments of this
+    scope still without a vector — for the next backfill to pick up. 0 means
+    no deadline."""
     from .settings import settings
     cap = cap_usd if cap_usd > 0 else settings.spend_cap_usd
     out = {"embedded": 0, "skipped": 0, "failed": 0, "available": available(),
-           "cap_usd": cap, "spent_usd": 0.0, "stopped_at_cap": False}
+           "cap_usd": cap, "spent_usd": 0.0, "stopped_at_cap": False,
+           "stopped_at_deadline": False, "behind": 0}
     if not out["available"]:
         if verbose:
             print(f"neural embeddings unavailable: {status()['reason']}")
@@ -373,6 +410,14 @@ def backfill(corpus, town: str = "", limit: int = 0,
         want = BATCH_MAX if remaining < 0 else min(BATCH_MAX, remaining)
         if want <= 0:
             break
+        if deadline and time.monotonic() >= deadline:
+            out["stopped_at_deadline"] = True
+            out["behind"] = _behind(corpus, town, meeting_id)
+            if verbose:
+                print(f"  stopping: the time budget is spent. {out['embedded']:,} "
+                      f"embedded this run; {out['behind']:,} still wait, and the "
+                      f"next backfill picks them up.")
+            break
         # The cap is checked at the top of the loop — before a row is read, let
         # alone bought — and it is measured against the `spend` ledger rather
         # than a counter this process holds. That is what makes it survive a
@@ -383,6 +428,7 @@ def backfill(corpus, town: str = "", limit: int = 0,
             out["spent_usd"] = round(already, 4)
             if already + estimate_usd(want) > cap:
                 out["stopped_at_cap"] = True
+                out["behind"] = _behind(corpus, town, meeting_id)
                 if verbose:
                     print(f"  stopping: ${already:.2f} already spent against a "
                           f"${cap:.2f} cap. {out['embedded']:,} embedded this "
@@ -410,7 +456,8 @@ def backfill(corpus, town: str = "", limit: int = 0,
 
         target = f"segments:{rows[0]['id']}-{after}"
         vecs = embed_batch([r["text"] or "" for r in rows], purpose="embed",
-                           town=town, corpus=corpus, target=target)
+                           town=town, corpus=corpus, target=target,
+                           deadline=deadline)
 
         wrote = 0
         with corpus._con() as con:
@@ -435,6 +482,12 @@ def backfill(corpus, town: str = "", limit: int = 0,
                   f"({out['embedded']:,} done, {out['failed']:,} failed, "
                   f"{out['skipped']:,} blank)")
         if wrote == 0 and any((r["text"] or "").strip() for r in rows):
+            if deadline and time.monotonic() >= deadline:
+                # Not an outage: the clock ran out inside this batch and the
+                # ladder stood down. Say so as a deadline, never as silence.
+                out["stopped_at_deadline"] = True
+                out["behind"] = _behind(corpus, town, meeting_id)
+                break
             # A whole batch of real text came back with nothing, after the
             # ladder and the singleton retries. That is an outage or a revoked
             # key, not a bad segment; grinding through the rest of the corpus
@@ -444,6 +497,30 @@ def backfill(corpus, town: str = "", limit: int = 0,
                       "stopping here; rerun when it is back.")
             break
     return out
+
+
+def _behind(corpus, town: str = "", meeting_id: str = "") -> int:
+    """How many segments in this scope still have no vector — what a stop
+    leaves for the next backfill. Never raises: a count that cannot be read
+    is reported as -1, unknown, rather than as a reason to fail a run whose
+    work is already written."""
+    # Blank cues never embed and are never behind; counting them would
+    # overstate what is left by hundreds, forever.
+    sql = ("SELECT COUNT(*) AS n FROM segments WHERE emb_neural IS NULL "
+           "AND btrim(coalesce(text, '')) <> ''")
+    args: list = []
+    if town:
+        sql += " AND town=%s"
+        args.append(town)
+    if meeting_id:
+        sql += " AND meeting_id=%s"
+        args.append(meeting_id)
+    try:
+        with corpus._con() as con:
+            row = con.execute(sql, args).fetchone()
+        return int(row["n"]) if row else 0
+    except Exception:
+        return -1
 
 
 def _pg_vector(vals: Sequence[float]) -> str:

@@ -20,6 +20,7 @@ Transcript resolution order:
 
 from __future__ import annotations
 
+import time
 import hashlib
 import json
 import re
@@ -96,7 +97,7 @@ def resolve_input(body: dict) -> dict:
     return plan
 
 
-def submit_dedupe(corpus, plan: dict) -> Optional[dict]:
+def submit_dedupe(corpus, plan: dict, stale_after: float = 0.0) -> Optional[dict]:
     """The cheap, local dedupe tiers — deterministic id, canonical URL, then
     media hash — so the submissions route can answer 'exists' without queueing.
     (Transcript-shingle similarity is the third tier; it needs the words and so
@@ -108,10 +109,42 @@ def submit_dedupe(corpus, plan: dict) -> Optional[dict]:
         hit = corpus.find_by_hash(plan["source_hash"])
     # already live OR already in the pipeline → don't queue a second job (which
     # would revert a finished meeting to 'transcribing' and recompute it). Only
-    # error / no_transcript rows are re-tried.
-    if hit and hit.get("status") in ("live", "queued", "transcribing", "analyzing"):
+    # error / no_transcript rows are re-tried — and, when the caller says how
+    # long its jobs may live (`stale_after`), an in-flight shell nobody has
+    # touched for longer than that: the job that was building it was killed
+    # (a timeout, a restart), and treating its shell as "on the record" would
+    # hand the next run an empty meeting to link to. The desk passes nothing:
+    # its on-device transcriptions run for hours without touching the row,
+    # and a second Scribe job on the same tape is the one thing this exists
+    # to prevent.
+    if hit and hit.get("status") == "live":
+        return hit
+    if hit and hit.get("status") in IN_FLIGHT and not stale_in_flight(hit, stale_after):
         return hit
     return None
+
+
+# The states a job moves a meeting through before `live`. How long a shell
+# may sit in one of them before it is presumed abandoned is the caller's
+# knowledge: the hosted pipeline's is its task timeout (`record-pipeline`,
+# 3600 s — `record/INFRA.md` §8 creates the job with it), because a job that
+# has not touched its meeting for that long is not running.
+IN_FLIGHT = ("queued", "transcribing", "analyzing")
+STALE_IN_FLIGHT_S = 3600
+
+
+def stale_in_flight(hit: dict, stale_after: float = 0.0, now: float = 0.0) -> bool:
+    """Has this in-flight shell been left alone longer than `stale_after`
+    seconds? With no bound (0) nothing is ever stale. A shell with no
+    timestamp at all is presumed stale under any bound — nothing running
+    could have written it."""
+    if not stale_after or stale_after <= 0:
+        return False
+    try:
+        touched = float(hit.get("updated_at") or hit.get("added_at") or 0)
+    except (TypeError, ValueError):
+        touched = 0.0
+    return touched < (now or time.time()) - float(stale_after)
 
 
 # --------------------------------------------------------------------------

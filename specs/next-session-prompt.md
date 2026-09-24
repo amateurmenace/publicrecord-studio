@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.1.16, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.1.20, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (on a new machine: `gh repo clone amateurmenace/publicrecord-studio`, then
@@ -10,7 +10,18 @@ state.** Written 2026-09-23, late.
 
 ## Where things stand
 
-- **LIVE: v2.1.19 / r42** — tag `v2.1.19` at the deployed commit. v2.1.19:
+- **LIVE: v2.1.20 / r43** — tag `v2.1.20` at the deployed commit. v2.1.20:
+  the first night with every switch on landed one meeting and sat silent for
+  an hour — the embedding endpoint had slowed to a batch a minute, one
+  meeting's vectors outran the job's hour, and a dozen approved tapes were
+  never reached. A landed meeting now spends `RECORD_EMBED_BUDGET_S` (120 s)
+  on its vectors inside the pipeline and no longer; `record-embed` is
+  scheduled nightly at 05:45 ET (`record-nightly-embed`) to drain the rest;
+  the nightly-edition workflow proved its federated sign-in, press and
+  bucket sync, and ignores a night whose only change is the press's own
+  `pressed_at` stamp. A job killed mid-ingest no longer strands its
+  submission (`reclaim_stale`; a stale in-flight shell is not a dedupe hit). The standing rule approved thirteen waiting tapes on
+  its first poll (10 Boston, 3 Brookline). 631 tests. v2.1.19:
   the nightly drain asks again for every meeting that parked without words
   in the last week (`retry_parked`) — Brookline's meetings are live streams
   and their auto captions arrive hours later. v2.1.18:
@@ -55,21 +66,28 @@ state.** Written 2026-09-23, late.
 
 ## Stephen's decisions (never unprompted) — the switches that make the night run
 
-1. **Store the YouTube Data API key** (he made one on 2026-09-23 and pasted it
+0. **`PAGES_TOKEN` cannot write.** The 2026-09-23 dispatch cloned the Pages
+   repo with it and the push was refused (`Permission to
+   amateurmenace/publicrecord.git denied`, 403). A fine-grained token needs
+   *Contents: read and write* on `amateurmenace/publicrecord` (a classic
+   token: `repo`). Until then the carry step fails every night after a
+   successful press, and a hand carries the edition (OPERATING §5).
+1. ~~Store the YouTube Data API key~~ done 2026-09-23 (`youtube-data-api-key`, on the poll and the pipeline). The original: (he made one on 2026-09-23 and pasted it
    in chat — treat it as exposed: restrict to YouTube Data API v3, rotate):
    `printf '%s' 'KEY' | gcloud secrets create youtube-data-api-key --data-file=- --project=publicrecord-studio`
    then `gcloud run jobs update record-poll --region=us-east1 --update-secrets=RECORD_YOUTUBE_API_KEY=youtube-data-api-key:latest`.
    Without it the probe reads the walled watch page and a standing rule
    approves nothing from the cloud.
-2. **Flip the standing rule** on the sources he trusts (the console's intake
+2. ~~Flip the standing rule~~ ticked 2026-09-23 on all three sources (Boston City TV, Boston City Council, Brookline Interactive Group). The original: (the console's intake
    screen, per source). The audit names the rule. The constitution page
    already says a standing rule may gate the record.
-3. **Provision the nightly-edition workflow's three secrets** (OPERATING §5)
+3. ~~Provision the nightly-edition workflow's three secrets~~ all three exist; see 0 — the token cannot push. The original:
    so ingested meetings reach readers without a hand: until then a press +
    Pages sync is manual (§5), and `edition_date` stays where the last hand
    left it.
-4. **Work the steward queue** meanwhile (3 Boston submissions filed
-   2026-09-23; 0 approved).
+4. **Work the steward queue** meanwhile (69 `submitted` on 2026-09-23 after
+   the rule's first pass: 58 Boston, 11 Brookline — the older ones a rule
+   never re-asks about; `REPROBE_DAYS = 7`).
 5. ~~A model-drafted analysis~~ shipped (v2.1.18). The issue-level draft (the
    arc across meetings) is a follow-on and needs a column on `issues`.
 6. ~~The ledger sentence about the desk lane~~ shipped (v2.1.18).
@@ -77,9 +95,19 @@ state.** Written 2026-09-23, late.
    sources, spend over $100/mo, paper-as-homepage (declined), brand questions,
    deleting anything, a `record` template for the over-time story.
 
+## Another session, same checkout
+
+On 2026-09-23 a second session was building **specs/25 — the topic story**
+(`web/topic.py`, `tests/test_web_topic.py`, `tp-`/`tq-`/`sq-`/`rp-` CSS)
+uncommitted on branch `topic-story` **in the main checkout**. v2.1.20 was
+built from a worktree on `embed-budget` and landed on `main` without
+touching it. Whoever ships `topic-story`: rebase on `main` first (server
+files, the workflow, docs and `tests/test_record_metadata.py` moved), take
+the next image tag and press version, and move every job.
+
 ## Do, in order (a normal session)
 
-1. Suite (`.venv/bin/python -m unittest discover -s tests -t . -q` → 584; PG
+1. Suite (`.venv/bin/python -m unittest discover -s tests -t . -q` → 631; PG
    tests skip without `RECORD_TEST_PG_DSN`).
 2. Read the live front page first (`https://publicrecord.studio/app/`), both
    stories; then the console's queue. The nightly logs:
@@ -132,3 +160,13 @@ the file is written first).
   is.
 - Headless renders of the front page may show both stories (the toggle runs
   on DOMContentLoaded); the pane shows one, as readers see.
+- The press stamps `pressed_at` into `app/pressing.json` on every run and is
+  byte-identical otherwise; a carry that diffs the whole tree commits every
+  night. Two embedders at once (a pipeline and a backfill) share one
+  throttled endpoint and both crawl — the `spend` ledger shows the pace, one
+  row per batch. A pipeline execution killed by its timeout is retried once
+  (`maxRetries: 1`); the meeting is marked live before its embed, so a kill
+  in the embed stage loses vectors only, never the meeting.
+- The main checkout may be on someone else's branch with uncommitted work —
+  check `git worktree list` and `git status` before anything; build from a
+  worktree on a branch of your own.

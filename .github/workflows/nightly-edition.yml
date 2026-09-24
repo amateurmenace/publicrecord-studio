@@ -61,12 +61,15 @@ jobs:
                   if b[:2] == b"\x1f\x8b":
                       p.write_bytes(gzip.decompress(b))
           PY
-          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then
+          git add -A
+          # the press stamps `pressed_at` into app/pressing.json on every run;
+          # a night whose only change is that stamp is a night the record did
+          # not change, and it is not carried (readers cache by corpus hash)
+          if git diff --cached --quiet -- . ':(exclude)app/pressing.json'; then
             echo "the edition did not change — nothing to carry"; exit 0
           fi
           ed=$(python3 -c "import json; m=json.load(open('app/manifest.json')); print(m['version'], m['edition_date'])")
           git config user.name "record-press"
           git config user.email "noreply@publicrecord.studio"
-          git add -A
           git commit -m "Nightly edition: v${ed% *}, record of ${ed#* }"
           git push

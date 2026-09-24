@@ -115,6 +115,32 @@ def approved_queue(corpus, limit: int = 0) -> List[dict]:
         return [dict(r) for r in con.execute(sql, args).fetchall()]
 
 
+def reclaim_stale(corpus, older_than: float = 0.0, dry_run: bool = False) -> int:
+    """Back to `approved`: every submission a dead job left at `queued`.
+
+    `queued` says a job has it, and nothing else ever selects that state —
+    so a job killed inside an ingest (the task timeout, 2026-09-23) left its
+    submission there for good: not approved, not live, not failed, and the
+    console could not say why. A queued row older than a job can live
+    (`memory.ingest.STALE_IN_FLIGHT_S`, the task timeout) is not in flight;
+    it is asked for again, oldest first, like any approved row. A dry run
+    counts them and writes nothing."""
+    from memory import ingest
+    bound = older_than or ingest.STALE_IN_FLIGHT_S
+    with corpus._con() as con:
+        if dry_run:
+            row = con.execute(
+                "SELECT COUNT(*) AS n FROM submissions "
+                "WHERE status=%s AND updated_at < %s",
+                (QUEUED, time.time() - bound)).fetchone()
+            return int(row["n"]) if row else 0
+        cur = con.execute(
+            "UPDATE submissions SET status=%s, updated_at=%s "
+            "WHERE status=%s AND updated_at < %s",
+            (APPROVED, time.time(), QUEUED, time.time() - bound))
+        return int(cur.rowcount or 0)
+
+
 def _mark(corpus, sub_id: str, status: str, meeting_id: str = "",
           reason: str = "") -> None:
     """Advance a submission, and say what it became.
@@ -186,9 +212,17 @@ def _embed(corpus, town: str, meeting_id: str = "",
         if not quiet:
             print(f"    meaning-search skipped — {why or 'no neural half here'}")
         return {"embedded": 0, "note": why}
+    # The budget is the pipeline's, not the backfill's: a landed meeting may
+    # spend this long on its vectors and no longer, because the endpoint can
+    # slow to a batch a minute (2026-09-23: one meeting, one silent hour, the
+    # job's timeout, a dozen approved tapes never reached). What it leaves is
+    # `record-embed`'s backlog, and the log says how much.
+    from .settings import settings
+    budget = float(getattr(settings, "embed_budget_s", 0) or 0)
+    deadline = time.monotonic() + budget if budget > 0 else 0.0
     try:
         r = embed_neural.backfill(corpus, town=town, meeting_id=meeting_id,
-                                  verbose=False)
+                                  verbose=False, deadline=deadline)
     except Exception as exc:
         if not quiet:
             print(f"    meaning-search deferred — {exc}")
@@ -200,6 +234,12 @@ def _embed(corpus, town: str, meeting_id: str = "",
             print(f"    ⚠ the ${r.get('cap_usd', 0):.2f} spend cap stopped this "
                   f"before the record was whole — the meeting reads, and "
                   f"meaning-search is behind for the rest")
+        if r.get("stopped_at_deadline"):
+            b = int(r.get("behind", 0) or 0)
+            left = f"{b:,} segment(s)" if b >= 0 else "the rest"
+            print(f"    ⏱ the {budget:.0f}s embedding budget ran out — the "
+                  f"meeting reads, and meaning-search is behind for {left} of "
+                  f"it until record-embed's next backfill")
     return r
 
 
@@ -275,7 +315,7 @@ def ingest_one(corpus, sub: dict, workdir: Path, quiet: bool = False) -> dict:
 
     # The cheap dedupe tiers, before a job is claimed: the same meeting may have
     # arrived through the poller and through a resident's paste.
-    already = ingest.submit_dedupe(corpus, plan)
+    already = ingest.submit_dedupe(corpus, plan, stale_after=ingest.STALE_IN_FLIGHT_S)
     if already:
         _mark(corpus, sub["id"], LIVE, meeting_id=already["id"],
               reason="already on the record")
@@ -359,14 +399,32 @@ def ingest_one(corpus, sub: dict, workdir: Path, quiet: bool = False) -> dict:
 RETRY_DAYS = 7
 
 
+def _touched(m: dict) -> float:
+    try:
+        return float(m.get("updated_at") or m.get("added_at") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def parked_meetings(corpus, days: int = RETRY_DAYS) -> List[dict]:
     """The meetings that arrived with no words in the last `days`, oldest
-    first — the rows a nightly run asks YouTube about again."""
-    since = time.time() - days * 86400
+    first — the rows a nightly run asks YouTube about again. With them, a
+    meeting of that week a dead job left mid-flight (`transcribing`,
+    `analyzing`, `queued` — untouched for longer than a job can live): the
+    retry stage runs last, and a kill inside it would otherwise strand a tape
+    nothing selects again. Only tapes with an address: a desk import's
+    `file:` row has none to ask."""
+    from memory import ingest
+    now = time.time()
+    since = now - days * 86400
     with corpus._con() as con:
         return [dict(r) for r in con.execute(
-            "SELECT * FROM meetings WHERE status = 'no_transcript' AND added_at > %s "
-            "ORDER BY added_at ASC", (since,)).fetchall()]
+            "SELECT * FROM meetings WHERE added_at > %s AND url <> '' "
+            "AND (status = 'no_transcript' "
+            "OR (status IN ('queued', 'transcribing', 'analyzing') "
+            "AND COALESCE(updated_at, added_at, 0) < %s)) "
+            "ORDER BY added_at ASC",
+            (since, now - ingest.STALE_IN_FLIGHT_S)).fetchall()]
 
 
 def plan_from_meeting(m: dict) -> dict:
@@ -383,14 +441,18 @@ def plan_from_meeting(m: dict) -> dict:
 
 
 def retry_parked(corpus, workdir: Path, quiet: bool = False,
-                 days: int = RETRY_DAYS) -> List[dict]:
+                 days: int = RETRY_DAYS, since: float = 0.0) -> List[dict]:
     """Ask again for the words of every meeting that parked in the last
     `days` (a live stream's auto captions arrive hours after it ends). One
     that lands closes its drain ticket and is embedded like any other; one
     still without words stays parked, said plainly; a failure is reported,
-    never raised — the queue behind it must not wait on it."""
+    never raised — the queue behind it must not wait on it. `since` is the
+    drain's own start: a tape the queue stage parked minutes ago is not
+    asked again in the same breath."""
     from memory import ingest
     rows = parked_meetings(corpus, days)
+    if since:
+        rows = [m for m in rows if _touched(m) < since]
     if not rows:
         return []
     if not quiet:
@@ -399,12 +461,26 @@ def retry_parked(corpus, workdir: Path, quiet: bool = False,
     out: List[dict] = []
     for m in rows:
         label = m.get("url") or m["id"]
+        # Read again before asking: the list is taken after the queue stage,
+        # and a live meeting is not asked for twice whatever the seam between
+        # that read and this one saw.
+        now_row = corpus.get_meeting(m["id"]) or m
+        if str(now_row.get("status") or "") == LIVE:
+            out.append({"meeting_id": m["id"], "status": "exists"})
+            continue
         if not quiet:
             print(f"  {label}")
         job = JobLog(label=label, quiet=quiet)
         try:
             result = ingest.run(corpus, plan_from_meeting(m), job, workdir=workdir)
         except Exception as exc:
+            # Back to parked, with the sentence: a failed ask is still a
+            # meeting without words, and `error` is a state nothing asks
+            # about again.
+            try:
+                corpus.set_status(m["id"], "no_transcript", str(exc))
+            except Exception:                    # pragma: no cover
+                pass
             if not quiet:
                 print(f"    failed — {exc}")
             out.append({"meeting_id": m["id"], "status": "failed", "error": str(exc)})
@@ -430,14 +506,17 @@ def drain(corpus, limit: int = 0, dry_run: bool = False,
           quiet: bool = False, retry_days: int = RETRY_DAYS) -> dict:
     """Work the approved queue, then ask again for the words of what parked
     lately. Returns what happened to each row."""
+    reclaimed = reclaim_stale(corpus, dry_run=dry_run)
     queue = approved_queue(corpus, limit=limit)
     parked_rows = parked_meetings(corpus, retry_days) if retry_days else []
     if not quiet:
         print(f"{len(queue)} approved submission(s) waiting"
+              + (f" · {reclaimed} reclaimed from a job that died" if reclaimed else "")
               + (f" · {len(parked_rows)} parked meeting(s) to ask again" if parked_rows else "")
               + (" — dry run, nothing is written" if dry_run else ""))
     if dry_run or not (queue or parked_rows):
         return {"queued": len(queue), "results": [], "retried": [],
+                "reclaimed": reclaimed,
                 "would": [s["id"] for s in queue],
                 "would_retry": [m["id"] for m in parked_rows]}
 
@@ -448,11 +527,13 @@ def drain(corpus, limit: int = 0, dry_run: bool = False,
     # survive the job exiting anyway.
     root = Path(tempfile.mkdtemp(prefix="record-ingest-"))
     results, retried = [], []
+    started = time.time()
     try:
         for sub in queue:
             results.append(ingest_one(corpus, sub, root, quiet=quiet))
         if retry_days:
-            retried = retry_parked(corpus, root, quiet=quiet, days=retry_days)
+            retried = retry_parked(corpus, root, quiet=quiet, days=retry_days,
+                                   since=started)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
@@ -467,8 +548,20 @@ def drain(corpus, limit: int = 0, dry_run: bool = False,
         for r in failed:
             print(f"  ✗ {r['submission']}: {r.get('error', '')}")
     return {"queued": len(queue), "results": results, "retried": retried,
+            "reclaimed": reclaimed,
             "landed": len(landed), "parked": len(parked), "failed": len(failed),
             "relanded": len(relanded)}
+
+
+def exit_code(r: dict) -> int:
+    """A job that failed a tape says so to its scheduler — in the queue
+    stage or in the retry stage; a parked tape asked again and refused is a
+    failure too, and the only trace of it otherwise is a log line."""
+    if r.get("failed"):
+        return 1
+    if any(str(x.get("status") or "") == "failed" for x in (r.get("retried") or [])):
+        return 1
+    return 0
 
 
 def main(argv=None) -> int:
@@ -498,7 +591,7 @@ def main(argv=None) -> int:
         # A failure inside one submission is reported, not raised — but the job
         # exits non-zero so a scheduler notices, because a nightly run that
         # always exits 0 is a nightly run nobody ever reads.
-        return 1 if r.get("failed") else 0
+        return exit_code(r)
     finally:
         corpus.close()
 
