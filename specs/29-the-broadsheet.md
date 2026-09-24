@@ -43,30 +43,36 @@ own; and **more templates**, the issue-over-time story first.
    ("Search the record — a word, a name, a street, a vote. Every hit is a
    moment you can play."), six "try" chips, and the sentence *everything you
    see is a search — click a name, a place, a thread*. Then, on the grid:
-   - **The year on the record, in four chapters** (the opening data story):
-     bars of hours a month, meetings as dots sized by length and coloured by
-     town, a rust dashed annotation on the active chapter; four chapter
-     buttons at the right (December — the budget night · Winter into spring —
-     the roll calls · June — the marathons · September — Boston arrives),
-     the active one open with a counted paragraph; clicking a dot names the
-     meeting under the chart. State: `chapter`, `pick`.
-   - **What they talked about, and how it shifted** (the river): a stacked
-     stream of the eight lenses' shares across every meeting, oldest to
-     newest; a legend of lens buttons with each lens's share of all lens
-     words; clicking a lens or a band isolates it and the italic caption
-     names where it was loudest. State: `lens`.
-   - **Tonight's meeting** as a night band (ink ground): the still with a
-     "Play from the moment it turned" and a duration/captions chip; a *Find in this
-     meeting* box; the headline; a counted lede whose topics are links; the
-     three labels (summary · the reading · counted); *make this your front
-     page →*; the three moments that decided it as cards.
+   - **Tonight's tape** — the video is the sun and the record reads it
+     around and beneath it. Cols 1–8: the frame, large (880×495), with a
+     "Play from …" chip and the current caption in italic over its foot;
+     under it **the score of the night**: the tape as a timeline with the
+     decisions as dots sized by weight, tension in rust, every dollar figure
+     the room named as a labelled tick, and eight thin lanes — one per lens —
+     showing where that lens's words fell; a rust playhead. Cols 9–12: the
+     headline, the counted lede, a *now at …* card (the nearest moment's
+     caption and why the record marked it), and **money named on the tape**
+     as a clickable list ($1 million, said 8 times, at 15:59 …). Across all
+     twelve: **the filmstrip** — three real frames from inside the tape
+     (YouTube's own hq1/hq2/hq3), each with the decisions that fall in its
+     third. Clicking anything — a lane tick, a dollar, a decision, a frame —
+     moves the playhead, the caption and the frame together. State: `t`.
+   - **The year in tapes**: every meeting as its own still, placed on a
+     December-to-September axis and sized by its length, town-coloured on
+     its top edge; four chapter pills (December — the budget night · Winter
+     into spring — the roll calls · June — the marathons · September — Boston
+     arrives) re-light the strip and set an italic counted paragraph; click a
+     still and it names the meeting. State: `chapter`, `pick`.
    - **Four columns — each a story you can delve into** (the newspaper
-     band, hairlines between): *The money words* (lens totals as bars: money
-     is the widest lens by far), *Who spoke, and where* (names and streets as
-     bars; each a search), *The roll calls* (27 votes as dots by month, the
-     one that failed in rust; who appears in the most rolls), *Warrant
-     season* (the thread's sparkline and the five nights). Each ends in a
-     rust "delve →".
+     band, hairlines between): *Two towns, two vocabularies* (a butterfly of
+     each town's lens shares — Boston gives community twice Brookline's
+     share; Brookline gives money 37%), *Who, and when* (names and streets
+     as a dot matrix over the months), *The roll calls* (27 squares by
+     month, the ayes in each, the one that failed in rust), *Warrant season*
+     (five tiny stills and the sparkline). Each ends in a rust "delve →".
+   - **How the talk flowed, meeting by meeting**: the eight-lens river,
+     refined — bands separated by a hair of paper, each lens labelled at its
+     widest point, a dashed line where Boston joins the record.
    - **Front pages — the record's own, and readers'**: five cards — tonight's
      meeting covered, the roll calls watched, the longest thread watched (the
      three `featured_papers` that exist today), one reader's page, and the
@@ -129,8 +135,9 @@ own; and **more templates**, the issue-over-time story first.
   chapter and all eight lenses, and the chapter buttons are anchors. The search spine and type-ahead are
   progressive: the box submits to the search page without scripts, and
   `app.js` adds the panel over the index that already ships.
-- Stills are **pressed into the edition** (`app/stills/<pid>.jpg`, fetched
-  by the press from the video's poster) — never hot-linked, so the reader
+- Stills are **pressed into the edition** (`app/stills/<pid>.jpg` plus the
+  three in-tape frames `<pid>-1..3.jpg`, fetched by the press from the
+  video's poster and storyboard frames) — never hot-linked, so the reader
   page still loads nothing from a third party. Sizes: ~20 KB each.
 - The store stays strict: a front page stores its title, the writer's
   notes and refs. New blocks are ref-only kinds (`lead:<pid>`, `week`,
@@ -193,10 +200,13 @@ green first (`.venv/bin/python -m unittest discover -s tests -t . -q`).
 **Build P0 from the plan above, in this order:** (1) `record/press.py`
 presses stills into `app/stills/`; (2) `web/charts.py` gains `still()`,
 `jump_bar()`, `timeline()`, `month_dots()`; (3) `web/emit.py::page_home` on
-the twelve-column grid with the sections of board 1 — the four-chapter year
-chart and the lens river first (`web/charts.py::year_chapters`, `lens_river`,
-pressed as SVG with the data for `app.js` to re-light), the night band, the
-four columns, then the rest — the masthead switch, the mode stamp, the
+the twelve-column grid with the sections of board 1 — the tape first, with
+the score beneath it (`web/charts.py::score`, from the meeting's moments,
+entities and lens moments), the filmstrip (three frames pressed per
+meeting), the year in tapes (`year_tapes`), the four columns
+(`butterfly`, `who_when`, `vote_grid`), the river (`lens_river`) — each
+pressed as SVG with its numbers alongside for `app.js` to re-light; then
+the rest — the masthead switch, the mode stamp, the
 front-pages strip from `featured_papers`; (4) the meeting
 page's jump bar and find box; (5) `app.js`: the search spine's type-ahead
 over the shipped index, grouped as board 2, keyboard-first, no network; the
