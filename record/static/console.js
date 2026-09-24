@@ -75,6 +75,12 @@ let TOWNS = [];        // the editable working copy of every town's intake rules
 let DIRTY = {};        // slug -> true, for towns edited but not yet saved
 let PREVIEWS = {};     // "slug/index" -> the last preview response
 let MERGE_PICK = {};   // issue id -> true, the sources of a pending merge
+let TOWN = '';         // the municipality every screen is scoped to ('' = every town)
+let SITE = '';         // where the record readers see lives (from config.json)
+let OVERVIEW = null;   // the last /api/steward/overview answer
+let TICK = null;       // the Tonight screen's refresh timer
+let SEQ = 0;           // which loadTonight is the newest — only it may reschedule
+let JOBS = null;       // the last /api/steward/jobs answer
 
 // --------------------------------------------------------------------------
 // talking to the record
@@ -111,8 +117,9 @@ async function api(path, opts) {
  * emptied the session and the gate must come back; a 503 means the console
  * was never configured, and no amount of clicking will change that. */
 function handle(err, where) {
-  if (err.status === 503) { unconfigured(err.message); return; }
+  if (err.status === 503) { stopTick(); unconfigured(err.message); return; }
   if (err.status === 401 || err.status === 403) {
+    stopTick();            // a lost session must not keep asking every 20 s
     TOKEN = ''; ME = null;
     $('console').hidden = true; $('gate').hidden = false;
     $('signout').hidden = true; $('who').textContent = '';
@@ -185,6 +192,8 @@ async function boot() {
                 'is configured (' + e.message + ')');
     return;
   }
+  SITE = (cfg.site_base || '').replace(/\/$/, '');
+  if (SITE) $('open-record').href = SITE + '/app/';
   if (!cfg.configured) { unconfigured(cfg.why || 'the reason was not given'); return; }
 
   $('gate-title').textContent = 'Sign in to curate the record';
@@ -233,7 +242,58 @@ async function onCredential(resp) {
   $('console').hidden = false;
   $('signout').hidden = false;
   $('who').textContent = ME.name ? (ME.name + ' · ' + ME.steward) : ME.steward;
-  loadIntake();
+  try { await loadTowns(); } catch (err) { handle(err, 'the towns'); }
+  loadTonight();
+}
+
+/* The town bar. Every screen reads TOWN; choosing a town redraws the screen
+ * that is open. Counts on the pills come from the overview when it has
+ * arrived, so a steward sees where the waiting is before clicking. */
+async function loadTowns() {
+  const j = await api('/api/steward/towns');
+  TOWNS = j.towns || [];
+  DIRTY = {};
+  fillTownPicker();
+  drawTownBar();
+}
+
+function townName(slug) {
+  for (const t of TOWNS) if (t.slug === slug) return t.name || t.slug;
+  return slug || 'every town';
+}
+
+function inTown(name) {
+  if (!TOWN) return true;
+  return name === TOWN || name === townName(TOWN);
+}
+
+function drawTownBar() {
+  const box = $('town-picks');
+  clear(box);
+  const picks = [{ slug: '', name: 'Every town' }].concat(TOWNS);
+  for (const t of picks) {
+    const ov = OVERVIEW && (OVERVIEW.towns || []).find(function (x) { return x.slug === t.slug; });
+    const waiting = t.slug ? (ov && ov.submissions && ov.submissions.submitted) || 0
+                           : (OVERVIEW && OVERVIEW.totals && OVERVIEW.totals.submissions &&
+                              OVERVIEW.totals.submissions.submitted) || 0;
+    box.appendChild(h('button', {
+      class: 'townpick', role: 'radio', 'data-town': t.slug,
+      'aria-checked': TOWN === t.slug ? 'true' : 'false',
+      onclick: function () { pickTown(t.slug); },
+    }, t.name || t.slug, waiting ? h('span', { class: 'n', text: String(waiting) + ' waiting' }) : ''));
+  }
+}
+
+function pickTown(slug) {
+  TOWN = slug;
+  for (const b of document.querySelectorAll('.townpick')) {
+    b.setAttribute('aria-checked', b.dataset.town === slug ? 'true' : 'false');
+  }
+  $('issues-town').value = slug;
+  clear($('say'));
+  const open = document.querySelector('.tab[aria-selected="true"]');
+  const load = open && LOADERS[open.dataset.pane];
+  if (load) load();
 }
 
 function signOut() {
@@ -247,8 +307,9 @@ function signOut() {
 // --------------------------------------------------------------------------
 
 const LOADERS = {
-  'pane-intake': loadIntake, 'pane-queue': loadQueue,
-  'pane-issues': loadIssues, 'pane-ledgers': loadLedgers,
+  'pane-tonight': loadTonight, 'pane-intake': loadIntake, 'pane-queue': loadQueue,
+  'pane-record': loadRecord, 'pane-issues': loadIssues, 'pane-log': loadLog,
+  'pane-ledgers': loadLedgers, 'pane-settings': loadSettings,
 };
 
 function wireTabs() {
@@ -260,17 +321,25 @@ function wireTabs() {
         $(t.dataset.pane).hidden = !on;
       }
       clear($('say'));
+      if (tab.dataset.pane !== 'pane-tonight') stopTick();
       const load = LOADERS[tab.dataset.pane];
       if (load) load();
     });
   }
   $('signout').addEventListener('click', signOut);
+  $('tonight-reload').addEventListener('click', loadTonight);
+  $('tonight-live').addEventListener('change', function () { if (this.checked) loadTonight(); else stopTick(); });
+  $('record-reload').addEventListener('click', loadRecord);
+  $('record-status').addEventListener('change', loadRecord);
+  $('log-reload').addEventListener('click', loadLog);
+  $('log-verb').addEventListener('change', loadLog);
+  $('log-exec-go').addEventListener('click', function () { readJobLog($('log-exec').value.trim()); });
+  $('issues-town').addEventListener('change', function () { pickTown(this.value); });
   $('intake-reload').addEventListener('click', loadIntake);
   $('queue-reload').addEventListener('click', loadQueue);
   $('queue-status').addEventListener('change', loadQueue);
   $('issues-reload').addEventListener('click', loadIssues);
   $('issues-status').addEventListener('change', loadIssues);
-  $('issues-town').addEventListener('change', loadIssues);
   $('mint-go').addEventListener('click', mint);
   $('rebuild-go').addEventListener('click', rebuild);
 }
@@ -289,6 +358,7 @@ async function loadIntake() {
   TOWNS = j.towns || [];
   DIRTY = {};
   fillTownPicker();
+  drawTownBar();
   drawIntake();
 }
 
@@ -311,7 +381,8 @@ function drawIntake() {
         'written here.' })));
     return;
   }
-  for (const town of TOWNS) box.appendChild(drawTown(town));
+  const shown = TOWNS.filter(function (t) { return !TOWN || t.slug === TOWN; });
+  for (const town of shown) box.appendChild(drawTown(town));
 }
 
 function drawTown(town) {
@@ -653,14 +724,17 @@ async function loadQueue() {
   clear(box);
   box.appendChild(h('p', { class: 'muted', text: 'reading the queue…' }));
   let j;
-  try { j = await api('/api/steward/submissions?status=' +
+  try { j = await api('/api/steward/submissions?town=' + encodeURIComponent(TOWN) + '&status=' +
                       encodeURIComponent($('queue-status').value) + '&limit=200'); }
   catch (err) { clear(box); handle(err, 'the queue'); return; }
   clear(box);
   const subs = j.submissions || [];
+  $('queue-count').textContent = subs.length + ' ' + plural(subs.length, 'submission') +
+    (TOWN ? ' in ' + townName(TOWN) : '') + (j.status === 'all' ? '' : ' ' + j.status);
   if (!subs.length) {
     box.appendChild(h('div', { class: 'card' },
-      h('p', { class: 'empty', text: 'Nothing is ' + j.status + '.' })));
+      h('p', { class: 'empty', text: 'Nothing is ' + (j.status === 'all' ? 'here' : j.status) +
+        (TOWN ? ' for ' + townName(TOWN) : '') + '.' })));
     return;
   }
   for (const s of subs) box.appendChild(drawSubmission(s));
@@ -876,50 +950,24 @@ async function rebuild() {
 // ==========================================================================
 
 async function loadLedgers() {
-  let spend, audit;
-  try {
-    spend = await api('/api/steward/spend?limit=200');
-    audit = await api('/api/steward/audit?limit=200');
-  } catch (err) { handle(err, 'the ledgers'); return; }
-
-  // Totals first and largest: the point of this ledger is that the number is
-  // seen before the invoice is.
+  let spend;
+  try { spend = await api('/api/steward/spend?limit=200'); }
+  catch (err) { handle(err, 'the ledgers'); return; }
   const totals = $('spend-totals');
   clear(totals);
-  const rows = spend.totals || [];
-  const allUnits = rows.reduce(function (a, r) { return a + (r.units || 0); }, 0);
-  const allCalls = rows.reduce(function (a, r) { return a + (r.calls || 0); }, 0);
-  totals.appendChild(h('div', { class: 'total' },
-    h('span', { class: 'n', text: allUnits.toLocaleString() }),
-    h('span', { class: 'k', text: 'units, all models' })));
-  totals.appendChild(h('div', { class: 'total' },
-    h('span', { class: 'n', text: allCalls.toLocaleString() }),
-    h('span', { class: 'k', text: 'calls' })));
-  for (const t of rows) {
-    totals.appendChild(h('div', { class: 'total' },
-      h('span', { class: 'n', text: (t.units || 0).toLocaleString() }),
-      h('span', { class: 'k', text: (t.model || '?') + ' · ' + (t.purpose || '?') +
-        ' · ' + (t.calls || 0) + ' ' + plural(t.calls || 0, 'call') })));
+  for (const t of spend.totals || []) {
+    totals.appendChild(h('div', { class: 'tile' },
+      h('span', { class: 'n', text: Number(t.units).toLocaleString() }),
+      h('span', { class: 'what', text: t.model + ' · ' + t.purpose + ' · ' + t.calls + ' ' + plural(t.calls, 'call') })));
   }
-  if (!rows.length) {
-    totals.appendChild(h('div', { class: 'total' },
-      h('span', { class: 'n', text: '0' }),
-      h('span', { class: 'k', text: 'nothing has been spent yet' })));
-  }
-
-  $('spend-rows').replaceChildren(table(
+  if (!(spend.totals || []).length) totals.appendChild(h('p', { class: 'empty', text: 'Nothing has been spent.' }));
+  const rows = $('spend-rows');
+  clear(rows);
+  rows.appendChild(table(
     ['when', 'model', 'purpose', 'town', 'target', 'units'],
     (spend.spend || []).map(function (s) {
-      return [when(s.added_at), s.model, s.purpose, s.town, s.target,
-              { num: (s.units || 0).toLocaleString() }];
-    }), 'No spend rows yet.'));
-
-  $('audit-rows').replaceChildren(table(
-    ['when', 'steward', 'verb', 'target', 'town', 'what'],
-    (audit.audit || []).map(function (a) {
-      return [when(a.added_at), a.steward, a.verb, a.target, a.town,
-              JSON.stringify(a.payload || {})];
-    }), 'Nothing has been curated yet.'));
+      return [when(s.added_at), s.model, s.purpose, s.town, s.target, String(s.units)];
+    }), 'no spend rows yet'));
 }
 
 function table(headers, rows, empty) {
@@ -939,3 +987,386 @@ function table(headers, rows, empty) {
 // --------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', boot);
+
+
+// --------------------------------------------------------------------------
+// tonight — what ran, what is running, the record at a glance
+// --------------------------------------------------------------------------
+
+function stopTick() { if (TICK) { clearTimeout(TICK); TICK = null; } }
+
+function ago(ts) {
+  if (!ts) return '';
+  const s = Math.max(0, Math.round(Date.now() / 1000 - ts));
+  if (s < 90) return s + ' s ago';
+  if (s < 5400) return Math.round(s / 60) + ' min ago';
+  if (s < 172800) return Math.round(s / 3600) + ' h ago';
+  return Math.round(s / 86400) + ' d ago';
+}
+
+function stateWord(e) {
+  if (e.state === 'running') return 'running' + (e.started ? ' since ' + when(e.started) : '');
+  if (e.state === 'succeeded') return 'finished ' + ago(e.completed);
+  if (e.state === 'failed') return 'FAILED ' + ago(e.completed) + (e.message ? ' — ' + e.message : '');
+  if (e.state === 'cancelled') return 'cancelled ' + ago(e.completed);
+  return e.state;
+}
+
+function pill(state, text) { return h('span', { class: 'pill ' + state, text: text || state }); }
+
+/* The whole screen on open and on Reload; on the timer only the jobs, which
+ * are the part that changes by the minute — the counted record is a wide
+ * read of a small database and is not asked for every twenty seconds.
+ * Only the newest call may reschedule, so two loops never run at once. */
+async function loadTonight() { return tonight(true); }
+
+async function tonight(whole) {
+  stopTick();
+  const my = ++SEQ;
+  const stamp = $('tonight-stamp');
+  stamp.textContent = 'reading…';
+  let ok = true;
+  try {
+    if (whole || !OVERVIEW) OVERVIEW = await api('/api/steward/overview');
+    JOBS = await api('/api/steward/jobs?limit=5');
+  } catch (err) { ok = false; stamp.textContent = ''; handle(err, 'tonight'); }
+  if (my !== SEQ) return;
+  if (ok) {
+    drawTownBar();
+    stamp.textContent = 'as of ' + new Date().toLocaleTimeString();
+    drawRunning(JOBS);
+    drawTiles(OVERVIEW);
+    drawChain(OVERVIEW, JOBS);
+    drawTownSummaries(OVERVIEW);
+  }
+  if (TOKEN && $('tonight-live').checked && !$('pane-tonight').hidden) {
+    TICK = setTimeout(function () { tonight(false); }, 20000);
+  }
+}
+
+function drawRunning(jobs) {
+  const box = $('tonight-running');
+  clear(box);
+  const running = [];
+  for (const job of Object.keys(jobs.jobs || {})) {
+    for (const e of jobs.jobs[job]) if (e.state === 'running') running.push(e);
+  }
+  if (!jobs.cloud || !jobs.cloud.configured) {
+    box.appendChild(h('div', { class: 'card' },
+      h('h2', { text: 'The desk cannot see the jobs' }),
+      h('p', { class: 'say bad', text: jobs.cloud ? jobs.cloud.why : 'no answer' }),
+      h('p', { class: 'muted', text: 'Set both on the record-api service (record/OPERATING.md, ' +
+        '"The steward desk"). Everything else on this page still works.' })));
+    return;
+  }
+  if (!running.length) {
+    box.appendChild(h('div', { class: 'card' },
+      h('h2', {}, 'Nothing is running ', pill('idle', 'idle')),
+      h('p', { class: 'muted', text: 'The next thing to run is in the schedule below. ' +
+        'Each step can be run now from its card — that spends what a night spends.' })));
+    return;
+  }
+  for (const e of running) {
+    const card = h('div', { class: 'card' });
+    card.appendChild(h('h2', {}, e.job + ' ', pill('running', 'running'),
+      h('span', { class: 'muted', text: '  ' + e.name + ' · ' + stateWord(e) + ' · image ' + (e.image || '?') })));
+    const logbox = h('div', { class: 'logbox', text: 'reading its log…' });
+    card.appendChild(logbox);
+    box.appendChild(card);
+    fillJobLog(logbox, e.job, e.name, 40);
+  }
+}
+
+async function fillJobLog(logbox, job, name, limit) {
+  let j;
+  try {
+    j = await api('/api/steward/jobs/' + encodeURIComponent(job) + '/executions/' +
+                  encodeURIComponent(name) + '/log?limit=' + (limit || 80));
+  } catch (err) { logbox.textContent = err.message; return; }
+  clear(logbox);
+  const lines = j.lines || [];
+  if (!lines.length) { logbox.textContent = '(nothing printed yet)'; return; }
+  for (const l of lines) {
+    logbox.appendChild(h('div', { class: 'sev-' + (l.severity || 'DEFAULT') },
+      h('span', { class: 't', text: when(l.t).split(', ').pop() || '' }), l.line));
+  }
+  logbox.scrollTop = logbox.scrollHeight;
+}
+
+function drawTiles(ov) {
+  const box = $('tonight-tiles');
+  clear(box);
+  const towns = (ov.towns || []).filter(function (t) { return !TOWN || t.slug === TOWN; });
+  const sum = function (pick) { return towns.reduce(function (n, t) { return n + (pick(t) || 0); }, 0); };
+  const live = sum(function (t) { return t.meetings.live; });
+  const waiting = sum(function (t) { return t.submissions.submitted; });
+  const approved = sum(function (t) { return t.submissions.approved; });
+  const parked = sum(function (t) { return t.parked; });
+  const behind = sum(function (t) { return t.behind; });
+  const flight = sum(function (t) { return t.in_flight.length; });
+  const ed = ov.edition || {};
+  const tiles = [
+    [live, plural(live, 'meeting') + ' live' + (TOWN ? ' in ' + townName(TOWN) : ''), ''],
+    [waiting, 'waiting on a steward', waiting ? 'warn' : ''],
+    [approved, 'approved, not yet ingested', ''],
+    [parked, 'parked without words', ''],
+    [flight, 'mid-flight right now', ''],
+    [behind.toLocaleString(), 'segments meaning-search cannot see yet', behind > 20000 ? 'warn' : ''],
+    [ed.reachable ? 'v' + ed.version : 'unreachable',
+     ed.reachable ? 'live edition · record of ' + ed.edition_date + ' · pressed ' + (ed.pressed_at || '').replace('T', ' ').replace('Z', 'Z')
+                  : 'the edition could not be read: ' + (ed.why || ''), ed.reachable ? '' : 'warn'],
+    ['$' + Number((ov.spend || {}).usd_estimate || 0).toFixed(2),
+     'embeddings bought so far, of a $' + Number((ov.spend || {}).cap_usd || 0).toFixed(0) + ' cap', ''],
+  ];
+  for (const t of tiles) {
+    box.appendChild(h('div', { class: 'tile ' + t[2] },
+      h('span', { class: 'n', text: String(t[0]) }), h('span', { class: 'what', text: t[1] })));
+  }
+}
+
+function drawChain(ov, jobs) {
+  const box = $('tonight-chain');
+  clear(box);
+  const card = h('div', { class: 'card' });
+  card.appendChild(h('h2', { text: 'The chain, step by step' }));
+  const grid = h('div', { class: 'chain' });
+  for (const step of ov.schedule || []) {
+    const execs = (jobs.jobs || {})[step.job] || [];
+    const last = execs[0];
+    const st = h('div', { class: 'step' });
+    st.appendChild(h('h3', {}, step.job, h('span', { class: 'at', text: step.at }),
+      last ? pill(last.state, last.state) : ''));
+    st.appendChild(h('p', { class: 'muted', text: step.does }));
+    if ((jobs.errors || {})[step.job]) st.appendChild(h('p', { class: 'say bad', text: jobs.errors[step.job] }));
+    if (execs.length) {
+      st.appendChild(h('ul', {}, execs.map(function (e) {
+        return h('li', {},
+          h('span', { class: 'exec mono', text: e.name, title: 'read what it printed',
+                      onclick: function () { showJobLog(e.job, e.name); } }),
+          ' — ' + stateWord(e) + (e.retries ? ' · retried ' + e.retries : ''));
+      })));
+    } else if (jobs.cloud && jobs.cloud.configured && /^record-/.test(step.job)) {
+      st.appendChild(h('p', { class: 'empty', text: 'no execution on record' }));
+    }
+    if (/^record-(poll|pipeline|embed)$/.test(step.job)) {
+      if (jobs.cloud && jobs.cloud.configured) {
+        st.appendChild(h('div', { class: 'row-actions' },
+          h('button', { class: 'btn grave', text: 'Run now',
+                        onclick: function () { runJob(step.job, this); } })));
+      }
+    } else {
+      st.appendChild(h('p', { class: 'muted', text: 'runs on GitHub; its log is in the repo’s Actions tab' }));
+    }
+    grid.appendChild(st);
+  }
+  card.appendChild(grid);
+  box.appendChild(card);
+}
+
+function showJobLog(job, name) {
+  for (const t of document.querySelectorAll('.tab')) {
+    const on = t.dataset.pane === 'pane-log';
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    $(t.dataset.pane).hidden = !on;
+  }
+  stopTick();
+  $('log-exec').value = name;
+  loadLog();
+  readJobLog(name);
+}
+
+async function runJob(job, btn) {
+  if (!confirm('Run ' + job + ' now?\n\nThis is what the scheduler does at night, and it spends what a night spends.')) return;
+  btn.disabled = true;
+  try {
+    const r = await api('/api/steward/jobs/' + encodeURIComponent(job) + '/run', { method: 'POST', body: {} });
+    say('started ' + job + (r.execution ? ' as ' + r.execution : ''), 'good');
+  } catch (err) { handle(err, 'running ' + job); }
+  btn.disabled = false;
+  setTimeout(loadTonight, 2500);
+}
+
+function drawTownSummaries(ov) {
+  const box = $('tonight-towns');
+  clear(box);
+  const towns = (ov.towns || []).filter(function (t) { return !TOWN || t.slug === TOWN; });
+  if (!towns.length) return;
+  const card = h('div', { class: 'card' });
+  card.appendChild(h('h2', { text: TOWN ? townName(TOWN) + ', counted' : 'Each municipality, counted' }));
+  const grid = h('div', { class: 'townsum' });
+  for (const t of towns) {
+    const sub = t.submissions || {}, m = t.meetings || {};
+    const pane = h('div', { class: 'pane' });
+    pane.appendChild(h('h4', { text: (t.name || t.slug || '(no town)') + (t.status ? ' · ' + t.status : '') }));
+    pane.appendChild(h('dl', { class: 'kv' },
+      h('dt', { text: 'live meetings' }), h('dd', { text: String(m.live || 0) + (t.latest ? ' · latest ' + t.latest : '') }),
+      h('dt', { text: 'waiting on a steward' }), h('dd', { text: String(sub.submitted || 0) }),
+      h('dt', { text: 'approved, not ingested' }), h('dd', { text: String(sub.approved || 0) }),
+      h('dt', { text: 'parked without words' }), h('dd', { text: String(t.parked || 0) }),
+      h('dt', { text: 'mid-flight' }), h('dd', {}, (t.in_flight || []).length
+        ? t.in_flight.map(function (f) { return h('div', { class: 'mono', text: f.id + ' · ' + f.status + (f.stale ? ' · stale — a job died here' : '') }); })
+        : '0'),
+      h('dt', { text: 'segments' }), h('dd', { text: Number(t.segments || 0).toLocaleString() + ' · ' + Number(t.behind || 0).toLocaleString() + ' without a vector' })));
+    if (t.slug) {
+      pane.appendChild(h('div', { class: 'row-actions' },
+        h('button', { class: 'btn tiny', text: 'its queue', onclick: function () { pickTown(t.slug); openPane('pane-queue'); } }),
+        h('button', { class: 'btn tiny', text: 'its meetings', onclick: function () { pickTown(t.slug); openPane('pane-record'); } }),
+        h('button', { class: 'btn tiny', text: 'its intake rules', onclick: function () { pickTown(t.slug); openPane('pane-intake'); } })));
+    }
+    grid.appendChild(pane);
+  }
+  card.appendChild(grid);
+  box.appendChild(card);
+}
+
+function openPane(id) {
+  for (const t of document.querySelectorAll('.tab')) {
+    const on = t.dataset.pane === id;
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    $(t.dataset.pane).hidden = !on;
+  }
+  if (id !== 'pane-tonight') stopTick();
+  const load = LOADERS[id];
+  if (load) load();
+}
+
+// --------------------------------------------------------------------------
+// the meetings on the record, by town
+// --------------------------------------------------------------------------
+
+async function loadRecord() {
+  const box = $('record');
+  clear(box);
+  box.appendChild(h('p', { class: 'muted', text: 'reading the record…' }));
+  let j;
+  try { j = await api('/api/steward/meetings?town=' + encodeURIComponent(TOWN) + '&limit=300'); }
+  catch (err) { clear(box); handle(err, 'the meetings'); return; }
+  clear(box);
+  const want = $('record-status').value;
+  const flight = { queued: 1, transcribing: 1, analyzing: 1 };
+  const rows = (j.meetings || []).filter(function (m) {
+    if (!want) return true;
+    if (want === 'flight') return !!flight[m.status];
+    return m.status === want;
+  });
+  $('record-count').textContent = rows.length + ' ' + plural(rows.length, 'meeting') + (TOWN ? ' in ' + townName(TOWN) : '');
+  if (!rows.length) {
+    box.appendChild(h('div', { class: 'card' }, h('p', { class: 'empty', text: 'No meeting matches.' })));
+    return;
+  }
+  const card = h('div', { class: 'card' });
+  for (const m of rows) {
+    const seen = Number(m.embedded || 0), segs = Number(m.n_segments || 0);
+    const title = m.status === 'live' && SITE
+      ? h('a', { href: SITE + '/app/m/' + encodeURIComponent(m.id) + '/', target: '_blank', rel: 'noopener', text: m.title || m.id })
+      : h('span', { text: m.title || m.id });
+    card.appendChild(h('div', { class: 'meeting-row' },
+      h('span', { class: 'd', text: m.date || '(no day)' }),
+      h('span', {}, title, ' ', pill(m.status === 'live' ? 'succeeded' : (flight[m.status] ? 'running' : (m.status === 'error' ? 'failed' : 'idle')), m.status),
+        h('div', { class: 'muted', text: [m.town, m.body, m.summary_origin ? 'summary ' + m.summary_origin : '', m.error ? m.error : ''].filter(Boolean).join(' · ') })),
+      h('span', { class: 'm', text: segs ? segs.toLocaleString() + ' segments · ' + Math.round(100 * seen / segs) + '% searchable by meaning' : '' })));
+  }
+  box.appendChild(card);
+}
+
+// --------------------------------------------------------------------------
+// the log — the record's edits, and what a job said
+// --------------------------------------------------------------------------
+
+async function loadLog() {
+  const box = $('audit-rows');
+  clear(box);
+  box.appendChild(h('p', { class: 'muted', text: 'reading the log…' }));
+  let j;
+  try {
+    j = await api('/api/steward/audit?limit=300&town=' + encodeURIComponent(TOWN) +
+                  '&verb=' + encodeURIComponent($('log-verb').value) +
+                  '&steward=' + encodeURIComponent($('log-who').value.trim()));
+  } catch (err) { clear(box); handle(err, 'the log'); return; }
+  const sel = $('log-verb');
+  const keep = sel.value;
+  clear(sel);
+  sel.appendChild(h('option', { value: '', text: 'every verb' }));
+  for (const v of j.verbs || []) sel.appendChild(h('option', { value: v, text: v }));
+  sel.value = keep;
+  clear(box);
+  const rows = j.audit || [];
+  $('log-count').textContent = rows.length + ' ' + plural(rows.length, 'entry', 'entries') + (TOWN ? ' for ' + townName(TOWN) : '');
+  box.appendChild(table(
+    ['when', 'by', 'verb', 'target', 'town', 'what'],
+    rows.map(function (a) {
+      return [when(a.added_at), a.steward, a.verb, a.target, a.town,
+              JSON.stringify(a.payload || {})];
+    }), 'nothing in the log' + (TOWN ? ' for ' + townName(TOWN) : '')));
+}
+
+function readJobLog(name) {
+  const box = $('joblog');
+  clear(box);
+  if (!name) { box.appendChild(h('p', { class: 'empty', text: 'name an execution first' })); return; }
+  const m = /^(record-[a-z]+)-[a-z0-9]+$/.exec(name);
+  if (!m) { box.appendChild(h('p', { class: 'say bad', text: 'an execution is named like record-pipeline-abc12' })); return; }
+  const logbox = h('div', { class: 'logbox', text: 'reading…' });
+  box.appendChild(h('p', { class: 'mono dim', text: name }));
+  box.appendChild(logbox);
+  fillJobLog(logbox, m[1], name, 200);
+}
+
+// --------------------------------------------------------------------------
+// settings — read from the running service, set where the note says
+// --------------------------------------------------------------------------
+
+async function loadSettings() {
+  const box = $('settings');
+  clear(box);
+  box.appendChild(h('p', { class: 'muted', text: 'reading the service…' }));
+  let ov;
+  try { ov = await api('/api/steward/overview'); }
+  catch (err) { clear(box); handle(err, 'settings'); return; }
+  OVERVIEW = ov;
+  clear(box);
+  const w = ov.windows || {}, lanes = ov.lanes || {}, cloud = ov.cloud || {}, ed = ov.edition || {};
+  const yes = function (b) { return b ? 'yes' : 'no'; };
+  const kv = function (rows) {
+    const dl = h('dl', { class: 'kv' });
+    for (const r of rows) {
+      dl.appendChild(h('dt', { text: r[0] }));
+      dl.appendChild(h('dd', {}, String(r[1]), r[2] ? h('span', { class: 'where', text: r[2] }) : ''));
+    }
+    return dl;
+  };
+  box.appendChild(h('h4', { text: 'the switches (per source, on the Intake screen)' }));
+  box.appendChild(h('p', { class: 'muted', text: 'enabled · cap per poll · nothing older than · the standing rule · body rules · exclusions. Saved per town; the poll reads them at 03:00 ET.' }));
+  box.appendChild(h('h4', { text: 'the windows' }));
+  box.appendChild(kv([
+    ['embedding budget per landed meeting', w.embed_budget_s + ' s', 'RECORD_EMBED_BUDGET_S on record-pipeline · 0 = no budget'],
+    ['a parked tape is asked again for', w.retry_days + ' days', 'RETRY_DAYS in record/pipeline.py'],
+    ['a standing rule re-asks YouTube for', w.reprobe_days + ' days', 'REPROBE_DAYS in record/connectors/youtube.py'],
+    ['a job is presumed dead after', w.stale_in_flight_s + ' s', 'STALE_IN_FLIGHT_S in memory/ingest.py = the job’s --task-timeout'],
+    ['the embedding spend cap', '$' + w.spend_cap_usd, 'RECORD_SPEND_CAP_USD on record-embed and record-pipeline'],
+  ]));
+  box.appendChild(h('h4', { text: 'the lanes' }));
+  box.appendChild(kv([
+    ['meaning-search (embeddings)', (lanes.neural && lanes.neural.available ? lanes.neural.model + ' @ ' + lanes.neural.dim : 'unavailable — ' + (lanes.neural && lanes.neural.reason)), 'RECORD_GEMINI_KEY, Secret Manager record-gemini-key'],
+    ['the model lane (summaries, the reading)', (lanes.model && lanes.model.enabled ? (lanes.model.model || '?') + ' via ' + (lanes.model.provider || lanes.model.source || '?') : 'off'), 'CONTROL_Z_LLM_MODEL on record-pipeline; the key is bridged from RECORD_GEMINI_KEY'],
+    ['YouTube Data API key on this service', yes(lanes.youtube_key), 'RECORD_YOUTUBE_API_KEY, Secret Manager youtube-data-api-key — the poll and pipeline carry it'],
+    ['caption routes', 'watch page → yt-dlp → the community caption relay', 'record/connectors/youtube.py'],
+  ]));
+  box.appendChild(h('h4', { text: 'where the jobs live' }));
+  box.appendChild(kv([
+    ['Cloud Run project · region', cloud.configured ? cloud.project + ' · ' + cloud.region : 'not set — ' + cloud.why, 'RECORD_CLOUD_PROJECT, RECORD_CLOUD_REGION on record-api'],
+    ['the schedule', (ov.schedule || []).map(function (s) { return s.at + ' ' + s.job; }).join(' · '), 'Cloud Scheduler + .github/workflows/nightly-edition.yml'],
+  ]));
+  box.appendChild(h('h4', { text: 'the edition readers have' }));
+  box.appendChild(kv([
+    ['version · record of', ed.reachable ? 'v' + ed.version + ' · ' + ed.edition_date : 'unreachable: ' + (ed.why || ''), ed.url || ''],
+    ['pressed at', ed.reachable ? ed.pressed_at : '', 'record-press, then the nightly-edition workflow carries it'],
+    ['counts', ed.reachable ? Object.keys(ed.counts || {}).map(function (k) { return k + ' ' + ed.counts[k]; }).join(' · ') : '', ''],
+  ]));
+  box.appendChild(h('h4', { text: 'the stewards' }));
+  box.appendChild(kv([
+    ['allowlist', (ov.stewards || []).join(', ') || '(nobody)', 'RECORD_STEWARD_ALLOWLIST on record-api — add a person there, never here'],
+    ['last edit', ov.last_audit ? ov.last_audit.steward + ' · ' + ov.last_audit.verb + ' · ' + when(ov.last_audit.added_at) : 'none yet', ''],
+  ]));
+}
+

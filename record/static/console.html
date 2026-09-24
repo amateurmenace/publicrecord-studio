@@ -24,6 +24,7 @@
   </a>
   <span class="chip">Steward</span>
   <span class="spacer"></span>
+  <a class="btn open-record" id="open-record" href="/app/" target="_blank" rel="noopener">Open the record ↗</a>
   <span class="who" id="who"></span>
   <button class="btn" id="signout" hidden>Sign out</button>
 </header>
@@ -56,17 +57,50 @@
 </div>
 
 <main id="console" hidden>
+  <!-- The town bar scopes every screen below it. "Every town" is the whole
+       record; a town is one municipality's intake, queue, meetings, issues
+       and log, and nothing from another town appears while it is chosen. -->
+  <nav class="townbar" id="townbar" aria-label="Which municipality">
+    <span class="townlabel">Municipality</span>
+    <div class="towns" id="town-picks" role="radiogroup" aria-label="municipality"></div>
+  </nav>
+
   <nav class="tabs" role="tablist">
-    <button class="tab" role="tab" id="tab-intake"  data-pane="pane-intake"  aria-selected="true">Intake</button>
+    <button class="tab" role="tab" id="tab-tonight" data-pane="pane-tonight" aria-selected="true">Tonight</button>
+    <button class="tab" role="tab" id="tab-intake"  data-pane="pane-intake"  aria-selected="false">Intake</button>
     <button class="tab" role="tab" id="tab-queue"   data-pane="pane-queue"   aria-selected="false">Review queue</button>
+    <button class="tab" role="tab" id="tab-record"  data-pane="pane-record"  aria-selected="false">Meetings</button>
     <button class="tab" role="tab" id="tab-issues"  data-pane="pane-issues"  aria-selected="false">Issues</button>
-    <button class="tab" role="tab" id="tab-ledgers" data-pane="pane-ledgers" aria-selected="false">Ledgers</button>
+    <button class="tab" role="tab" id="tab-log"     data-pane="pane-log"     aria-selected="false">Log</button>
+    <button class="tab" role="tab" id="tab-ledgers" data-pane="pane-ledgers" aria-selected="false">Spend</button>
+    <button class="tab" role="tab" id="tab-settings" data-pane="pane-settings" aria-selected="false">Settings</button>
   </nav>
 
   <div id="say"></div>
 
+  <!-- 0. TONIGHT — what the night did, what is running, the record at a glance -->
+  <section id="pane-tonight" role="tabpanel" aria-labelledby="tab-tonight">
+    <div class="card">
+      <div class="srchead">
+        <h2>The night, as it stands</h2>
+        <span class="muted" id="tonight-stamp"></span>
+        <span class="spacer"></span>
+        <label class="inline muted"><input type="checkbox" id="tonight-live" checked> refresh every 20 s</label>
+        <button class="btn" id="tonight-reload">Reload</button>
+      </div>
+      <p class="muted">Four things happen at night, each on the one before: the
+      poll files and approves, the pipeline ingests, the edition is pressed and
+      carried, the embed job catches meaning-search up. This screen reads the
+      platform directly — what ran, whether it finished, and its own sentences.</p>
+    </div>
+    <div id="tonight-running"></div>
+    <div id="tonight-tiles" class="tiles"></div>
+    <div id="tonight-chain"></div>
+    <div id="tonight-towns"></div>
+  </section>
+
   <!-- 1. INTAKE — the cost lever, and the reason this console exists -->
-  <section id="pane-intake" role="tabpanel" aria-labelledby="tab-intake">
+  <section id="pane-intake" role="tabpanel" aria-labelledby="tab-intake" hidden>
     <div class="card">
       <h2>What the record is allowed to swallow</h2>
       <p class="muted">Default-deny. A video enters the queue only if a rule
@@ -95,12 +129,40 @@
             <option value="queued">queued</option>
             <option value="live">live</option>
             <option value="rejected">rejected</option>
+            <option value="failed">failed</option>
+            <option value="all">every state</option>
           </select>
         </label>
         <button class="btn" id="queue-reload">Reload</button>
+        <span class="muted" id="queue-count"></span>
       </div>
     </div>
     <div id="queue"></div>
+  </section>
+
+  <!-- 2b. THE MEETINGS — the record itself, by town, with what search knows -->
+  <section id="pane-record" role="tabpanel" aria-labelledby="tab-record" hidden>
+    <div class="card">
+      <h2>Meetings on the record</h2>
+      <p class="muted">Every meeting the pipeline has touched, newest day
+      first — live, parked without words, or mid-flight — with how much of it
+      meaning-search can see. A live meeting links to its own page in the
+      pressed edition.</p>
+      <div class="field">
+        <label class="inline">Show
+          <select id="record-status">
+            <option value="" selected>every state</option>
+            <option value="live">live</option>
+            <option value="no_transcript">waiting for words</option>
+            <option value="flight">mid-flight</option>
+            <option value="error">error</option>
+          </select>
+        </label>
+        <button class="btn" id="record-reload">Reload</button>
+        <span class="muted" id="record-count"></span>
+      </div>
+    </div>
+    <div id="record"></div>
   </section>
 
   <!-- 3. THE EIGHT VERBS -->
@@ -135,7 +197,38 @@
     <div id="issues"></div>
   </section>
 
-  <!-- 4. THE LEDGERS -->
+  <!-- 4. THE LOG — the record's own edits, and the jobs' own sentences -->
+  <section id="pane-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+    <div class="card">
+      <h2>The audit log</h2>
+      <p class="muted">The record remembers its own edits — a name and a time
+      against each one. A standing rule signs as <span class="mono">rule:&lt;the source&gt;</span>;
+      a job run from this desk signs with the steward who pressed the button.</p>
+      <div class="field">
+        <label class="inline">Verb
+          <select id="log-verb"><option value="">every verb</option></select>
+        </label>
+        <label class="inline">By
+          <input type="text" id="log-who" placeholder="steward or rule:…">
+        </label>
+        <button class="btn" id="log-reload">Reload</button>
+        <span class="muted" id="log-count"></span>
+      </div>
+      <div id="audit-rows"></div>
+    </div>
+    <div class="card">
+      <h2>What a job said</h2>
+      <p class="muted">Pick an execution on the Tonight screen, or name one
+      here, to read the last lines it printed.</p>
+      <div class="field">
+        <input type="text" id="log-exec" class="grow" placeholder="record-pipeline-abc12">
+        <button class="btn" id="log-exec-go">Read</button>
+      </div>
+      <div id="joblog"></div>
+    </div>
+  </section>
+
+  <!-- 5. SPEND -->
   <section id="pane-ledgers" role="tabpanel" aria-labelledby="tab-ledgers" hidden>
     <div class="card">
       <h2>Spend</h2>
@@ -146,11 +239,17 @@
       <div id="spend-totals" class="totals"></div>
       <div id="spend-rows"></div>
     </div>
+  </section>
+
+  <!-- 6. SETTINGS — what the night runs on, and where each thing is set -->
+  <section id="pane-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <div class="card">
-      <h2>Audit</h2>
-      <p class="muted">The record remembers its own edits — now with a name and
-      a time against each one.</p>
-      <div id="audit-rows"></div>
+      <h2>What the night runs on</h2>
+      <p class="muted">The switches a steward flips live on the Intake screen,
+      per source. Everything here is the service's own configuration — read
+      from the running service, set where the note beside it says — so the
+      screen never disagrees with the thing that runs at three in the morning.</p>
+      <div id="settings"></div>
     </div>
   </section>
 </main>

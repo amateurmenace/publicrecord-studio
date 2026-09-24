@@ -303,6 +303,33 @@ nameless or unread, run the recipe in `specs/next-session-prompt.md`
 ("Repairing a meeting") as a one-off pipeline execution with overridden
 args — never from a Mac.
 
+### The steward desk — the night, readable without a terminal (specs/27)
+
+`/steward` opens on **Tonight**: what is running, its own log lines, the
+record counted, the chain step by step with its last executions, and a
+*Run now* on poll, pipeline and embed (audited as `run-job`, signed by the
+steward). The desk
+reads Cloud Run and Cloud Logging with the service's own identity
+(`roles/editor` on the default compute account covers `run.executions.list`,
+`logging.entries.list` and `run.jobs.run`), and it needs to be told where
+the jobs live — two names on the service, nothing else:
+
+```bash
+gcloud run services update record-api --region=us-east1 \
+  --update-env-vars=RECORD_CLOUD_PROJECT=publicrecord-studio,RECORD_CLOUD_REGION=us-east1
+```
+
+Absent, the Tonight screen says so in a sentence and every other screen
+still works. The press is not run from the desk — the nightly-edition
+workflow owns it (it presses and carries in one breath). While Tonight is
+open it re-reads the jobs every twenty seconds and the counted record only
+on open and Reload; the log route reads `entries.list` with the service's
+identity. Migration `002_neural_todo.sql` (a partial index on the segments
+still without a vector) is what keeps those counts cheap — run
+`record-migrate` with this deploy. The municipality bar scopes every screen; **Settings** shows
+the windows, the lanes, the schedule and the edition readers have, each
+with where it is set — nothing on that screen is written from the browser.
+
 ### The nightly edition — automated, once two credentials exist
 
 The freeze diagnosis (specs/23 D2, 2026-09-23) found the missing step: the

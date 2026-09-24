@@ -446,7 +446,10 @@ def create_app(corpus=None, papers=None) -> FastAPI:
         ok = auth.configured()
         return {"configured": ok,
                 "client_id": settings.google_client_id if ok else "",
-                "why": "" if ok else auth.why_unconfigured()}
+                "why": "" if ok else auth.why_unconfigured(),
+                # where the record readers see lives — the console links to
+                # it, and the desk fetches its pressing manifest from there
+                "site_base": (settings.site_base or "https://publicrecord.studio").rstrip("/")}
 
     # -- the steward API ---------------------------------------------------
     # Everything below this line requires a signed-in steward on the

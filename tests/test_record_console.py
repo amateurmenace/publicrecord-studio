@@ -164,8 +164,9 @@ class ConsolePageTest(unittest.TestCase):
 
     def test_a_configured_console_hands_over_the_client_id_and_nothing_else(self):
         """The client id is public by Google's design — it is in the markup of
-        every page that renders a sign-in button. The allowlist is not, and a
-        page has no business knowing who the other stewards are."""
+        every page that renders a sign-in button. The allowlist is not: it
+        reaches a signed-in steward through /api/steward/overview (the desk's
+        Settings screen), never the unauthenticated config."""
         from record import auth
         from record.settings import Settings
 
@@ -214,7 +215,8 @@ class ConsoleCoversTheSpecTest(unittest.TestCase):
         self.assertIn("auto_approve", self.js)
         self.assertIn("standing rule", self.js)
 
-    def test_the_ledgers_are_read(self):
+    def test_the_spend_and_the_audit_log_are_read(self):
+        # spend on its own screen; the audit log on the Log screen (specs/27)
         self.assertIn("/api/steward/spend", self.js)
         self.assertIn("/api/steward/audit", self.js)
 

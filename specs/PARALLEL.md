@@ -157,6 +157,10 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24 — **v2.1.22 / r45: the steward's desk** (specs/27): Tonight,
+  the municipality bar, Meetings, Log, Settings, a way back to the record;
+  `record/ops.py` reads Cloud Run and Cloud Logging. The service carries
+  `RECORD_CLOUD_PROJECT` / `RECORD_CLOUD_REGION`. 687 tests.
 - 2026-09-24 (last) — **v2.1.21 / r44 is LIVE** (PR #1, merged; tag
   `v2.1.21` at 049eba5, the commit the image was built from): **a word,
   over time** (specs/25) — the front page leads with *How Brookline talks

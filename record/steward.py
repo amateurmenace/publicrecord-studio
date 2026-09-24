@@ -40,7 +40,7 @@ from fastapi.responses import JSONResponse
 
 from memory import issues as issue_engine
 
-from . import sources
+from . import ops, sources
 
 from . import auth
 
@@ -72,16 +72,25 @@ def register_steward(app, store, steward_of) -> None:
     # -- the review queue -------------------------------------------------
 
     @app.get("/api/steward/submissions")
-    def list_submissions(status: str = Query("submitted"),
+    def list_submissions(status: str = Query("submitted"), town: str = Query(""),
                          limit: int = Query(100, ge=1, le=500),
                          authorization: Optional[str] = Header(None)):
+        """`status=all` lists every state; `town` narrows to one municipality
+        (its slug or its name — the queue has named towns both ways)."""
         steward_of(authorization)
         corpus = store()
+        sql, args = "SELECT * FROM submissions WHERE 1=1", []
+        if status and status != "all":
+            sql += " AND status=%s"
+            args.append(status)
+        if town:
+            sql += " AND (town=%s OR town=(SELECT name FROM towns WHERE slug=%s))"
+            args += [town, town]
+        sql += " ORDER BY added_at DESC LIMIT %s"
+        args.append(limit)
         with corpus._con() as con:
-            rows = con.execute(
-                "SELECT * FROM submissions WHERE status=%s "
-                "ORDER BY added_at DESC LIMIT %s", (status, limit)).fetchall()
-        return {"status": status, "submissions": [dict(r) for r in rows]}
+            rows = con.execute(sql, args).fetchall()
+        return {"status": status, "town": town, "submissions": [dict(r) for r in rows]}
 
     @app.post("/api/steward/submissions/{sub_id:path}/approve")
     def approve(sub_id: str, authorization: Optional[str] = Header(None)):
@@ -393,15 +402,92 @@ def register_steward(app, store, steward_of) -> None:
     # -- the ledgers ------------------------------------------------------
 
     @app.get("/api/steward/audit")
-    def audit_log(limit: int = Query(200, ge=1, le=1000),
+    def audit_log(limit: int = Query(200, ge=1, le=1000), town: str = Query(""),
+                  verb: str = Query(""), steward: str = Query(""),
                   authorization: Optional[str] = Header(None)):
+        """The record's own log of edits, filterable by town, verb and the
+        name against the row (a steward's email or `rule:<source>`)."""
         steward_of(authorization)
         corpus = store()
+        sql, args = "SELECT * FROM audit WHERE 1=1", []
+        if town:
+            sql += " AND (town=%s OR town=(SELECT name FROM towns WHERE slug=%s))"
+            args += [town, town]
+        if verb:
+            sql += " AND verb=%s"
+            args.append(verb)
+        if steward:
+            sql += " AND steward=%s"
+            args.append(steward)
+        sql += " ORDER BY added_at DESC LIMIT %s"
+        args.append(limit)
         with corpus._con() as con:
-            rows = con.execute(
-                "SELECT * FROM audit ORDER BY added_at DESC LIMIT %s",
-                (limit,)).fetchall()
-        return {"audit": [dict(r) for r in rows]}
+            rows = con.execute(sql, args).fetchall()
+            verbs = [r["verb"] for r in con.execute(
+                "SELECT DISTINCT verb FROM audit ORDER BY verb").fetchall()]
+        return {"audit": [dict(r) for r in rows], "verbs": verbs}
+
+    # -- the desk: what the night did, what is running, the record counted --
+
+    @app.get("/api/steward/overview")
+    def steward_overview(authorization: Optional[str] = Header(None)):
+        """Every number the desk shows at a glance — per town and whole —
+        plus the lanes, the windows, the schedule and the edition readers
+        have (record/ops.py::overview)."""
+        steward_of(authorization)
+        return ops.overview(store())
+
+    @app.get("/api/steward/meetings")
+    def steward_meetings(town: str = Query(""), limit: int = Query(100, ge=1, le=500),
+                         authorization: Optional[str] = Header(None)):
+        steward_of(authorization)
+        return {"town": town, "meetings": ops.meetings_of(store(), town=town, limit=limit)}
+
+    @app.get("/api/steward/jobs")
+    def steward_jobs(limit: int = Query(5, ge=1, le=20),
+                     authorization: Optional[str] = Header(None)):
+        """The latest executions of every job, from Cloud Run itself. When
+        the console has not been told where the jobs live it says so, with
+        the two names, rather than showing an empty night."""
+        steward_of(authorization)
+        c = ops.cloud()
+        out = {"cloud": c, "schedule": list(ops.SCHEDULE), "jobs": {}, "errors": {}}
+        if not c["configured"]:
+            return out
+        for job in ops.JOBS:
+            try:
+                out["jobs"][job] = ops.executions(job, limit=limit)
+            except ops.OpsError as exc:
+                out["errors"][job] = exc.detail
+        return out
+
+    @app.get("/api/steward/jobs/{job}/executions/{name}/log")
+    def steward_job_log(job: str, name: str, limit: int = Query(80, ge=1, le=500),
+                        authorization: Optional[str] = Header(None)):
+        steward_of(authorization)
+        if job not in ops.JOBS or not name.startswith(job + "-"):
+            return JSONResponse({"error": "that execution does not belong to that job"},
+                                status_code=400)
+        try:
+            return {"job": job, "execution": name, "lines": ops.log_tail(name, limit=limit)}
+        except ops.OpsError as exc:
+            # the platform's own 403 or 503 must not read as "your sign-in
+            # will not do" — the console treats those as a lost session
+            return JSONResponse({"error": exc.detail},
+                                status_code=400 if exc.status == 400 else 502)
+
+    @app.post("/api/steward/jobs/{job}/run")
+    def steward_job_run(job: str, authorization: Optional[str] = Header(None)):
+        """Run one job now — the desk's one verb over the platform, and it is
+        audited like every other: a name and a time against the night."""
+        who = steward_of(authorization)
+        try:
+            r = ops.run_job(job)
+        except ops.OpsError as exc:
+            return JSONResponse({"error": exc.detail},
+                                status_code=400 if exc.status == 400 else 502)
+        _audit(store(), who, "run-job", job, "", execution=r.get("execution", ""))
+        return r
 
     @app.get("/api/steward/spend")
     def spend(limit: int = Query(200, ge=1, le=1000),

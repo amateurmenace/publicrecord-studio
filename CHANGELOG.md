@@ -2,6 +2,17 @@
 
 ## unreleased
 
+### The steward's desk — 2026-09-24 (v2.1.22)
+
+The console grew from four screens into a desk (specs/27): the night as it
+stands — what is running, with its own log lines; the record counted; the
+chain step by step, each step with its last executions and a *Run now* —
+every screen scoped to one municipality, the meetings on the record with
+how much of each search can see, a log a steward can filter and an
+execution's own sentences by name, the settings the night runs on with
+where each is set, and a way back to the record from the header. 687
+tests.
+
 ### A word, over time — the search told as a story, the supercut, the player's transport, and a search page that explains itself — 2026-09-23 (v2.1.21)
 
 A citizen's question of the record is usually one word. The search page
