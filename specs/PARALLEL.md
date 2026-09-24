@@ -157,6 +157,24 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-24, 11:23Z — **v2.2.2 / r49 is LIVE: the front pages, listed** (specs/29
+  P2; tag `v2.2.2` at 629302a, the commit the image was built from; the
+  service and all six jobs on r49; the press at `--version 2.2.2`, and
+  `record-press` now carries `RECORD_PAPERS_BUCKET=publicrecord-papers`).
+  The gallery at `/app/front-pages/`: the press lists the share store's
+  `p/` prefix and presses readers' pages as cards beside the record's own
+  (the first still, whose page it is, the title, what it is made of, the
+  day it was shared — nobody named), with filters the reader's script
+  narrows the grid by; the front page's strip seats the newest reader's
+  page that is a day old. Three brakes and no new stored field: only pages
+  minted since 2026-09-24 are listed, twelve from any one day at most, the
+  strip a day behind the gallery. The store's listing joins the pressing's
+  fingerprint and the worker's cache key, so a new shared page alone
+  presses a night and reaches returning readers. Takedown stays the
+  steward's (`p/` → `taken/`; the store refuses the same bytes again).
+  Reviewed through two lenses and two skeptics (five and five regressions
+  in the folds, all folded). specs/29 is BUILT whole; what
+  is next is Stephen's list in `specs/next-session-prompt.md`.
 - 2026-09-24, 10:05Z — **v2.2.1 / r48 is LIVE: writing in the same style** (specs/29
   P1; tag `v2.2.1` at dca34a0, the commit the image was built from; the
   service and all six jobs on r48; the press at `--version 2.2.1`). The

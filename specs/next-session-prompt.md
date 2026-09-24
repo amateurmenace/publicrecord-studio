@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.1, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.2, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,109 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, 11:23Z — v2.2.2 / r49 IS LIVE: the front pages, listed (specs/29 P2)
+
+The gallery (board 9), the last of specs/29's three deploys — specs/29 is
+BUILT whole. The CHANGELOG entry says what shipped; the shape, for whoever
+touches it next:
+
+- **The gallery module** (`web/gallery.py`): `readers_cards` turns the
+  share store's rows into cards — each row's canonical bytes parsed the way
+  the reader parses a link (`is_page` gates the shape; a blob that is not a
+  page, whatever its shape, makes no card and never a failed press);
+  `kind_of` is the reader's own judgement (≡ `bsMadeFrom`; a node twin
+  holds them equal); `what_of` counts the parts as the reader does
+  (`paragraphs_of`); `when_words` is absolute (*September 20*, the year
+  only when it is not this one) and every press takes its day from the
+  caller (`today`), so two presses of one store are byte-identical;
+  `card_of` counts only the meetings and issues the pressing holds and
+  reads a town off an issue slug when the plane names none. `own_cards`
+  presses the record's own from the featured papers; `strip_cards` seats
+  the newest reader's page that is a day old (`STRIP_READERS` = 1);
+  `page_body` presses the filter nav `hidden` (a control that did nothing
+  with the script off would be the dishonesty the covenant is against) and
+  the count as `role="status"`.
+- **Three brakes, no new stored field**: `LISTED_SINCE` = 2026-09-24 (the
+  day the share button began to say it lists the page — pages minted
+  before it are not listed; listing them after the fact is Stephen's
+  call), `PER_DAY` = 12, `MAX_LISTED` = 400 (= `record/papers.py::LIST_MAX`);
+  the strip a day behind the gallery; the press log prints the newest five
+  titles for a steward's morning glance.
+- **The press** (`web/bake.py`, `record/press.py`, `web/emit.py`):
+  `Bake(shared=, today=)` → `bake_frontpages` after the graph;
+  `shared_hash` (sha256 of the listed ids and their day bits — this week ·
+  a day old · the year said, `gallery.age_bits` — 8 hex) into
+  `manifest.json` when there is one and onto the worker's cache key (`cz-record-<version>-<corpus>-<shared>`);
+  `/app/front-pages/` in the shell. `record/press.py::main` lists
+  `GcsPapers(RECORD_PAPERS_BUCKET).list_all()` BEFORE the gate:
+  `shared_digest` (12 hex, order-blind; a row the press would list brings
+  its day bits, so a page turning a day old or the year turning presses
+  too, and a quiet night after is quiet) is appended to the pressing's
+  fingerprint, so a night with no new meeting and one new shared page
+  presses; a store that cannot be listed prints so and the record's own
+  stand alone; no bucket configured prints so too. `record-press` carries
+  `RECORD_PAPERS_BUCKET=publicrecord-papers` now (the deploy set it;
+  `record/OPERATING.md` §5 says so).
+- **The store** (`record/papers.py`): `GcsPapers.list_all(limit)` — ids
+  filtered before the cut, newest first by `time_created`, best-effort
+  downloads; `put_new` looks under `taken/` first, so a page taken down
+  stays down when the same bytes are shared again; `MemPapers` mirrors
+  both (newest first, a `taken` set).
+- **The reader** (`app.js` `bsGallery`): unhides the filters, narrows by
+  `data-by` / `data-towns` tokens / `data-week` / `data-kind`, reads and
+  writes the hash (`hashchange`; a click `replaceState`s), says *no front
+  pages here yet — Brookline* at zero, and pre-selects the reader's own
+  stored town when there is no hash. The front page's `NAV` gained *Front
+  pages*; the share hint says *on the front pages after tonight's press*;
+  the desk's covenant line says a short link lists the page after the next
+  nightly press, unsigned, and a steward can take it down.
+- **Tests**: 928 (110 PG-backed skip without a DSN). New
+  `tests/test_web_gallery.py`: the kind twin, `what_of` / `when_words`, the
+  brakes (since, per day, max), wrong-shape blobs, `MemPapers` and a
+  fake-client `GcsPapers`, the pressed page, the strip's seasoning, the
+  hidden nav, the count's grammar, the worker key with the shared hash,
+  idempotence across two presses of one store, and `needs_press` moved by
+  the store alone.
+- **Deploy**: r49 (image `sha256:98c51303…`, built from 629302a) on the
+  service (revision record-api-00041-x6m) and all six jobs; the press at `--version 2.2.2`
+  (execution record-press-z6v5x, 11:22Z); Pages 4563f8e (the workflow carried it, run 35992316517); `sw.js` key
+  `cz-record-2.2.2-9eb9be490f17df4c` (no shared suffix yet: the store holds three pages, all from July, none listed — the log says so); tag `v2.2.2` at 629302a.
+- **Reviewed**: two lenses (the press and the store; the page, the script
+  and the covenant) — 29 findings, 26 folded (a flood with no brake, a
+  takedown undone by re-sharing, *today* going stale on a static page,
+  wrong-shape blobs as empty cards, the worker's key blind to the list, the
+  gate blind to the store, `record-press` without the bucket's name, capped
+  lists counted, a JS-off control that did nothing) — then a skeptic on
+  the folds (five, all folded: the strip's seating and the week's edge sat
+  behind a gate and a key that never saw a day pass — `gallery.age_bits`
+  rides both now; the gallery narrowed to the one town an edition holds and
+  hid the record's own record-wide pages under any town — only a chosen
+  town narrows, and a card with no town is every town's; a taken page
+  offered again was answered 200 with a link that 404s — 410 now, the read
+  path's own sentence; a store test asserted past its own cut; the memory
+  store dated its pages before the listing threshold) — then a second
+  skeptic on those folds (five, folded: the taken page's guard test seated
+  after a mid-file `__main__` block and never collected — seated in its
+  class; the gate flipping for rows it never lists — bits only for rows on
+  or after the threshold; the year suffix at New Year outside both digests
+  — a third bit; a stale line in this file; and the 410's sentence being a
+  read-path sentence on a write screen — Stephen's, above).
+- **Notes**: the read page's kicker still says *shared as a link · the
+  writer is not named* for the record's own pressed pages (the featured
+  links carry no press marker — `by=press` on the link, never a block,
+  would fix it); *said alongside it* (board 6) is still not built; a
+  reader's card routes to the API's `/app/p?p=<id>` as every short link
+  does, so the gallery's own cards are static and its readers' pages are
+  not.
+- **Stephen's, before or after**: (1) `LISTED_SINCE` — list the pages
+  shared before 2026-09-24 too, or not; (2) the takedown request's words —
+  there is no reader-facing *ask for this to come down* link because the
+  words are his, and a taken page offered again is refused with the read
+  path's existing sentence for want of his own; (3) the moderation stance — the strip a day behind and
+  twelve a day are a press's brakes, not a steward's review: may a night's
+  press seat a reader's page on the front page unseen? (4) the board copy
+  amendments listed under v2.2.1 below.
 
 ## 2026-09-24, 10:05Z — v2.2.1 / r48 IS LIVE: writing in the same style (specs/29 P1)
 
@@ -208,11 +311,7 @@ says what shipped; the shape, for whoever touches it next:
   touches no server) became *Add the drafted reading* from the pressed
   plane; the two acts (Preview / Share) sit under the title row, not in the
   pressed top bar; the reel's pill says clips, not moments.
-- **Still Stephen's / next**: P2 — the gallery (board 9): the press lists
-  shared pages from the store and presses cards (title, made-from counts,
-  the first still) beside the record's own; the gallery page with its
-  filters; takedown stays the steward's (its words are Stephen's to
-  decide); the front page's strip reads from it. Version 2.2.2.
+- **Then**: P2 — the gallery — shipped as v2.2.2 / r49 (the section above).
 
 ## 2026-09-24, 05:28Z — v2.2.0 / r47 IS LIVE: the civic broadsheet (specs/29 P0)
 
