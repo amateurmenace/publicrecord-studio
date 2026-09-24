@@ -8313,12 +8313,13 @@
     if (!D || !Array.isArray(D.tapes)) return;
     const sec = box.closest(".bs-year-sec") || box.parentElement;
     const line = $("#bs-tapeline", sec), meta = $("#bs-tapemeta", sec);
-    const pills = $$(".bs-chap", sec), tapes = $$(".bs-tape", box);
+    const pills = $$(".bs-chap", sec), tapes = $$(".bs-tape", box), dots = $$(".bs-ydot", box);   // the phone's picture of the year (board 3) lights with the tapes
     let chapter = Math.max(0, (D.chapters || []).length - 1), pick = null;
     const paint = () => {
       const st = bsYearState(D, chapter, pick), dim = new Set(st.dim);
       tapes.forEach(a => { a.classList.toggle("bs-dim", dim.has(a.dataset.pid)); const on = a.dataset.pid === pick;
         a.classList.toggle("on", on); if (on) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current"); });
+      dots.forEach(c => { c.classList.toggle("bs-dim", dim.has(c.dataset.pid)); c.classList.toggle("on", c.dataset.pid === pick); });
       pills.forEach(p => { const on = +p.dataset.chapter === chapter; p.classList.toggle("on", on); if (on) p.setAttribute("aria-current", "true"); else p.removeAttribute("aria-current"); });
       if (line) { if (st.href) line.innerHTML = `<a href="${esc(st.href)}">${esc(st.line)}</a>`;
         else if (st.html) line.innerHTML = st.html;      // press-made and already escaped — the page's own bytes

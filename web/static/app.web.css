@@ -2292,6 +2292,11 @@ a.tp-mcol:hover b{text-decoration:underline}
 .bs-tape{cursor:pointer}
 .bs-tape.bs-dim{opacity:.25}
 .bs-tape.on .bs-tape-ring{stroke:var(--write)}
+.bs-yearphone{display:none;padding:4px 12px 2px}
+.bs-yearphone-svg{display:block;width:100%;height:auto;max-width:420px;margin:0 auto}
+.bs-yearphone-svg text{font-family:var(--font-mono)}
+.bs-ydot.bs-dim{opacity:.25}
+.bs-ydot.on{stroke:var(--write);stroke-width:2}
 .bs-yearwords{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:24px;margin-top:14px}
 .bs-yearline{grid-column:span 7;display:flex;flex-direction:column;gap:8px}
 .bs-tapeline{margin:0;font-family:var(--font-display);font-style:italic;font-size:20px;line-height:1.35;color:var(--ink)}
@@ -2521,6 +2526,14 @@ a.tp-mcol:hover b{text-decoration:underline}
   .bs-tapeline{font-size:16px}
   .bs-colgrid{grid-template-columns:1fr;gap:20px}
   .bs-river-svg{height:110px}
+  /* the river static at a phone's width (specs/29 board 3): its labels and
+     dates would be specks stretched to nothing, so the bands stand alone —
+     still a link to the full page — and the sentence beneath reads them */
+  .bs-river-svg text{display:none}
+  /* the year at a phone's width is board 3's own picture — a dot per
+     meeting, month by month — where the stills would be specks */
+  .bs-year .fp-chartwrap{display:none}
+  .bs-yearphone{display:block}
   .bs-reading{font-size:14px}
   .bs-fpgrid{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
   .bs-fpcard,.bs-fpdoor{width:230px;flex:0 0 230px}

@@ -18,7 +18,7 @@ from __future__ import annotations
 import html
 import math
 import re
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # The broadsheet's palette (specs/29): paper and ink, a municipality's
 # colour on what belongs to it, rust for the one action — writing — and for
@@ -1289,7 +1289,55 @@ def year_tapes(meetings: Sequence[dict], chapters: Sequence[dict], stills: Optio
     # well as the plain blurb, so a re-lit chapter keeps its links
     payload = {"tapes": tapes, "chapters": list(chapters), "months": months}
     return (f'<div class="bs-year" {data_attr("year", payload)}><div class="fp-chartwrap">{svg}</div>'
+            + year_phone(months, tapes, lit)
             + twin(trows, "<th>date</th><th>town</th><th>body</th><th>meeting</th><th>hours</th>") + "</div>")
+
+
+PHONE_W = 340                 # board 3's picture of the year, at a phone's width (its height fits the tallest month)
+PHONE_ROWS, PHONE_COLS = 6, 2  # a month's dots stack six high, two wide; the count says the rest
+
+
+def year_phone(months: Sequence[str], tapes: Sequence[dict], lit: Iterable[str] = ()) -> str:
+    """The year at a phone's width (specs/29 board 3, "the record, over
+    time"): a column per month, one dot per meeting in its town's colour,
+    the month's count above its dots and the month beneath. It stands in
+    for the year in tapes under 720px, where the stills would be specks and
+    their labels unreadable; the same chapters light it (app.js bsYear,
+    by each dot's data-pid) and the pressed state dims the same months.
+    A picture, not a control: the chapters and the words beneath it are
+    the way in, and every meeting is a link in the table beside it."""
+    if not months or not tapes:
+        return ""
+    lit = set(lit or ())
+    colw = PHONE_W / len(months)
+    by_month: Dict[str, List[dict]] = {}
+    for t in sorted(tapes, key=lambda t: (t["date"], t["pid"])):
+        by_month.setdefault(t["month"], []).append(t)
+    step, r = 11.0, 4.5
+    tallest = max(min(PHONE_ROWS, len(by_month.get(mo) or [])) for mo in months)
+    height = max(70, 48 + int(tallest * step))
+    base_y = height - 28.0
+    out = []
+    for i, mo in enumerate(months):
+        cx = i * colw + colw / 2
+        out.append(f'<text x="{_r(cx)}" y="{height - 8}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{month_short(mo)}</text>')
+        ts = by_month.get(mo) or []
+        if not ts:
+            continue
+        shown = ts[:PHONE_ROWS * PHONE_COLS]
+        cols = 1 if len(shown) <= PHONE_ROWS else PHONE_COLS
+        rows = min(PHONE_ROWS, len(shown))
+        for k, t in enumerate(shown):
+            col, row = (k // PHONE_ROWS, k % PHONE_ROWS) if cols > 1 else (0, k)
+            x = cx + (col - (cols - 1) / 2) * step
+            y = base_y - row * step
+            dim = "" if (not lit or mo in lit) else " bs-dim"
+            out.append(f'<circle class="bs-ydot{dim}" data-pid="{esc(t["pid"])}" data-month="{esc(mo)}" cx="{_r(x)}" cy="{_r(y)}" r="{r}" '
+                       f'fill="{town_color(t["town"])}"><title>{esc(t["date"])} · {esc(t["town"])} · {esc(t["body"])}</title></circle>')
+        out.append(f'<text x="{_r(cx)}" y="{_r(base_y - rows * step - 4)}" font-size="11" fill="{INK}" text-anchor="middle" style="{MONO}">{len(ts)}</text>')
+    return (f'<div class="bs-yearphone"><svg class="bs-yearphone-svg" width="{PHONE_W}" height="{height}" viewBox="0 0 {PHONE_W} {height}" '
+            f'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="meetings on the record, by month — {n_of(len(tapes), "meeting")}">'
+            + "".join(out) + "</svg></div>")
 
 
 # --------------------------------------------------------------------------

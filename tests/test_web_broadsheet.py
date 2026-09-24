@@ -283,6 +283,46 @@ class TestTheChartsArePure(unittest.TestCase):
         self.assertRegex(svg, r'<svg x="\d+" y="44" width="\d+" height="168" viewBox="-100 0 \d+ 168">')
         self.assertIn(">financial</text>", svg)
 
+    def test_the_phone_draws_the_year_as_board_three_does(self):
+        """At a phone's width the year is board 3's own picture — a dot per
+        meeting, month by month, the month's count above — where the stills
+        would be specks: the same meetings as the tapes, the same pressed
+        dims, the chapters light it by each dot's pid (app.js bsYear), and
+        the sheet swaps the two under 720px. The river goes static there:
+        its stretched labels are hidden and its bands still link."""
+        from web import charts, story, broadsheet
+        ms = [{"pid": f"p{i:02d}", "date": f"2026-{1 + i // 4:02d}-{10 + i % 4:02d}", "town": "Boston" if i % 3 else "Brookline",
+               "body": "B", "title": f"t{i}", "duration": 3600, "votes": []} for i in range(10)]
+        html_ = broadsheet.year_section(ms, [], {}, None)
+        tapes = re.findall(r'<a href="[^"]+" class="bs-tape( bs-dim)?" data-pid="([^"]+)"', html_)
+        dots = re.findall(r'<circle class="bs-ydot( bs-dim)?" data-pid="([^"]+)"', html_)
+        self.assertEqual(sorted(p for _, p in dots), sorted(p for _, p in tapes))          # the same meetings
+        self.assertEqual({p for d, p in dots if d}, {p for d, p in tapes if d})          # the same pressed dims
+        self.assertIn('class="bs-yearphone"', html_)
+        svg = html_[html_.index('<svg class="bs-yearphone-svg"'):]
+        svg = svg[:svg.index("</svg>")]
+        for mo in ("Jan", "Feb", "Mar"):
+            self.assertIn(f">{mo}</text>", svg)
+        self.assertIn(">4</text>", svg)                                                   # January's four meetings, counted
+        h = int(re.search(r'viewBox="0 0 340 (\d+)"', svg).group(1))
+        self.assertEqual(h, 48 + 4 * 11)                                                  # the height fits the tallest month
+        # a month of fourteen: twelve dots drawn, the count says fourteen
+        many = [{"pid": f"q{i:02d}", "date": f"2026-03-{1 + i:02d}", "town": "Boston", "body": "B", "title": "t",
+                 "duration": 1800} for i in range(14)]
+        months, laid = charts.year_layout(many)
+        big = charts.year_phone(months, laid, [])
+        self.assertEqual(big.count("<circle"), 12); self.assertIn(">14</text>", big)
+        self.assertEqual(charts.year_phone([], [], []), "")
+        # the sheet: the phone picture hidden at desktop, swapped in under 720px; the river's text hidden there
+        css = (REPO / "web" / "static" / "app.web.css").read_text()
+        self.assertIn(".bs-yearphone{display:none", css)
+        phone = css[css.rindex("@media (max-width:720px)"):]
+        phone = phone[:phone.index("\n}\n")]
+        for rule in (".bs-year .fp-chartwrap{display:none}", ".bs-yearphone{display:block}", ".bs-river-svg text{display:none}"):
+            self.assertIn(rule, phone)
+        self.assertIn('dots = $$(".bs-ydot", box)', JS)
+        self.assertIn('dots.forEach(c => { c.classList.toggle("bs-dim", dim.has(c.dataset.pid));', JS)
+
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
         ms = [{"pid": f"p{i}", "date": f"2026-0{1 + i % 9}-{10 + i % 15:02d}", "town": "Boston" if i % 2 else "Brookline",
