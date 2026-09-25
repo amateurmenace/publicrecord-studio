@@ -8557,11 +8557,22 @@
     const x = bsMonthX(months, width), colw = width / months.length, base = 110;
     let out = months.map((mo, i) => `<text x="${r1(i * colw + 4)}" y="${height - 8}" font-size="11" fill="#6F6A5B" style="font-family:var(--font-mono)">${TP_MON[+mo.slice(5, 7)]}</text><line x1="${r1(i * colw)}" y1="${base - 6}" x2="${r1(i * colw)}" y2="${base + 6}" stroke="#D9D1BF"/>`).join("");
     out += `<line x1="0" y1="${base}" x2="${width}" y2="${base}" stroke="#D9D1BF" stroke-width="2"/>`;
+    // a dot's words only where they have room, whole inside the picture —
+    // reckoned as charts.timeline_dots reckons them (sans_w, mono_w), to the byte
+    let last = -Infinity;
     for (const r of said.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.pid < b.pid ? -1 : a.pid > b.pid ? 1 : 0))) {
       const cx = x(r.date);
+      const body = tpCutWords(r.body, 24), day = bsDayShort(r.date);
+      const half = Math.max(0.58 * 12 * [...String(body)].length, 0.62 * 11 * [...String(day)].length) / 2;
+      const lx = Math.min(Math.max(cx, half), width - half);
+      let words = "";
+      if (lx - half >= last + 6) {
+        last = lx + half;
+        words = `<text x="${r1(lx)}" y="${base - 22}" font-size="12" fill="#4B473E" text-anchor="middle" style="font-family:var(--font-sans)">${bsEsc(body)}</text>`
+          + `<text x="${r1(lx)}" y="${base - 38}" font-size="11" fill="#6F6A5B" text-anchor="middle" style="font-family:var(--font-mono)">${bsEsc(day)}</text>`;
+      }
       out += `<a href="${BASE}/m/${bsEsc(r.pid)}#t${Math.floor(r.first_t || 0)}" class="bs-tdot" data-pid="${bsEsc(r.pid)}"><circle cx="${r1(cx)}" cy="${base}" r="9" fill="${bsTown(r.town)}"><title>${bsEsc(r.title || r.pid)} — ${tpN(+r.n || 0, unit || "line")}</title></circle>`
-        + `<text x="${r1(cx)}" y="${base - 22}" font-size="12" fill="#4B473E" text-anchor="middle" style="font-family:var(--font-sans)">${bsEsc(tpCutWords(r.body, 24))}</text>`
-        + `<text x="${r1(cx)}" y="${base - 38}" font-size="11" fill="#6F6A5B" text-anchor="middle" style="font-family:var(--font-mono)">${bsEsc(bsDayShort(r.date))}</text></a>`;
+        + `${words}</a>`;
     }
     const label = q ? `when “${q}” came up` : "when it came up";
     return `<div class="bs-timeline"><span class="kicker">${bsEsc(label)} — each dot is a meeting; click one to jump</span><div class="fp-chartwrap"><svg class="bs-timeline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${bsEsc(label)}">${out}</svg></div></div>`;

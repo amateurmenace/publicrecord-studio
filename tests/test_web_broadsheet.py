@@ -535,6 +535,16 @@ class TestTheChartsArePure(unittest.TestCase):
             half = charts.mono_w(lens, 11) / 2
             self.assertGreaterEqual(float(x) - half, 0, lens); self.assertLessEqual(float(x) + half, rw, lens)
         self.assertIn('data-lens="community" x="', river)
+        # the issue graph: a name at the ring's side is read whole — the picture widens by its overhang
+        from web import emit
+        nodes = [{"slug": f"s{i}", "name": nm, "n_meetings": 1 + i} for i, nm in enumerate(
+            ["Public Comment Procedures", "Community Development Block", "Data Reporting and Transparency", "Senior Center Funding"])]
+        page = emit.page_graph({"nodes": nodes, "edges": [{"a": "s0", "b": "s1", "weight": 2}]}, {"version": "9", "corpus_hash": "x", "edition_date": "2026-09-01", "counts": {}}, "")
+        vb = [float(v) for v in re.search(r'<svg viewBox="([-\d.]+) 0 ([\d.]+) 760" class="graphsvg"', page).groups()]
+        for x, anchor, nm in re.findall(r'<text x="([-\d.]+)" y="[-\d.]+" text-anchor="(\w+)" font-size="10"[^>]*>([^<]+)</text>', page):
+            w = charts.sans_w(nm, 10)
+            lo, hi = (float(x), float(x) + w) if anchor == "start" else (float(x) - w, float(x))
+            self.assertGreaterEqual(lo, vb[0], nm); self.assertLessEqual(hi, vb[0] + vb[1], nm)
 
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
@@ -695,6 +705,22 @@ class TestBroadsheetTwins(unittest.TestCase):
                 {"pid": "vid3", "date": "2026-05-02", "n": 0, "first_t": None, "town": "Testville", "body": "Board", "title": "silent"},
                 {"pid": "vid4", "date": "", "n": 3, "first_t": 1.0, "town": "Testville", "body": "Board", "title": "undated"}]
         want = charts.timeline_dots(rows, q="budget")
+        # a crowded record: a week apart, the same day twice, the record's first night at its edge
+        crowded = [{"pid": f"c{i}", "date": d, "n": 1, "first_t": 5.0, "town": "Brookline", "body": b, "title": f"t{i}"}
+                   for i, (d, b) in enumerate([("2025-12-09", "Select Board"), ("2026-03-10", "Select Board"), ("2026-03-24", "Select Board"),
+                                               ("2026-03-31", "Select Board"), ("2026-06-16", "Select Board"), ("2026-06-18", "School Committee"),
+                                               ("2026-09-16", "Select Board"), ("2026-09-16", "School Committee")])]
+        svg = charts.timeline_dots(crowded, q="housing")
+        words = [(float(x), lab) for x, lab in re.findall(r'<text x="([-\d.]+)" y="88" font-size="12"[^>]*>([^<]+)</text>', svg)]
+        days = [(float(x), lab) for x, lab in re.findall(r'<text x="([-\d.]+)" y="72" font-size="11"[^>]*>([^<]+)</text>', svg)]
+        self.assertEqual(len(words), len(days))
+        self.assertTrue(2 <= len(words) < len(crowded))                           # some dots keep only their dot
+        self.assertEqual(svg.count('class="bs-tdot"'), len(crowded))            # every dot stands, with its title
+        spans = sorted((x - max(charts.sans_w(b, 12), charts.mono_w(d, 11)) / 2, x + max(charts.sans_w(b, 12), charts.mono_w(d, 11)) / 2)
+                       for (x, b), (_, d) in zip(words, days))
+        for (lo, hi), (nlo, _) in zip(spans, spans[1:]):
+            self.assertLessEqual(hi + 6, nlo)                                     # no words on words
+        self.assertGreaterEqual(spans[0][0], 0); self.assertLessEqual(spans[-1][1], 1160)   # whole inside
         self.ok(node("\n".join([
             PRELUDE,
             "const TP_MON = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];",
@@ -711,6 +737,9 @@ class TestBroadsheetTwins(unittest.TestCase):
             lift(r"  function bsTimeline\(rows, q, width, height, unit\) \{.+?\n  \}"),
             f"const got = bsTimeline({json.dumps(rows)}, 'budget'); const want = {json.dumps(want)};",
             "if (got !== want) { let i = 0; while (i < got.length && got[i] === want[i]) i++; fail('drift at ' + i + ': ' + got.slice(i, i + 160) + ' vs ' + want.slice(i, i + 160)); }",
+            # a crowded record — the live topic pages' own shape — draws the same bytes on both sides too
+            f"const got2 = bsTimeline({json.dumps(crowded)}, 'housing'); const want2 = {json.dumps(charts.timeline_dots(crowded, q='housing'))};",
+            "if (got2 !== want2) { let i = 0; while (i < got2.length && got2[i] === want2[i]) i++; fail('crowded drift at ' + i + ': ' + got2.slice(i, i + 160) + ' vs ' + want2.slice(i, i + 160)); }",
             "if (bsTimeline([], 'x') !== '') fail('no rows, no picture');",
             "console.log('ok');"])))
 

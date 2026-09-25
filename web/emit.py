@@ -1707,7 +1707,16 @@ def page_graph(graph, manifest, base):
         labels += (f'<text x="{lx}" y="{ly}" text-anchor="{anchor}" '
                    f'font-size="10" fill="#475569" dominant-baseline="middle">'
                    f'{esc(node["name"][:22])}</text>')
-    svg = (f'<svg viewBox="0 0 {W} {W}" class="graphsvg" '
+    # the picture is widened by the longest name's overhang, so a name at the
+    # ring's side is read whole (a sweep of the live graph: up to 35 px cut)
+    from . import charts as _charts
+    over = 0.0
+    for i, node in enumerate(nodes):
+        lx = round(cx + (R + 14) * math.cos(-math.pi/2 + 2*math.pi*i/max(1, n)), 1)
+        w = _charts.sans_w(node["name"][:22], 10)
+        over = max(over, lx + w - W if lx >= cx else w - lx)
+    pad = math.ceil(over + 4) if over > 0 else 0
+    svg = (f'<svg viewBox="{-pad} 0 {W + 2 * pad} {W}" class="graphsvg" '
            f'xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="issue co-occurrence network">{lines}{dots}{labels}</svg>'
            if nodes else '<p class="hint">the graph needs issues that share meetings</p>')

@@ -852,6 +852,12 @@ def mono_w(text: str, size: float) -> float:
     return 0.62 * size * len(str(text))
 
 
+def sans_w(text: str, size: float) -> float:
+    """The reading face's labels, reckoned the same way: IBM Plex Sans runs
+    narrower than the mono, a little over half an em a character."""
+    return 0.58 * size * len(str(text))
+
+
 def data_attr(name: str, obj) -> str:
     """A picture's numbers, beside it: data-bs-<name>='<json>' — sorted keys,
     no spaces, HTML-escaped once, so two presses agree byte for byte and the
@@ -1677,13 +1683,26 @@ def timeline_dots(rows: Sequence[dict], base: str = "/app", width: int = 1160, h
         out.append(f'<text x="{_r(i * colw + 4)}" y="{height - 8}" font-size="11" fill="{MUTED}" style="{MONO}">{month_short(mo)}</text>'
                    f'<line x1="{_r(i * colw)}" y1="{base_y - 6}" x2="{_r(i * colw)}" y2="{base_y + 6}" stroke="{RULE}"/>')
     out.append(f'<line x1="0" y1="{base_y}" x2="{width}" y2="{base_y}" stroke="{RULE}" stroke-width="2"/>')
+    # a dot's words — its body, its day — stand only where they have room
+    # after the last dot that kept its words, whole inside the picture; a dot
+    # too near keeps its dot and its title (a sweep of the live topic pages:
+    # "Select Board" lay on "Select Board", and the first ran off the edge).
+    # The JS twin (app.js bsTimeline) reckons it the same, to the byte.
+    last = float("-inf")
     for r in sorted(said, key=lambda r: (str(r["date"]), str(r["pid"]))):
         x = x_of(r["date"])
         col = town_color(r.get("town"))
+        body, day = cut_words(r.get("body"), 24), day_short(r["date"])
+        half = max(sans_w(body, 12), mono_w(day, 11)) / 2
+        lx = min(max(x, half), width - half)
+        words = ""
+        if lx - half >= last + 6:
+            last = lx + half
+            words = (f'<text x="{_r(lx)}" y="{base_y - 22}" font-size="12" fill="{INK2}" text-anchor="middle" style="font-family:var(--font-sans)">{esc(body)}</text>'
+                     f'<text x="{_r(lx)}" y="{base_y - 38}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{esc(day)}</text>')
         out.append(f'<a href="{base}/m/{esc(r["pid"])}#t{int(float(r.get("first_t") or 0))}" class="bs-tdot" data-pid="{esc(r["pid"])}">'
                    f'<circle cx="{_r(x)}" cy="{base_y}" r="9" fill="{col}"><title>{esc(r.get("title") or r["pid"])} — {n_of(int(r["n"]), "line")}</title></circle>'
-                   f'<text x="{_r(x)}" y="{base_y - 22}" font-size="12" fill="{INK2}" text-anchor="middle" style="font-family:var(--font-sans)">{esc(cut_words(r.get("body"), 24))}</text>'
-                   f'<text x="{_r(x)}" y="{base_y - 38}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{esc(day_short(r["date"]))}</text></a>')
+                   f'{words}</a>')
     label = f'when “{q}” came up' if q else "when it came up"
     return (f'<div class="bs-timeline"><span class="kicker">{esc(label)} — each dot is a meeting; click one to jump</span>'
             f'<div class="fp-chartwrap"><svg class="bs-timeline-svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
