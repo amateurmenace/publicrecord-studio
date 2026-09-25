@@ -94,7 +94,7 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
 
-## 2026-09-24, 03:00Z — v2.2.9 / r56 IS LIVE: every label fits its picture
+## 2026-09-25, 03:00Z — v2.2.9 / r56 IS LIVE: every label fits its picture
 
 Stephen's "continue then push and deploy" after v2.2.8. The desk's list
 had two items; both were decided rather than built (below). A sweep of the
