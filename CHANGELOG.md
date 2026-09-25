@@ -2,6 +2,37 @@
 
 ## unreleased
 
+### The reach: what a reader could not reach or read — 2026-09-25 (v2.2.10)
+
+A second sweep of the live edition, this time for reach: duplicate ids and
+dangling references, images without alt, controls without names, targets
+a finger cannot press (WCAG 2.5.8's 24 px, its spacing exception applied),
+and text under AA contrast (every translucent layer blended as it paints).
+Most of the record was already clean; what was not:
+
+- **A meeting's transcript gave two lines one id.** Every line took the id
+  of its second, so lines that start in the same second shared it — four
+  lines on one live page. The id now goes on the second's first line
+  alone; a link to that second lands where it always did.
+- **The record drawn's counts read on every cell.** The framing heat
+  flipped its numbers to white where white reads 2.9:1. Dark ink holds to
+  the middle of the scale and white takes over past it; a cell in the
+  narrow band where neither reads is drawn a shade darker.
+- **Targets a finger can press.** The scope and range buttons stand 25 px
+  tall; on a phone, the way back, the colophon's links and the glossary's
+  index stand 24 px; a table twin that scrolls keeps its dates whole
+  instead of breaking them into a column of characters; and a tape's
+  slices, 2 px bars on a phone, reach into the gaps beside them, so a
+  press anywhere on the row lands on a slice.
+- **The word cloud fades no further than a word reads.** Its rarest
+  words faded to 2.5:1; the fade now stops at AA — 4.5:1 for the smaller
+  bold words, 3:1 for the large.
+
+Known, not changed: a tape's 48 slices cannot each be 24 px wide on a
+phone without pressing fewer slices than the live search page draws, and
+nothing else on the page opens a slice's own time — they fail WCAG 2.5.8
+there.
+
 ### Every label fits its picture — 2026-09-24 (v2.2.9)
 
 A sweep of the live edition in headless Chrome — every kind of page at a
