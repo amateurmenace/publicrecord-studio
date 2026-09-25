@@ -461,6 +461,81 @@ class TestTheChartsArePure(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), "ok", r.stdout + r.stderr)
         self.assertIn("bsYear(); bsYearStills();", JS)
 
+    def test_every_label_fits_its_picture_and_none_lies_on_another(self):
+        """A review of the live front page, measured: Brookline's 37% ran off
+        the butterfly's edge, a roll-call month of none or one ran its label
+        into the next month's (and the last month's off the edge), and a
+        night that named six sums close together printed them over each
+        other on the score. Each label now has its room — reckoned in the
+        mono face's own advance (charts.mono_w) — or, on the score, goes,
+        keeping its tick and its title."""
+        from web import charts
+        texts = lambda svg: [(float(m.group(1)), m.group(2) or "start", float(m.group(3)), re.sub(r"<[^>]+>.*", "", m.group(4)))
+                             for m in re.finditer(r'<text x="([-\d.]+)" y="[-\d.]+" font-size="10"[^>]*?(?:text-anchor="(\w+)")?[^>]*?style="[^"]*"()>([^<]*)', svg)]
+        def span(x, anchor, label):
+            w = charts.mono_w(label, 10)
+            return (x - w, x) if anchor == "end" else (x - w / 2, x + w / 2) if anchor == "middle" else (x, x + w)
+        # the butterfly: the longest bar's number inside the picture, on either side
+        shares = [{"town": "Boston", "color": "#1F4E79", "shares": {"community": 0.32, "financial": 0.20}},
+                  {"town": "Brookline", "color": "#1E5E3F", "shares": {"financial": 0.37, "community": 0.13}}]
+        svg = charts.butterfly(shares)
+        width = float(re.search(r'<svg class="bs-butterfly" width="(\d+)"', svg).group(1))
+        nums = [(float(x), a or "start", v) for x, a, v in re.findall(r'<text x="([-\d.]+)" y="[-\d.]+" font-size="10" fill="[^"]+"(?: text-anchor="(\w+)")? style="[^"]+">(\d+%)</text>', svg)]
+        self.assertTrue(any(v == "37%" for _, _, v in nums) and any(v == "32%" for _, _, v in nums))
+        for x, a, v in nums:
+            lo, hi = span(x, a, v)
+            self.assertGreaterEqual(lo, 0, v); self.assertLessEqual(hi, width, v)
+        # the towns' names clear of the first lens name: the first row sits lower than the header's baseline + a line
+        self.assertGreaterEqual(float(re.search(r'<text x="[-\d.]+" y="([-\d.]+)" font-size="10" fill="[^"]+" text-anchor="middle">financial', svg).group(1)), 10 + 12)
+        # the roll calls: each month's label ends before the next begins, and the last inside the picture
+        votes = [{"pid": "p", "date": "2026-01-05", "t": 5, "outcome": "passes", "tally": "5-0", "roll": []},
+                 {"pid": "q", "date": "2026-03-02", "t": 9, "outcome": "passes", "tally": "5-0", "roll": []},
+                 {"pid": "r", "date": "2026-05-04", "t": 9, "outcome": "fails", "tally": "0-5", "roll": []}]
+        votes += [{"pid": f"m{i}", "date": "2026-03-10", "t": i, "outcome": "passes", "tally": "5-0", "roll": []} for i in range(17)]
+        grid = charts.vote_grid(votes)
+        W = float(re.search(r'<svg class="bs-votegrid" width="(\d+)"', grid).group(1))
+        heads = [(float(x), lab) for x, lab in re.findall(r'<text x="([-\d.]+)" y="10" font-size="10" fill="[^"]+" style="[^"]+">([^<]+)</text>', grid)]
+        self.assertEqual([lab for _, lab in heads], ["Jan · 1", "Feb · 0", "Mar · 18", "Apr · 0", "May · 1"])
+        for (x, lab), (nx, _) in zip(heads, heads[1:]):
+            self.assertLessEqual(x + charts.mono_w(lab, 10), nx, lab)
+        self.assertLessEqual(heads[-1][0] + charts.mono_w(heads[-1][1], 10), W)
+        # the score: six sums inside twenty minutes of a four-hour tape — no two labels in a row
+        # overlap, each inside the picture, and a sum with no room keeps its tick and its title
+        m = {"pid": "s", "duration": 14400.0, "analysis": {"entities": {"money": [
+            {"name": n, "t": t, "count": 1} for n, t in [("$0.02", 500), ("$2,000 m", 650), ("$15,000", 700), ("$47,265,655", 820),
+                                                         ("$250,000", 900), ("$150,000", 1000), ("$120 million", 14000)]]}}}
+        svg = charts.score(m)
+        labels = [(float(x), a, float(y), lab) for x, y, a, lab in re.findall(
+            r'<text x="([-\d.]+)" y="(\d+)" font-size="10" fill="[^"]+" text-anchor="(\w+)" style="[^"]+">([^<]+)<title>', svg)]
+        self.assertTrue(labels)
+        W = 880
+        for row in (34.0, 45.0):
+            spans = sorted(span(x, a, lab) for x, a, y, lab in labels if y == row)
+            for (lo, hi), (nlo, _) in zip(spans, spans[1:]):
+                self.assertLessEqual(hi + 6, nlo)
+            for lo, hi in spans:
+                self.assertGreaterEqual(lo, 0); self.assertLessEqual(hi, W + 10)
+        ticks = re.findall(r'<a href="[^"]+" class="bs-money" data-t="[^"]+" data-label="([^"]+)">(.*?)</a>', svg)
+        self.assertEqual(len(ticks), 7)                                          # every sum keeps its tick
+        for lab, inner in ticks:
+            self.assertIn("<title>", inner, lab)                                 # and its title, labelled or not
+        self.assertLess(len(labels), 7)                                          # some had no room, and went quietly
+        self.assertIn("$120 million", [lab for *_, lab in labels])              # the lone late sum keeps its label
+        # the playhead's time reads over the axis's: drawn after every axis time, on a hair of the card
+        self.assertGreater(svg.index('<g class="bs-playhead">'), svg.rindex('font-size="10" fill="#6F6A5B" text-anchor="middle"'))
+        self.assertRegex(svg, r'<g class="bs-playhead">.*?paint-order:stroke" stroke="#FBF9F4" stroke-width="4">')
+        self.assertEqual(charts.mono_w("100%", 10), 0.62 * 10 * 4)
+        # the river: a band widest on the last night (or the first) keeps its whole label inside
+        rows = [{"pid": "a", "date": "2026-01-05", "total": 100, "lenses": {"financial": 90, "community": 10}},
+                {"pid": "b", "date": "2026-02-05", "total": 100, "lenses": {"financial": 50, "community": 50}},
+                {"pid": "c", "date": "2026-03-05", "total": 100, "lenses": {"financial": 10, "community": 90}}]
+        river = charts.lens_river(rows, {"a": "T", "b": "T", "c": "T"})
+        rw = float(re.search(r'<svg class="bs-river-svg" width="(\d+)"', river).group(1))
+        for x, lens in re.findall(r'<text class="bs-rlabel" data-lens="\w+" x="([-\d.]+)" y="[-\d.]+" font-size="11"[^>]*>(\w+)</text>', river):
+            half = charts.mono_w(lens, 11) / 2
+            self.assertGreaterEqual(float(x) - half, 0, lens); self.assertLessEqual(float(x) + half, rw, lens)
+        self.assertIn('data-lens="community" x="', river)
+
     def test_the_year_lays_every_dated_tape_without_overlap(self):
         from web import charts
         ms = [{"pid": f"p{i}", "date": f"2026-0{1 + i % 9}-{10 + i % 15:02d}", "town": "Boston" if i % 2 else "Brookline",

@@ -845,6 +845,13 @@ MONTH_DAYS = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 MONO = "font-family:var(--font-mono)"
 
 
+def mono_w(text: str, size: float) -> float:
+    """How wide a label in the mono face runs: IBM Plex Mono advances 0.6 em
+    a character, and a hair more keeps a neighbour off it — so a picture can
+    leave a label its room before it draws it (the word cloud's own rule)."""
+    return 0.62 * size * len(str(text))
+
+
 def data_attr(name: str, obj) -> str:
     """A picture's numbers, beside it: data-bs-<name>='<json>' — sorted keys,
     no spaces, HTML-escaped once, so two presses agree byte for byte and the
@@ -1056,13 +1063,27 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
         out.append(f'<a href="{at(k["t"])}" class="bs-tick" data-t="{_r(k["t"])}" data-lens="{esc(k["lens"])}" data-text="{esc(k["text"])}">'
                    f'<rect x="{_r(x(k["t"]) - 1.5)}" y="{y}" width="3" height="{lane_h}" fill="{LENS_COLOR.get(k["lens"], INK)}">'
                    f'<title>{hms(k["t"])} · {esc(k["lens"])}: “{esc(k["text"])}”</title></rect></a>')
-    for i, mo in enumerate(d["money"]):
-        ly = 34 + (i % 2) * 11
-        anchor = "end" if x(mo["t"]) > W - 60 else "start"
+    # the dollar figures' labels take two rows, and never lie on one another:
+    # a figure whose label finds no room in either keeps its tick, its title
+    # and its row in the table beneath (a review of the live page: a night
+    # that named six sums in twenty minutes printed them over each other)
+    taken = [float("-inf"), float("-inf")]          # the right edge each row has used
+    for mo in d["money"]:
+        xm, lw = x(mo["t"]), mono_w(mo["label"], 10)
+        anchor = "end" if xm > W - 60 else "start"
+        left, right = (xm - lw, xm) if anchor == "end" else (xm, xm + lw)
+        row = next((r for r in (0, 1) if left >= taken[r] + 6), None)
+        tip = f'<title>{esc(mo["label"])} — said {n_of(mo["count"], "time")}, first at {hms(mo["t"])}</title>'
+        if row is None:
+            out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
+                       f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="45" stroke="{LENS_COLOR["financial"]}" stroke-width="1">{tip}</line></a>')
+            continue
+        taken[row] = right
+        ly = 34 + row * 11
         out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
-                   f'<line x1="{_r(x(mo["t"]))}" y1="54" x2="{_r(x(mo["t"]))}" y2="{ly}" stroke="{LENS_COLOR["financial"]}" stroke-width="1"/>'
-                   f'<text x="{_r(x(mo["t"]))}" y="{ly}" font-size="10" fill="{MONEY}" text-anchor="{anchor}" style="{MONO}">{esc(mo["label"])}'
-                   f'<title>{esc(mo["label"])} — said {n_of(mo["count"], "time")}, first at {hms(mo["t"])}</title></text></a>')
+                   f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="{ly}" stroke="{LENS_COLOR["financial"]}" stroke-width="1"/>'
+                   f'<text x="{_r(xm)}" y="{ly}" font-size="10" fill="{MONEY}" text-anchor="{anchor}" style="{MONO}">{esc(mo["label"])}'
+                   f'{tip}</text></a>')
     if questions:
         for q in (an.get("questions") or []):
             if q.get("t") is None:
@@ -1076,14 +1097,18 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
         out.append(f'<a href="{at(dc["t"])}" class="bs-dec" data-i="{i}" data-t="{_r(dc["t"])}" data-kind="{esc(dc["kind"])}">'
                    f'<circle cx="{_r(x(dc["t"]))}" cy="44" r="{_r(r)}" fill="{fill}" opacity=".9">'
                    f'<title>{hms(dc["t"])} · {esc(SHAPE_KINDS.get(dc["kind"], dc["kind"]))}: “{esc(dc["quote"])}”</title></circle></a>')
-    st = score_state(d, d["t"])
-    out.append(f'<g class="bs-playhead"><line x1="{st["x"]}" y1="32" x2="{st["x"]}" y2="150" stroke="{RUST}" stroke-width="2"/>'
-               f'<text x="{st["x"]}" y="164" font-size="11" fill="{RUST}" text-anchor="middle" style="{MONO}">{st["mmss"]}</text></g>')
     step = 1800.0
     t = 0.0
     while t < dur - 60:
         out.append(f'<text x="{_r(x(t))}" y="166" font-size="10" fill="{MUTED}" text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}">{hms(t)}</text>')
         t += step
+    # the playhead last, its time on a hair of the card: wherever it stands it
+    # reads over the axis's own times (a review of the live page: 1:52:55
+    # and 2:00:00 lay on one another)
+    st = score_state(d, d["t"])
+    out.append(f'<g class="bs-playhead"><line x1="{st["x"]}" y1="32" x2="{st["x"]}" y2="150" stroke="{RUST}" stroke-width="2"/>'
+               f'<text x="{st["x"]}" y="164" font-size="11" fill="{RUST}" text-anchor="middle" style="{MONO};paint-order:stroke" '
+               f'stroke="{CARD}" stroke-width="4">{st["mmss"]}</text></g>')
     svg = (f'<svg class="bs-score-svg" width="{W}" height="168" viewBox="-100 0 {W + 110} 168" xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="the shape of the meeting along the tape: its loudest moments as dots, '
            f'the dollar figures the room named, eight lanes of lens words">' + "".join(out) + "</svg>")
@@ -1378,9 +1403,15 @@ def butterfly(shares: Sequence[dict], width: int = 290) -> str:
     if not ts:
         return '<p class="hint">the lenses need a read meeting</p>'
     mid = width / 2 + 5 if len(ts) == 2 else 110
-    rowh, top = 24, 22
+    # a row's number sits under the next row's lens name, and the towns' names
+    # over the first — each clear of the other (a review of the live page:
+    # they touched)
+    rowh, top = 27, 26
     mx = max((v for t in ts for v in t["shares"].values()), default=0.0) or 1.0
-    scale = (mid - 20) / mx
+    # the longest bar leaves its number room inside the picture on either side
+    # of the spine (a review of the live page: Brookline's 37% ran off the edge)
+    room = (min(width - mid, mid) - 8 - mono_w("100%", 10)) if len(ts) == 2 else (mid - 20)
+    scale = room / mx
     out = []
     if len(ts) == 2:
         out.append(f'<text x="{_r(mid - 4)}" y="10" font-size="10" fill="{ts[0]["color"]}" text-anchor="end" style="{MONO}">{esc(ts[0]["town"])}</text>'
@@ -1487,7 +1518,8 @@ def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
     for mo in months:
         ms = by.get(mo, [])
         ncols = max(1, min(cols, len(ms)))
-        out.append(f'<text x="{_r(x0)}" y="10" font-size="10" fill="{MUTED}" style="{MONO}">{month_short(mo)} · {len(ms)}</text>')
+        label = f"{month_short(mo)} · {len(ms)}"
+        out.append(f'<text x="{_r(x0)}" y="10" font-size="10" fill="{MUTED}" style="{MONO}">{label}</text>')
         for i, v in enumerate(ms):
             r, c = divmod(i, cols)
             maxrows = max(maxrows, r + 1)
@@ -1499,7 +1531,10 @@ def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
                        f'<text x="{_r(x + sq / 2)}" y="{y + 12}" font-size="8" fill="{PAPER}" text-anchor="middle" style="{MONO}">{"·" if ayes_of(v) is None else ayes_of(v)}</text><title>{esc(tip)}</title></a>')
             trows.append(f'<tr><td><a href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}">{esc(v.get("date"))}</a></td>'
                          f'<td>{esc(cut_words(v.get("motion"), 90))}</td><td>{esc(out_)}</td><td>{esc(v.get("tally") or "")}</td></tr>')
-        x0 += ncols * (sq + gap) + 14
+        # as wide as its squares or its label, whichever is wider: a month of
+        # none or one ran its label into the next month's, and the last month's
+        # off the picture's edge (a review of the live page)
+        x0 += max(ncols * (sq + gap), mono_w(label, 10)) + 14
     W, H = int(x0), 16 + maxrows * (sq + gap + 1) + 4
     svg = (f'<svg class="bs-votegrid" width="{W}" height="{H}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="{n_of(len(vs), "roll call")} by month">' + "".join(out) + "</svg>")
@@ -1593,7 +1628,11 @@ def lens_river(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str], base:
                    f'opacity=".86" stroke="{CARD}" stroke-width="1.2"><title>{lens} — its share of each night’s framed words</title></path></a>')
         widest = max(range(n), key=lambda i: (base_y[i] - tops[i], -i))
         if base_y[widest] - tops[widest] >= 9:
-            labels.append(f'<text class="bs-rlabel" data-lens="{lens}" x="{_r(xs[widest])}" y="{_r((base_y[widest] + tops[widest]) / 2 + 4)}" '
+            # a band widest on the first or last night keeps its whole label
+            # inside the picture (a desk edition's "community" ran off the edge)
+            half = mono_w(lens, 11) / 2 + 2
+            lx = min(max(xs[widest], half), width - half)
+            labels.append(f'<text class="bs-rlabel" data-lens="{lens}" x="{_r(lx)}" y="{_r((base_y[widest] + tops[widest]) / 2 + 4)}" '
                           f'font-size="11" fill="{INK}" text-anchor="middle" style="{MONO};paint-order:stroke" stroke="{CARD}" stroke-width="3">{lens}</text>')
         base_y = tops
     if d["joins"] is not None:
