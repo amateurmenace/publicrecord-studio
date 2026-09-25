@@ -491,6 +491,7 @@ def page_meeting(m, manifest, base, terms=None):
     # the transcript as a real document (JS-off complete)
     rows = []
     last_spk = None
+    anchored = set()   # a second's anchor goes on its first line only: an id is one element's
     for i, s in enumerate(m["segments"]):
         t = float(s.get("start") or 0)
         spk = s.get("speaker") or ""
@@ -501,8 +502,13 @@ def page_meeting(m, manifest, base, terms=None):
         # deep-link's #t<sec> won't match its row. data-t carries the exact
         # start (for precise seek + Math.floor()==int(t)); NEVER the rounded
         # form — round(t,1) can cross an integer and break ~5% of deep-links.
+        # (two lines that start in one second shared its id — a sweep of the
+        # live pages found t116 four times; #t<sec> and rowAt land on the
+        # second's first line either way, as a browser always did)
+        anchor = "" if int(t) in anchored else f' id="t{int(t)}"'
+        anchored.add(int(t))
         rows.append(
-            f'<p class="seg" id="t{int(t)}" data-t="{t}" data-i="{i}">'
+            f'<p class="seg"{anchor} data-t="{t}" data-i="{i}">'
             f'<a class="ts" href="#t{int(t)}">{hms(t)}</a> '
             f'{head_spk}<span class="sx">{esc(s.get("text"))}</span></p>')
     transcript = "\n".join(rows)
@@ -1614,13 +1620,17 @@ def page_analytics(analytics, manifest, base):
     for r in fm:
         tot = r.get("total", 0) or 1
         # the green tint scale (specs/20 §5): a darker deep-green is a bigger
-        # share; the lens hues never come near this domain. Ink flips to white
-        # once the cell is dark enough to need it (AA on the count).
+        # share; the lens hues never come near this domain. The count reads at
+        # AA (4.5:1 at this size) on every cell: dark ink to 0.56, white from
+        # 0.62, and a cell between — where neither ink reads — takes the
+        # darker 0.62 (a sweep's catch: white flipped in at 0.46 and read 2.9:1)
         cells = ""
         for n in order:
             cnt = r["lenses"].get(n, 0)
             a = round(0.05 + 0.9 * min(1, cnt / tot * 4), 2)
-            ink = "#ffffff" if a > 0.45 else "#0f172a"
+            if 0.56 < a < 0.62:
+                a = 0.62
+            ink = "#ffffff" if a >= 0.62 else "#0f172a"
             cells += (f'<td style="background:rgba(5,46,22,{a});color:{ink}" '
                       f'title="{esc(n)}: {cnt}">{cnt or ""}</td>')
         body_rows.append(
