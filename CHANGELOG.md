@@ -2,6 +2,50 @@
 
 ## unreleased
 
+### Every label fits its picture — 2026-09-24 (v2.2.9)
+
+A sweep of the live edition in headless Chrome — every kind of page at a
+desk's width and a phone's, and the words in each picture measured by
+their geometry rather than read off screenshots — found no failed request,
+no console error, no sideways scroll, and no dead link among 301 internal
+paths. It did find pictures cutting their own words:
+
+- the two towns' lenses ran Brookline's 37% off the picture, at every width;
+- a roll-call month of none or one ran its label into the next month's,
+  and the last month's off the edge;
+- a night that named six sums in twenty minutes printed them over one
+  another on the score (the front page's and every meeting page's), and
+  the playhead's time lay on the axis's own;
+- the timeline of meetings that said a word — the topic pages, and the
+  search page's story — laid "Select Board" on "Select Board" wherever two
+  meetings sat a week apart, and ran the record's first night off its edge;
+- the river let a band widest on the first or last night run its name off
+  the end, and the issue graph cut the names at its ring's sides.
+
+Each label now has its room, reckoned in its face's own measured advance
+— or, where a picture is crowded, steps aside, leaving its mark, its title
+and its row in the table beneath. A meeting's words over time take a
+second row before they give up, so a close pair (June 16 and 18, or two
+bodies on one day) is named both; the sums take one row above the
+decisions' dots, and a sum named close to another joins its label as a
+count ("$1.13 million +1"), keeping its own tick and title; and an axis
+time the playhead's would lie on steps aside, wherever the playhead moves. The
+search page's timeline and the pressed one stay one picture: a node twin
+holds them byte-equal on a crowded record.
+
+Decided, not built:
+
+- **The nightly press stays ungated.** A gate on the live pressing's
+  fingerprint would skip a quiet night — about two minutes of a job, and a
+  press that is already idempotent (unchanged files are not uploaded; the
+  carry skips a night whose only change is the stamp). But the fingerprint
+  does not cover every plane the press now reads (an issue's keywords, the
+  ledger's tombstones), so a gate would risk a stale record to save pennies.
+  Freshness is the record's promise; the press keeps pressing.
+- **No pictures on the studio panel's reel list or the reel viewer's.** No
+  board draws them (the Studio board pictures the paper's reel block, which
+  has its pictures since v2.2.7), and the boards are the spec.
+
 ### The list follows its count; a phrase said both ways shows once; a phone fetches only the pictures it shows — 2026-09-24 (v2.2.8)
 
 Three corrections from the list of what was left, none touching a stored
