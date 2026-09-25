@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.9, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.10, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,55 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-25, 13:52Z — v2.2.10 / r57 IS LIVE: the reach
+
+Stephen's "continue" after v2.2.9. A second sweep of the live edition, for
+reach: `scratchpad/sweep/a11y2.mjs` in the session that built it — ids and
+dangling references, alt, names, WCAG 2.5.8 targets (24 px, the spacing
+exception applied; links in running text exempt; a closed `<details>` twin
+is not on screen), AA contrast with every translucent layer blended as it
+paints. The shape:
+
+- **A second's anchor, once** (`emit.page_meeting`): a transcript line's
+  `id="t<sec>"` goes on the first line that starts in that second only
+  (t116 was on four lines); every line keeps its `.ts` link; `rowAt` and
+  the browser's fragment land where they always did.
+- **The heat's counts at AA** (`emit.page_analytics`): dark ink to a=0.56,
+  white from 0.62, a cell between drawn at 0.62 (the only tinted table in
+  the edition with a count on it).
+- **A finger's targets**: `.scopeacts .btn` and `.sq-rb` 25 px; in the
+  phone block `.back`, `.bs-site`, `.cov`, `.gl-index a` stand 24 px; a
+  twin's first column whole where its wrapper scrolls (`.fp-twinwrap`,
+  `.pb-twinwrap`; the graph's twin has none, and its names wrap);
+  `.fp-sbar::after` reaches a pixel into the gaps so a press on a tape's
+  row lands on a slice.
+- **The word cloud** (`charts.word_cloud`): the fade stops at AA — 0.62
+  under 18.66 px (the cloud is bold), 0.48 above.
+- **Known, not changed**: a tape's 48 slices fail 2.5.8 on a phone
+  (nothing else opens a slice's time; fewer slices would break the twin
+  with the live search page); at 320 px the slices are near-invisible
+  hairlines; the word cloud's boxes touch (not their ink); a bare first
+  name can appear in a meeting's cloud (a single word, not a person page).
+- **Tests**: 1018 (110 PG-backed skip without a DSN) — `tests/test_web_reach.py`:
+  unique ids with a second's anchor on its first line, every heat cell's
+  count at 4.5:1 composited on the card, the target rules in the phone
+  block alone, the station hint's colour on its dark ground, the cloud's
+  words at AA on the card and the paper; each fails on its parent.
+- **Deploy**: r57 (image `sha256:47fa59c2…`, built from 7ca9e66) on the service
+  (revision record-api-00049-ksh) and all six jobs; the press at `--version 2.2.10`
+  (execution record-press-hfk28, 13:50Z, by the nightly-edition workflow, run
+  36143362032 — the record now 31 meetings, of 2026-09-24); Pages d64dfcc; `sw.js`
+  key `cz-record-2.2.10-64730f48c11c9e8e`; tag `v2.2.10` at 7ca9e66. Verified live:
+  six meeting pages' ids unique (the longest: 9,869 lines, 9,067 anchors); the
+  heat's 248 cells none in the dead band, no white count under 0.62; the new rules
+  in the served sheet.
+- **Reviewed**: one adversarial pass (four found — the station hint was
+  already right on its dark ground and the change is undone; the whole
+  dates only where a twin scrolls; the slices' claimed equivalents were
+  none; the cloud's fade — folded), the folds re-measured with the
+  reviewer's own probes (`rev10a/graphlong.mjs`: no page overflow at 320
+  to 414).
 
 ## 2026-09-25, 03:00Z — v2.2.9 / r56 IS LIVE: every label fits its picture
 

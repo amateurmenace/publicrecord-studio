@@ -157,6 +157,14 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-25, 13:52Z — **v2.2.10 / r57 is LIVE: the reach** (tag `v2.2.10` at
+  7ca9e66, the commit the image was built from; the service and all six jobs
+  on r57; the press at `--version 2.2.10`). A sweep for what a reader could
+  not reach or read: a transcript second's anchor once, the record drawn's
+  counts at AA, 24 px targets on a phone, a table twin's dates whole where
+  it scrolls, a tape's row pressable end to end, the word cloud's fade
+  stopped at AA. Reviewed through one pass (four, folded). r57 / 2.2.10
+  are spent; next numbers r58 / 2.2.11.
 - 2026-09-25, 03:00Z — **v2.2.9 / r56 is LIVE: every label fits its picture**
   (tag `v2.2.9` at 0e9b5f1, the commit the image was built from; the service
   and all six jobs on r56; the press at `--version 2.2.9`). A measured sweep
