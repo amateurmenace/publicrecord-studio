@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.8, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.9, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,72 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-24, 03:00Z — v2.2.9 / r56 IS LIVE: every label fits its picture
+
+Stephen's "continue then push and deploy" after v2.2.8. The desk's list
+had two items; both were decided rather than built (below). A sweep of the
+live edition then found what to build. The shape:
+
+- **The sweep** (headless Chrome, `scratchpad/sweep/` in the session that
+  built it): twelve page kinds at 1280 and 390, console errors, failed
+  requests, sideways scroll, broken images — none; a crawl of 105 pages
+  and 301 internal paths — no dead link; then every SVG's words measured
+  by `getBoundingClientRect` (never by screenshot — headless narrow shots
+  fake clipping) for words off their picture or on one another.
+- **`charts.mono_w` / `sans_w`** — a label's width before it is drawn: the
+  mono face 0.62 em a character; IBM Plex Sans per character (0.53 lower,
+  0.68 capitals, 0.25 space — measured in Chrome, a hair over), summed in a
+  plain loop because newer Pythons' `sum()` compensates and the JS twin
+  must agree to the bit. **`charts._r`** now writes a tenth exactly as
+  app.js `r1` does (Math.round's rule, JS's number format).
+- **The pictures**: the two towns' lenses leave the longest bar's number
+  room; the roll calls keep labels and squares in their own rows (the
+  board's) and end where the last month does; the score's sums take one
+  row above the decisions' dots, a close sum joining its group's label as
+  a count ("$1.13 million +1") with its own tick and title; the questions
+  stand above; the playhead's time stays inside the picture and an axis
+  time it would lie on steps aside (`bs-ax`, `data-lo`/`data-hi`; pressed
+  where it starts, re-decided by app.js on every move — `playhead_x` /
+  `bsPlayheadX`, `axis_hidden` / `bsAxisHidden`); the last axis time is
+  not written past the tape's end; the timeline of meetings (the topic
+  pages and the search page's story, `timeline_dots` / `bsTimeline`) puts
+  a dot's words in a lower row, else an upper, else none, whole inside —
+  a close pair is named both; the river names a band where the whole
+  name fits and turns its join words at the last night; the issue graph
+  pads each side by its own overhang.
+- **Decided, not built** (written into CHANGELOG): the nightly press stays
+  ungated — a gate on the live pressing's fingerprint saves two minutes of
+  an idempotent job and risks a stale record, since the fingerprint does
+  not see every plane the press reads (an issue's keywords, the ledger);
+  no pictures on the studio panel's reel list or the reel viewer's — no
+  board draws them.
+- **Known, not changed**: the word cloud's words pack close (their boxes
+  touch; their ink does not); two neighbours at the top of the issue
+  graph's ring can meet; a river's join words can meet a lens's name on a
+  long synthetic record (never the real one); the roll calls' grid is a
+  little wider than the board's 290 when months are sparse, so it scales
+  down in a narrow column.
+- **Tests**: 1014 (110 PG-backed skip without a DSN) — every label's span
+  checked against its picture and its neighbours (the two towns, the roll
+  calls, the score's groups, the river, the timeline's two rows, the
+  graph), each part failing on its parent; the timeline twin byte-equal on
+  a crowded record (and a reviewer's fuzz of 2,400 row sets); the
+  playhead and axis twins; `_r` against `r1`.
+- **Deploy**: r56 (image `sha256:daa2e8b9…`, built from 0e9b5f1) on the service
+  (revision record-api-00048-542) and all six jobs; the press at `--version 2.2.9`
+  (execution record-press-6zb26, 02:58Z, by the nightly-edition workflow, run
+  36088407961); Pages 3818147; `sw.js` key `cz-record-2.2.9-9eb9be490f17df4c`;
+  tag `v2.2.9` at 0e9b5f1. Verified live: the front page's sums grouped
+  ("$0.02 +3", "$250,000 +2", "$120 million"), 30:00 stepping aside for the
+  playhead at 23:46; the topic pages, the graph's sides and every sampled page
+  measured clean but for the known word-cloud and ring-top pairs.
+- **Reviewed**: one adversarial pass over both label commits (ten found,
+  folded), the folds re-reviewed (seven found — the sums' second row under
+  the dots, stubs read as a neighbour's, the axis end, the twins' inline
+  formula, `_r`'s edges — folded, re-measured with the reviewer's own
+  probes: no label on another, under a dot, struck through or clipped
+  over the front page and every meeting).
 
 ## 2026-09-24, 22:44Z — v2.2.8 / r55 IS LIVE: the list follows its count; a phrase said both ways shows once; a phone fetches only what it shows
 

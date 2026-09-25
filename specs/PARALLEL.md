@@ -157,6 +157,16 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-25, 03:00Z — **v2.2.9 / r56 is LIVE: every label fits its picture**
+  (tag `v2.2.9` at 0e9b5f1, the commit the image was built from; the service
+  and all six jobs on r56; the press at `--version 2.2.9`). A measured sweep
+  of the live edition; the two towns' lenses, the roll calls, the score's
+  sums (one row, grouped with a count) and playhead, the timeline of
+  meetings (two rows, both twins), the river and the issue graph keep their
+  words inside and off one another. Decided, not built: the nightly press
+  stays ungated; no pictures on the panel's or viewer's reel lists.
+  Reviewed through one pass and two re-reviews (ten, seven — folded).
+  r56 / 2.2.9 are spent; next numbers r57 / 2.2.10.
 - 2026-09-24, 22:44Z — **v2.2.8 / r55 is LIVE: the list follows its count; a phrase
   said both ways shows once; a phone fetches only the pictures it shows**
   (tag `v2.2.8` at fe0b2e5, the commit the image was built from; the service
