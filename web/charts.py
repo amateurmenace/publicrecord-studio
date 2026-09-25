@@ -75,9 +75,15 @@ def esc(s) -> str:
 
 
 def _r(x) -> str:
-    # half up, as app.js r1 (Math.round) and every JS twin round — Python's
-    # round() goes half to even, and the twins drifted by a tenth at .x5
-    return f"{math.floor(float(x) * 10 + 0.5) / 10:g}"
+    """A coordinate to a tenth, as app.js r1 writes it — Math.round's own
+    rule (the nearest, a tie toward +∞; Python's round() goes half to even,
+    and the twins drifted by a tenth at .x5), and JS's way of writing the
+    number: no exponent, no "-0", no trailing ".0"."""
+    y = float(x) * 10
+    f = math.floor(y)
+    v = (f + (1 if y - f >= 0.5 else 0)) / 10 + 0.0
+    out = f"{v:.1f}"
+    return out[:-2] if out.endswith(".0") else out
 
 
 def hms(t) -> str:
@@ -1026,6 +1032,13 @@ def playhead_half(mmss: str) -> float:
     return 0.62 * 11 * len(str(mmss)) / 2 + 3
 
 
+def axis_hidden(lo: float, hi: float, hx: float, mmss: str) -> bool:
+    """Whether an axis time (spanning lo…hi) steps aside for the playhead's
+    time standing at hx. The JS twin is app.js bsAxisHidden."""
+    half = playhead_half(mmss)
+    return lo < hx + half and hi > hx - half
+
+
 def playhead_x(x: float, mmss: str, w: float) -> float:
     """Where the playhead's time stands: at the playhead, kept whole inside
     the score's picture (its viewBox runs from -100 to w + 10). The JS twin
@@ -1047,6 +1060,11 @@ def score_state(data: dict, t: float) -> dict:
             near = i
     return {"x": int(round(t / dur * w)), "near": near, "third": min(2, int(t / dur * 3)),
             "mmss": hms(t)}
+
+
+def _money_head(g) -> str:
+    """A group of sums' label: the first, and how many more were named with it."""
+    return g[0]["label"] + (f" +{len(g[4])}" if g[4] else "")
 
 
 def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False,
@@ -1090,37 +1108,36 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
         out.append(f'<a href="{at(k["t"])}" class="bs-tick" data-t="{_r(k["t"])}" data-lens="{esc(k["lens"])}" data-text="{esc(k["text"])}">'
                    f'<rect x="{_r(x(k["t"]) - 1.5)}" y="{y}" width="3" height="{lane_h}" fill="{LENS_COLOR.get(k["lens"], INK)}">'
                    f'<title>{hms(k["t"])} · {esc(k["lens"])}: “{esc(k["text"])}”</title></rect></a>')
-    # the dollar figures' labels take two rows, and never lie on one another:
-    # a figure whose label finds no room in either keeps its tick, its title
-    # and its row in the table beneath (a review of the live page: a night
-    # that named six sums in twenty minutes printed them over each other)
-    # (the upper row's tick crosses the lower row, so it may not pass through
-    # a lower label, nor a lower label cover it; a label turns to end at its
-    # tick when it would run past the picture; a sum with no room keeps a
-    # stub of a tick below both rows — review catches: a dropped sum's tick
-    # read as its neighbour's, and a tick struck through a label)
-    taken = [float("-inf"), float("-inf")]          # the right edge each row has used
-    lower, upper_ticks = [], []                     # the lower row's spans, the upper row's ticks
+    # the dollar figures: one row of labels, above the decisions' dots, and
+    # never one on another — a sum named too close to the one before joins
+    # its group, whose label says how many more ("$1.13 million +1"), each
+    # keeping its own tick up to the group's label, its own title and its
+    # own row in the table beneath (review catches: a night that named six
+    # sums in twenty minutes printed them over one another; then a second
+    # row lay under the dots, and a sum with no room kept a stub that read
+    # as its neighbour's). A label turns to end at its tick where it would
+    # run past the picture, with room kept for its count.
+    groups = []                                     # [head sum, its x, anchor, left edge, [the others]]
     for mo in d["money"]:
-        xm, lw = x(mo["t"]), mono_w(mo["label"], 10)
-        anchor = "end" if xm + lw > W + 8 else "start"
-        left, right = (xm - lw, xm) if anchor == "end" else (xm, xm + lw)
-        fits = lambda r: left >= taken[r] + 6 and (
-            not any(lo - 3 <= xm <= hi + 3 for lo, hi in lower) if r == 0
-            else not any(left - 3 <= tx <= right + 3 for tx in upper_ticks))
-        row = next((r for r in (0, 1) if fits(r)), None)
-        tip = f'<title>{esc(mo["label"])} — said {n_of(mo["count"], "time")}, first at {hms(mo["t"])}</title>'
-        if row is None:
-            out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
-                       f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="50" stroke="{LENS_COLOR["financial"]}" stroke-width="1">{tip}</line></a>')
+        xm = x(mo["t"])
+        room = mono_w(mo["label"] + " +9", 10)
+        anchor = "end" if xm + room > W + 8 else "start"
+        left = xm - room if anchor == "end" else xm
+        if groups and left < groups[-1][3] + mono_w(_money_head(groups[-1]), 10) + 6:
+            groups[-1][4].append((mo, xm))
             continue
-        taken[row] = right
-        (upper_ticks.append(xm) if row == 0 else lower.append((left, right)))
-        ly = 34 + row * 11
+        groups.append([mo, xm, anchor, left if anchor == "start" else xm - mono_w(mo["label"], 10), []])
+    for g in groups:
+        mo, xm, anchor, _, rest = g
+        tip = lambda m: f'<title>{esc(m["label"])} — said {n_of(m["count"], "time")}, first at {hms(m["t"])}</title>'
         out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
-                   f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="{ly}" stroke="{LENS_COLOR["financial"]}" stroke-width="1"/>'
-                   f'<text x="{_r(xm)}" y="{ly}" font-size="10" fill="{MONEY}" text-anchor="{anchor}" style="{MONO}">{esc(mo["label"])}'
-                   f'{tip}</text></a>')
+                   f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="34" stroke="{LENS_COLOR["financial"]}" stroke-width="1"/>'
+                   f'<text x="{_r(xm)}" y="34" font-size="10" fill="{MONEY}" text-anchor="{anchor}" style="{MONO}">{esc(_money_head(g))}'
+                   f'{tip(mo)}</text></a>')
+        for m, mx in rest:
+            # a member's tick stops just under its group's words
+            out.append(f'<a href="{at(m["t"])}" class="bs-money" data-t="{_r(m["t"])}" data-label="{esc(m["label"])}">'
+                       f'<line x1="{_r(mx)}" y1="54" x2="{_r(mx)}" y2="38" stroke="{LENS_COLOR["financial"]}" stroke-width="1">{tip(m)}</line></a>')
     if questions:
         for q in (an.get("questions") or []):
             if q.get("t") is None:
@@ -1148,7 +1165,9 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
         lab, ax = hms(t), x(t)
         lw = mono_w(lab, 10)
         lo, hi = (ax, ax + lw) if t == 0 else (ax - lw / 2, ax + lw / 2)
-        hide = ' visibility="hidden"' if lo < hx + half and hi > hx - half else ""
+        if hi > W + 10:                    # it would run off the tape's end (a re-review catch)
+            break
+        hide = ' visibility="hidden"' if axis_hidden(lo, hi, hx, st["mmss"]) else ""
         out.append(f'<text class="bs-ax" data-lo="{_r(lo)}" data-hi="{_r(hi)}" x="{_r(ax)}" y="166" font-size="10" fill="{MUTED}" '
                    f'text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}"{hide}>{lab}</text>')
         t += step

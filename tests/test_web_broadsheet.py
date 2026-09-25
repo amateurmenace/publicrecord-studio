@@ -499,34 +499,37 @@ class TestTheChartsArePure(unittest.TestCase):
         for (x, lab), (nx, _) in zip(heads, heads[1:]):
             self.assertLessEqual(x + charts.mono_w(lab, 10), nx, lab)
         self.assertLessEqual(heads[-1][0] + charts.mono_w(heads[-1][1], 10), W)
-        # the score: six sums inside twenty minutes of a four-hour tape — no two labels in a row
-        # overlap, each inside the picture, and a sum with no room keeps its tick and its title
+        # the score: six sums inside twenty minutes of a four-hour tape — one row of labels, above the
+        # dots, none on another, each inside the picture; a sum named too close joins the group before it,
+        # whose label counts it ("+5"), and keeps its own tick (up to just under the words) and its title
         m = {"pid": "s", "duration": 14400.0, "analysis": {"entities": {"money": [
             {"name": n, "t": t, "count": 1} for n, t in [("$0.02", 500), ("$2,000 m", 650), ("$15,000", 700), ("$47,265,655", 820),
                                                          ("$250,000", 900), ("$150,000", 1000), ("$120 million", 14000)]]}}}
         svg = charts.score(m)
         labels = [(float(x), a, float(y), lab) for x, y, a, lab in re.findall(
             r'<text x="([-\d.]+)" y="(\d+)" font-size="10" fill="[^"]+" text-anchor="(\w+)" style="[^"]+">([^<]+)<title>', svg)]
-        self.assertTrue(labels)
+        self.assertEqual({y for *_, y, _l in labels}, {34.0})                  # one row, above the decisions' dots (cy 44)
         W = 880
-        for row in (34.0, 45.0):
-            spans = sorted(span(x, a, lab) for x, a, y, lab in labels if y == row)
-            for (lo, hi), (nlo, _) in zip(spans, spans[1:]):
-                self.assertLessEqual(hi + 6, nlo)
-            for lo, hi in spans:
-                self.assertGreaterEqual(lo, 0); self.assertLessEqual(hi, W + 10)
+        spans = sorted(span(x, a, lab) for x, a, y, lab in labels)
+        for (lo, hi), (nlo, _) in zip(spans, spans[1:]):
+            self.assertLessEqual(hi + 6, nlo)
+        for lo, hi in spans:
+            self.assertGreaterEqual(lo, 0); self.assertLessEqual(hi, W + 10)
+        self.assertEqual([lab for *_, lab in labels], ["$0.02 +5", "$120 million"])
         ticks = re.findall(r'<a href="[^"]+" class="bs-money" data-t="[^"]+" data-label="([^"]+)">(.*?)</a>', svg)
         self.assertEqual(len(ticks), 7)                                          # every sum keeps its tick
         for lab, inner in ticks:
-            self.assertIn("<title>", inner, lab)                                 # and its title, labelled or not
-        self.assertLess(len(labels), 7)                                          # some had no room, and went quietly
-        self.assertIn("$120 million", [lab for *_, lab in labels])              # the lone late sum keeps its label
-        # no upper sum's tick passes through a lower sum's words; a sum with no room keeps a stub below both rows
-        lower = [span(x, a, lab) for x, a, y, lab in labels if y == 45.0]
-        for x, a, y, lab in labels:
-            if y == 34.0:
-                self.assertFalse(any(lo - 3 <= x <= hi + 3 for lo, hi in lower), lab)
-        self.assertEqual(len(re.findall(r'y1="54" x2="[-\d.]+" y2="50"', svg)), 7 - len(labels))
+            self.assertIn("<title>", inner, lab)                                 # and its own title
+        self.assertEqual(len(re.findall(r'y1="54" x2="[-\d.]+" y2="38"', svg)), 5)   # the group's others, up to its words
+        self.assertNotIn('y2="50"', svg); self.assertNotIn('y="45"', svg)      # no stubs, no second row
+        # a group of one says no count, and a sum alone near the end turns to end at its tick, inside
+        lone = charts.score({"pid": "s", "duration": 3600.0, "analysis": {"entities": {"money": [{"name": "$9,999,999", "t": 3590, "count": 2}]}}})
+        self.assertIn('text-anchor="end" style="font-family:var(--font-mono)">$9,999,999<title>', lone)
+        # the axis: a time whose words would run off the tape's end is not written (4:30:00 on a 4:31:40 tape)
+        long_ = charts.score({"pid": "s", "duration": 16300.0, "analysis": {}})
+        for lo, hi in re.findall(r'<text class="bs-ax" data-lo="([-\d.]+)" data-hi="([-\d.]+)"', long_):
+            self.assertLessEqual(float(hi), 890)
+        self.assertNotIn(">4:30:00</text>", long_)
         # the playhead's time: an axis time it would lie on steps aside (here the tape's start, 0:00), the rest stand
         axes = re.findall(r'<text class="bs-ax" data-lo="([-\d.]+)" data-hi="([-\d.]+)" x="[-\d.]+" y="166"[^>]*?( visibility="hidden")?>([^<]+)</text>', svg)
         self.assertEqual([a[3] for a in axes if a[2]], ["0:00"])
@@ -534,13 +537,20 @@ class TestTheChartsArePure(unittest.TestCase):
                       '<text x="0" y="164" font-size="11" fill="#B23A1D" text-anchor="middle"', svg)   # the picture begins at -100: whole
         self.assertEqual(charts.playhead_x(0, "0:00", 880), 0.0)                        # at the start it stands at the playhead
         self.assertEqual(charts.playhead_x(880, "4:00:00", 880), 890 - charts.playhead_half("4:00:00"))   # the tape's end, whole
-        self.assertEqual(charts._r(239.25), "239.3")                                  # half up, as the JS twins round
+        # charts._r writes a tenth exactly as app.js r1 does: Math.round's rule and JS's own way of writing it
+        cases = [239.25, 0.049999999999999996, -0.04, -2.5, 123456.8, 1e6, 240.0, 0.05, 30.6, -0.0, 7.25, 1234.55]
+        r = node("\n".join([lift(r"  const r1 = [^\n]+"), f"console.log(JSON.stringify({json.dumps(cases)}.map(v => String(r1(v)))));"]))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), [charts._r(v) for v in cases])
         self.assertEqual(charts.mono_w("100%", 10), 0.62 * 10 * 4)
         # the playhead's time: bsPlayheadX stands where charts.playhead_x does
-        r = node("\n".join([lift(r"  const bsPlayheadX = [^\n]+"),
-                             "console.log(JSON.stringify([[0, '0:00', 880], [440, '2:00:00', 880], [880, '4:00:00', 880], [870, '3:57:30', 880], [5, '0:01', 320]].map(a => bsPlayheadX(...a))));"]))
+        heads = [(0, "0:00", 880), (440, "2:00:00", 880), (880, "4:00:00", 880), (870, "3:57:30", 880), (5, "0:01", 320)]
+        axes_ = [(0, 24.8, 0, "0:00"), (418.3, 461.7, 425, "1:52:55"), (418.3, 461.7, 400, "1:52:55"), (94.5, 125.5, 60, "23:46"), (94.5, 125.5, 140, "0:00")]
+        r = node("\n".join([lift(r"  const bsPlayheadHalf = [^\n]+"), lift(r"  const bsPlayheadX = [^\n]+"), lift(r"  const bsAxisHidden = [^\n]+"),
+                             f"console.log(JSON.stringify([{json.dumps(heads)}.map(a => bsPlayheadX(...a)), {json.dumps(axes_)}.map(a => bsAxisHidden(...a)), ['0:00', '4:00:00'].map(bsPlayheadHalf)]));"]))
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads(r.stdout), [charts.playhead_x(*a) for a in [(0, "0:00", 880), (440, "2:00:00", 880), (880, "4:00:00", 880), (870, "3:57:30", 880), (5, "0:01", 320)]])
+        self.assertEqual(json.loads(r.stdout), [[charts.playhead_x(*a) for a in heads], [charts.axis_hidden(*a) for a in axes_],
+                                                [charts.playhead_half(m) for m in ("0:00", "4:00:00")]])
         # the river's join line at the record's last night: the words turn to end at the line, inside
         late = [{"pid": "a", "date": "2026-01-05", "total": 100, "lenses": {"financial": 60, "community": 40}},
                 {"pid": "b", "date": "2026-02-05", "total": 100, "lenses": {"financial": 50, "community": 50}}]

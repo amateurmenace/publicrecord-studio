@@ -8357,10 +8357,10 @@
         const st = bsScoreState(D, t);
         if (line) { line.setAttribute("x1", st.x); line.setAttribute("x2", st.x); }
         if (lab) {
-          const hx = bsPlayheadX(st.x, st.mmss, +D.w || 880), half = 0.62 * 11 * [...String(st.mmss)].length / 2 + 3;
+          const hx = bsPlayheadX(st.x, st.mmss, +D.w || 880);
           lab.setAttribute("x", r1(hx)); lab.textContent = st.mmss;
           // an axis time the playhead's would lie on steps aside, as the press decided where it started
-          axes.forEach(a => a.setAttribute("visibility", +a.getAttribute("data-lo") < hx + half && +a.getAttribute("data-hi") > hx - half ? "hidden" : "visible"));
+          axes.forEach(a => a.setAttribute("visibility", bsAxisHidden(+a.getAttribute("data-lo"), +a.getAttribute("data-hi"), hx, st.mmss) ? "hidden" : "visible"));
         }
         decs.forEach((a, i) => a.classList.toggle("on", i === st.near));
         ticks.forEach(a => a.classList.toggle("near", Math.abs(+a.dataset.t - t) < 240));
@@ -8423,7 +8423,10 @@
   }
   /* where the playhead's time stands — at the playhead, whole inside the
      score's picture (viewBox -100 … w + 10); the twin of charts.playhead_x */
-  const bsPlayheadX = (x, mmss, w) => { const half = 0.62 * 11 * [...String(mmss)].length / 2 + 3; return Math.min(Math.max(+x, -100 + half), w + 10 - half); };
+  const bsPlayheadHalf = mmss => 0.62 * 11 * [...String(mmss)].length / 2 + 3;
+  const bsPlayheadX = (x, mmss, w) => { const half = bsPlayheadHalf(mmss); return Math.min(Math.max(+x, -100 + half), w + 10 - half); };
+  /* whether an axis time (lo…hi) steps aside for the playhead's — the twin of charts.axis_hidden */
+  const bsAxisHidden = (lo, hi, hx, mmss) => { const half = bsPlayheadHalf(mmss); return lo < hx + half && hi > hx - half; };
   function bsYear() {
     const box = $(".bs-year"); if (!box) return;
     let D; try { D = JSON.parse(box.dataset.bsYear || ""); } catch { return; }
