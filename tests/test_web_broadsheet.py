@@ -521,10 +521,31 @@ class TestTheChartsArePure(unittest.TestCase):
             self.assertIn("<title>", inner, lab)                                 # and its title, labelled or not
         self.assertLess(len(labels), 7)                                          # some had no room, and went quietly
         self.assertIn("$120 million", [lab for *_, lab in labels])              # the lone late sum keeps its label
-        # the playhead's time reads over the axis's: drawn after every axis time, on a hair of the card
-        self.assertGreater(svg.index('<g class="bs-playhead">'), svg.rindex('font-size="10" fill="#6F6A5B" text-anchor="middle"'))
-        self.assertRegex(svg, r'<g class="bs-playhead">.*?paint-order:stroke" stroke="#FBF9F4" stroke-width="4">')
+        # no upper sum's tick passes through a lower sum's words; a sum with no room keeps a stub below both rows
+        lower = [span(x, a, lab) for x, a, y, lab in labels if y == 45.0]
+        for x, a, y, lab in labels:
+            if y == 34.0:
+                self.assertFalse(any(lo - 3 <= x <= hi + 3 for lo, hi in lower), lab)
+        self.assertEqual(len(re.findall(r'y1="54" x2="[-\d.]+" y2="50"', svg)), 7 - len(labels))
+        # the playhead's time: an axis time it would lie on steps aside (here the tape's start, 0:00), the rest stand
+        axes = re.findall(r'<text class="bs-ax" data-lo="([-\d.]+)" data-hi="([-\d.]+)" x="[-\d.]+" y="166"[^>]*?( visibility="hidden")?>([^<]+)</text>', svg)
+        self.assertEqual([a[3] for a in axes if a[2]], ["0:00"])
+        self.assertIn('<g class="bs-playhead"><line x1="0" y1="32" x2="0" y2="150" stroke="#B23A1D" stroke-width="2"/>'
+                      '<text x="0" y="164" font-size="11" fill="#B23A1D" text-anchor="middle"', svg)   # the picture begins at -100: whole
+        self.assertEqual(charts.playhead_x(0, "0:00", 880), 0.0)                        # at the start it stands at the playhead
+        self.assertEqual(charts.playhead_x(880, "4:00:00", 880), 890 - charts.playhead_half("4:00:00"))   # the tape's end, whole
+        self.assertEqual(charts._r(239.25), "239.3")                                  # half up, as the JS twins round
         self.assertEqual(charts.mono_w("100%", 10), 0.62 * 10 * 4)
+        # the playhead's time: bsPlayheadX stands where charts.playhead_x does
+        r = node("\n".join([lift(r"  const bsPlayheadX = [^\n]+"),
+                             "console.log(JSON.stringify([[0, '0:00', 880], [440, '2:00:00', 880], [880, '4:00:00', 880], [870, '3:57:30', 880], [5, '0:01', 320]].map(a => bsPlayheadX(...a))));"]))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), [charts.playhead_x(*a) for a in [(0, "0:00", 880), (440, "2:00:00", 880), (880, "4:00:00", 880), (870, "3:57:30", 880), (5, "0:01", 320)]])
+        # the river's join line at the record's last night: the words turn to end at the line, inside
+        late = [{"pid": "a", "date": "2026-01-05", "total": 100, "lenses": {"financial": 60, "community": 40}},
+                {"pid": "b", "date": "2026-02-05", "total": 100, "lenses": {"financial": 50, "community": 50}}]
+        jr = charts.lens_river(late, {"a": "Brookline", "b": "Boston"})
+        self.assertIn('class="bs-rjoin" text-anchor="end">Boston joins the record</text>', jr)
         # the river: a band widest on the last night (or the first) keeps its whole label inside
         rows = [{"pid": "a", "date": "2026-01-05", "total": 100, "lenses": {"financial": 90, "community": 10}},
                 {"pid": "b", "date": "2026-02-05", "total": 100, "lenses": {"financial": 50, "community": 50}},
@@ -711,16 +732,23 @@ class TestBroadsheetTwins(unittest.TestCase):
                                                ("2026-03-31", "Select Board"), ("2026-06-16", "Select Board"), ("2026-06-18", "School Committee"),
                                                ("2026-09-16", "Select Board"), ("2026-09-16", "School Committee")])]
         svg = charts.timeline_dots(crowded, q="housing")
-        words = [(float(x), lab) for x, lab in re.findall(r'<text x="([-\d.]+)" y="88" font-size="12"[^>]*>([^<]+)</text>', svg)]
-        days = [(float(x), lab) for x, lab in re.findall(r'<text x="([-\d.]+)" y="72" font-size="11"[^>]*>([^<]+)</text>', svg)]
-        self.assertEqual(len(words), len(days))
-        self.assertTrue(2 <= len(words) < len(crowded))                           # some dots keep only their dot
+        named = []
+        for body_y, day_y in ((88, 72), (56, 40)):                                # the lower row, then the one above
+            words = [(float(x), lab) for x, lab in re.findall(rf'<text x="([-\d.]+)" y="{body_y}" font-size="12"[^>]*>([^<]+)</text>', svg)]
+            days = [(float(x), lab) for x, lab in re.findall(rf'<text x="([-\d.]+)" y="{day_y}" font-size="11"[^>]*>([^<]+)</text>', svg)]
+            self.assertEqual(len(words), len(days))
+            spans = sorted((x - max(charts.sans_w(b, 12), charts.mono_w(d, 11)) / 2, x + max(charts.sans_w(b, 12), charts.mono_w(d, 11)) / 2)
+                           for (x, b), (_, d) in zip(words, days))
+            for (lo, hi), (nlo, _) in zip(spans, spans[1:]):
+                self.assertLessEqual(hi + 6, nlo)                                 # no words on words, in either row
+            if spans:
+                self.assertGreaterEqual(spans[0][0], 0); self.assertLessEqual(spans[-1][1], 1160)   # whole inside
+            named += [(d, b) for (_, b), (_, d) in zip(words, days)]
+        self.assertTrue(len(named) < len(crowded))                                # some dots keep only their dot
         self.assertEqual(svg.count('class="bs-tdot"'), len(crowded))            # every dot stands, with its title
-        spans = sorted((x - max(charts.sans_w(b, 12), charts.mono_w(d, 11)) / 2, x + max(charts.sans_w(b, 12), charts.mono_w(d, 11)) / 2)
-                       for (x, b), (_, d) in zip(words, days))
-        for (lo, hi), (nlo, _) in zip(spans, spans[1:]):
-            self.assertLessEqual(hi + 6, nlo)                                     # no words on words
-        self.assertGreaterEqual(spans[0][0], 0); self.assertLessEqual(spans[-1][1], 1160)   # whole inside
+        # a close pair is named both: June's School Committee night, and September's two bodies on one day
+        self.assertIn(("Jun 18", "School Committee"), named)
+        self.assertIn(("Sep 16", "School Committee"), named); self.assertIn(("Sep 16", "Select Board"), named)
         self.ok(node("\n".join([
             PRELUDE,
             "const TP_MON = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];",

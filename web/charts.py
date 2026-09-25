@@ -75,7 +75,9 @@ def esc(s) -> str:
 
 
 def _r(x) -> str:
-    return f"{round(float(x), 1):g}"
+    # half up, as app.js r1 (Math.round) and every JS twin round — Python's
+    # round() goes half to even, and the twins drifted by a tenth at .x5
+    return f"{math.floor(float(x) * 10 + 0.5) / 10:g}"
 
 
 def hms(t) -> str:
@@ -853,9 +855,15 @@ def mono_w(text: str, size: float) -> float:
 
 
 def sans_w(text: str, size: float) -> float:
-    """The reading face's labels, reckoned the same way: IBM Plex Sans runs
-    narrower than the mono, a little over half an em a character."""
-    return 0.58 * size * len(str(text))
+    """The reading face's labels, reckoned by character: IBM Plex Sans,
+    measured, runs 0.50 em a lower-case letter, 0.63 a capital and 0.24 a
+    space — a hair more of each here. Summed left to right in a plain loop,
+    as app.js bsTimeline sums it (sum() compensates on newer Pythons, and
+    the twins must agree to the last bit)."""
+    t = 0.0
+    for c in str(text):
+        t += 0.68 if "A" <= c <= "Z" else 0.25 if c == " " else 0.53
+    return t * size
 
 
 def data_attr(name: str, obj) -> str:
@@ -1013,6 +1021,19 @@ def score_data(m: dict, width: int = 880) -> dict:
             "decisions": score_moments(m), "thirds": thirds_of(m)}
 
 
+def playhead_half(mmss: str) -> float:
+    """Half the room the playhead's time takes, a hair either side."""
+    return 0.62 * 11 * len(str(mmss)) / 2 + 3
+
+
+def playhead_x(x: float, mmss: str, w: float) -> float:
+    """Where the playhead's time stands: at the playhead, kept whole inside
+    the score's picture (its viewBox runs from -100 to w + 10). The JS twin
+    is app.js bsPlayheadX."""
+    half = playhead_half(mmss)
+    return min(max(float(x), -100 + half), w + 10 - half)
+
+
 def score_state(data: dict, t: float) -> dict:
     """What the score shows at a time t — the playhead's x, the nearest
     decision (ties to the earlier), the third the frame shows. The JS twin
@@ -1073,18 +1094,28 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
     # a figure whose label finds no room in either keeps its tick, its title
     # and its row in the table beneath (a review of the live page: a night
     # that named six sums in twenty minutes printed them over each other)
+    # (the upper row's tick crosses the lower row, so it may not pass through
+    # a lower label, nor a lower label cover it; a label turns to end at its
+    # tick when it would run past the picture; a sum with no room keeps a
+    # stub of a tick below both rows — review catches: a dropped sum's tick
+    # read as its neighbour's, and a tick struck through a label)
     taken = [float("-inf"), float("-inf")]          # the right edge each row has used
+    lower, upper_ticks = [], []                     # the lower row's spans, the upper row's ticks
     for mo in d["money"]:
         xm, lw = x(mo["t"]), mono_w(mo["label"], 10)
-        anchor = "end" if xm > W - 60 else "start"
+        anchor = "end" if xm + lw > W + 8 else "start"
         left, right = (xm - lw, xm) if anchor == "end" else (xm, xm + lw)
-        row = next((r for r in (0, 1) if left >= taken[r] + 6), None)
+        fits = lambda r: left >= taken[r] + 6 and (
+            not any(lo - 3 <= xm <= hi + 3 for lo, hi in lower) if r == 0
+            else not any(left - 3 <= tx <= right + 3 for tx in upper_ticks))
+        row = next((r for r in (0, 1) if fits(r)), None)
         tip = f'<title>{esc(mo["label"])} — said {n_of(mo["count"], "time")}, first at {hms(mo["t"])}</title>'
         if row is None:
             out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
-                       f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="45" stroke="{LENS_COLOR["financial"]}" stroke-width="1">{tip}</line></a>')
+                       f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="50" stroke="{LENS_COLOR["financial"]}" stroke-width="1">{tip}</line></a>')
             continue
         taken[row] = right
+        (upper_ticks.append(xm) if row == 0 else lower.append((left, right)))
         ly = 34 + row * 11
         out.append(f'<a href="{at(mo["t"])}" class="bs-money" data-t="{_r(mo["t"])}" data-label="{esc(mo["label"])}">'
                    f'<line x1="{_r(xm)}" y1="54" x2="{_r(xm)}" y2="{ly}" stroke="{LENS_COLOR["financial"]}" stroke-width="1"/>'
@@ -1095,7 +1126,7 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
             if q.get("t") is None:
                 continue
             out.append(f'<a href="{at(q["t"])}" class="bs-q" data-t="{_r(q["t"])}">'
-                       f'<line x1="{_r(x(q["t"]))}" y1="24" x2="{_r(x(q["t"]))}" y2="31" stroke="{MUTED}" stroke-width="1"/>'
+                       f'<line x1="{_r(x(q["t"]))}" y1="14" x2="{_r(x(q["t"]))}" y2="21" stroke="{MUTED}" stroke-width="1"/>'
                        f'<title>{hms(q["t"])} · a question: “{esc(cut_words(q.get("text"), 100))}”</title></a>')
     for i, dc in enumerate(d["decisions"]):
         r = 5.0 + 3.0 * dc["score"]
@@ -1103,18 +1134,26 @@ def score(m: dict, base: str = "/app", width: int = 880, questions: bool = False
         out.append(f'<a href="{at(dc["t"])}" class="bs-dec" data-i="{i}" data-t="{_r(dc["t"])}" data-kind="{esc(dc["kind"])}">'
                    f'<circle cx="{_r(x(dc["t"]))}" cy="44" r="{_r(r)}" fill="{fill}" opacity=".9">'
                    f'<title>{hms(dc["t"])} · {esc(SHAPE_KINDS.get(dc["kind"], dc["kind"]))}: “{esc(dc["quote"])}”</title></circle></a>')
+    # the playhead's time stands whole inside the picture, and an axis time
+    # it would lie on steps aside — pressed where the playhead starts, and
+    # re-decided by app.js bsScore wherever it moves, from each axis time's
+    # own span (review catches: 1:52:55 lay on 2:00:00; a halo left bits of
+    # the axis between its glyphs, "11:02:43"; the time ran off the tape's end)
+    st = score_state(d, d["t"])
+    hx = playhead_x(st["x"], st["mmss"], W)
+    half = playhead_half(st["mmss"])
     step = 1800.0
     t = 0.0
     while t < dur - 60:
-        out.append(f'<text x="{_r(x(t))}" y="166" font-size="10" fill="{MUTED}" text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}">{hms(t)}</text>')
+        lab, ax = hms(t), x(t)
+        lw = mono_w(lab, 10)
+        lo, hi = (ax, ax + lw) if t == 0 else (ax - lw / 2, ax + lw / 2)
+        hide = ' visibility="hidden"' if lo < hx + half and hi > hx - half else ""
+        out.append(f'<text class="bs-ax" data-lo="{_r(lo)}" data-hi="{_r(hi)}" x="{_r(ax)}" y="166" font-size="10" fill="{MUTED}" '
+                   f'text-anchor="{"start" if t == 0 else "middle"}" style="{MONO}"{hide}>{lab}</text>')
         t += step
-    # the playhead last, its time on a hair of the card: wherever it stands it
-    # reads over the axis's own times (a review of the live page: 1:52:55
-    # and 2:00:00 lay on one another)
-    st = score_state(d, d["t"])
     out.append(f'<g class="bs-playhead"><line x1="{st["x"]}" y1="32" x2="{st["x"]}" y2="150" stroke="{RUST}" stroke-width="2"/>'
-               f'<text x="{st["x"]}" y="164" font-size="11" fill="{RUST}" text-anchor="middle" style="{MONO};paint-order:stroke" '
-               f'stroke="{CARD}" stroke-width="4">{st["mmss"]}</text></g>')
+               f'<text x="{_r(hx)}" y="164" font-size="11" fill="{RUST}" text-anchor="middle" style="{MONO}">{st["mmss"]}</text></g>')
     svg = (f'<svg class="bs-score-svg" width="{W}" height="168" viewBox="-100 0 {W + 110} 168" xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="the shape of the meeting along the tape: its loudest moments as dots, '
            f'the dollar figures the room named, eight lanes of lens words">' + "".join(out) + "</svg>")
@@ -1518,7 +1557,7 @@ def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
     for v in vs:
         by.setdefault(str(v["date"])[:7], []).append(v)
     sq, gap, cols = 16, 3, 4
-    x0 = 0.0
+    x0 = right = 0.0
     out, trows = [], []
     maxrows = 1
     for mo in months:
@@ -1537,11 +1576,14 @@ def vote_grid(votes: Sequence[dict], base: str = "/app") -> str:
                        f'<text x="{_r(x + sq / 2)}" y="{y + 12}" font-size="8" fill="{PAPER}" text-anchor="middle" style="{MONO}">{"·" if ayes_of(v) is None else ayes_of(v)}</text><title>{esc(tip)}</title></a>')
             trows.append(f'<tr><td><a href="{base}/m/{esc(v["pid"])}#t{int(float(v.get("t") or 0))}">{esc(v.get("date"))}</a></td>'
                          f'<td>{esc(cut_words(v.get("motion"), 90))}</td><td>{esc(out_)}</td><td>{esc(v.get("tally") or "")}</td></tr>')
-        # as wide as its squares or its label, whichever is wider: a month of
-        # none or one ran its label into the next month's, and the last month's
-        # off the picture's edge (a review of the live page)
-        x0 += max(ncols * (sq + gap), mono_w(label, 10)) + 14
-    W, H = int(x0), 16 + maxrows * (sq + gap + 1) + 4
+        # the next month starts past this month's squares and a gap, or past
+        # its label and a hair, whichever is further — labels and squares keep
+        # their own rows, as the board draws them — and the picture ends where
+        # the last month does (a review of the live page: a month of none or
+        # one ran its label into the next month's, the last month's off the edge)
+        right = max(right, x0 + max(ncols * (sq + gap) - gap, mono_w(label, 10)))
+        x0 += max(ncols * (sq + gap) + 14, mono_w(label, 10) + 6)
+    W, H = int(math.ceil(right + 2)), 16 + maxrows * (sq + gap + 1) + 4
     svg = (f'<svg class="bs-votegrid" width="{W}" height="{H}" viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" role="img" '
            f'aria-label="{n_of(len(vs), "roll call")} by month">' + "".join(out) + "</svg>")
     return f'<div class="fp-chartwrap">{svg}</div>' + twin("".join(trows), "<th>date</th><th>motion</th><th>outcome</th><th>tally</th>")
@@ -1632,19 +1674,26 @@ def lens_river(framing_rows: Sequence[dict], towns_by_pid: Dict[str, str], base:
         path = f'{fwd} L{_r(xs[-1])},{_r(base_y[-1])} {back[1:]} Z'
         out.append(f'<a href="{base}/analytics"><path class="bs-band" data-lens="{lens}" d="{path}" fill="{LENS_COLOR[lens]}" '
                    f'opacity=".86" stroke="{CARD}" stroke-width="1.2"><title>{lens} — its share of each night’s framed words</title></path></a>')
-        widest = max(range(n), key=lambda i: (base_y[i] - tops[i], -i))
+        # a band's name at its widest point among the nights where the whole
+        # name fits inside the picture — its middle there, so it never sits
+        # on a neighbouring band (review catches: "community" ran off the
+        # edge; then a clamped name slid over the band beside it)
+        half = mono_w(lens, 11) / 2 + 2
+        room = [i for i in range(n) if half <= xs[i] <= width - half] or list(range(n))
+        widest = max(room, key=lambda i: (base_y[i] - tops[i], -i))
         if base_y[widest] - tops[widest] >= 9:
-            # a band widest on the first or last night keeps its whole label
-            # inside the picture (a desk edition's "community" ran off the edge)
-            half = mono_w(lens, 11) / 2 + 2
             lx = min(max(xs[widest], half), width - half)
             labels.append(f'<text class="bs-rlabel" data-lens="{lens}" x="{_r(lx)}" y="{_r((base_y[widest] + tops[widest]) / 2 + 4)}" '
                           f'font-size="11" fill="{INK}" text-anchor="middle" style="{MONO};paint-order:stroke" stroke="{CARD}" stroke-width="3">{lens}</text>')
         base_y = tops
     if d["joins"] is not None:
         j = d["joins"]
+        said = f'{ms[j]["town"]} joins the record'
+        # at the record's last night the words turn to end at the line (a review catch: they ran off)
+        end = xs[j] + 6 + sans_w(said, 13) > width
+        turn = ' text-anchor="end"' if end else ""
         out.append(f'<line class="bs-rjoinline" x1="{_r(xs[j])}" y1="4" x2="{_r(xs[j])}" y2="{_r(bottom - 4)}" stroke="{INK}" stroke-dasharray="3 4"/>'
-                   f'<text x="{_r(xs[j] + 6)}" y="16" font-size="13" fill="{INK}" class="bs-rjoin">{esc(ms[j]["town"])} joins the record</text>')
+                   f'<text x="{_r(xs[j] - 6 if end else xs[j] + 6)}" y="16" font-size="13" fill="{INK}" class="bs-rjoin"{turn}>{esc(said)}</text>')
     every = max(1, n // 6)
     for i, m in enumerate(ms):
         if i % every and i != n - 1:
@@ -1683,12 +1732,14 @@ def timeline_dots(rows: Sequence[dict], base: str = "/app", width: int = 1160, h
         out.append(f'<text x="{_r(i * colw + 4)}" y="{height - 8}" font-size="11" fill="{MUTED}" style="{MONO}">{month_short(mo)}</text>'
                    f'<line x1="{_r(i * colw)}" y1="{base_y - 6}" x2="{_r(i * colw)}" y2="{base_y + 6}" stroke="{RULE}"/>')
     out.append(f'<line x1="0" y1="{base_y}" x2="{width}" y2="{base_y}" stroke="{RULE}" stroke-width="2"/>')
-    # a dot's words — its body, its day — stand only where they have room
-    # after the last dot that kept its words, whole inside the picture; a dot
-    # too near keeps its dot and its title (a sweep of the live topic pages:
-    # "Select Board" lay on "Select Board", and the first ran off the edge).
-    # The JS twin (app.js bsTimeline) reckons it the same, to the byte.
-    last = float("-inf")
+    # a dot's words — its body, its day — stand in the lower row where they
+    # have room after the words already there, else in the row above, whole
+    # inside the picture; a dot with room in neither keeps its dot and its
+    # title (review catches: "Select Board" lay on "Select Board", the first
+    # night ran off the edge; then the record's one School Committee night
+    # lost its name to its neighbour's). The JS twin (app.js bsTimeline)
+    # reckons it the same, to the byte.
+    taken = [float("-inf"), float("-inf")]
     for r in sorted(said, key=lambda r: (str(r["date"]), str(r["pid"]))):
         x = x_of(r["date"])
         col = town_color(r.get("town"))
@@ -1696,10 +1747,12 @@ def timeline_dots(rows: Sequence[dict], base: str = "/app", width: int = 1160, h
         half = max(sans_w(body, 12), mono_w(day, 11)) / 2
         lx = min(max(x, half), width - half)
         words = ""
-        if lx - half >= last + 6:
-            last = lx + half
-            words = (f'<text x="{_r(lx)}" y="{base_y - 22}" font-size="12" fill="{INK2}" text-anchor="middle" style="font-family:var(--font-sans)">{esc(body)}</text>'
-                     f'<text x="{_r(lx)}" y="{base_y - 38}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{esc(day)}</text>')
+        row = 0 if lx - half >= taken[0] + 6 else 1 if lx - half >= taken[1] + 6 else -1
+        if row >= 0:
+            taken[row] = lx + half
+            up = 32 * row
+            words = (f'<text x="{_r(lx)}" y="{base_y - 22 - up}" font-size="12" fill="{INK2}" text-anchor="middle" style="font-family:var(--font-sans)">{esc(body)}</text>'
+                     f'<text x="{_r(lx)}" y="{base_y - 38 - up}" font-size="11" fill="{MUTED}" text-anchor="middle" style="{MONO}">{esc(day)}</text>')
         out.append(f'<a href="{base}/m/{esc(r["pid"])}#t{int(float(r.get("first_t") or 0))}" class="bs-tdot" data-pid="{esc(r["pid"])}">'
                    f'<circle cx="{_r(x)}" cy="{base_y}" r="9" fill="{col}"><title>{esc(r.get("title") or r["pid"])} — {n_of(int(r["n"]), "line")}</title></circle>'
                    f'{words}</a>')
