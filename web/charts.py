@@ -328,6 +328,10 @@ def word_cloud(words: Sequence[dict], base: str = "/app", width: int = 720, heig
         x, y, x0, y0, x1, y1 = pos
         placed.append((x0, y0, x1, y1))
         op = 0.95 - 0.55 * (rank / max(1, len(ws) - 1))
+        # the fade stops where a word still reads at AA on the paper — 4.5:1
+        # under 18.66 px (the cloud is bold), 3:1 above (a review's catch: the
+        # rarest words faded to 2.5:1)
+        op = max(op, 0.62 if fs < 18.66 else 0.48)
         link = href(w) if href else f'{base}/s?q={html.escape(word).replace(" ", "+")}'
         tip = f'{word} — {n_of(c, "mention")}'
         out.append(f'<a href="{link}" aria-label="{esc(tip)}"><text x="{_r(x)}" y="{_r(y + fs * 0.35)}" '

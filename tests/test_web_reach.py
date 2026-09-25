@@ -68,17 +68,37 @@ class TestTheReach(unittest.TestCase):
         stand 24 px; a table twin's first column (its date) is never split
         into a column of characters — its wrapper scrolls instead."""
         self.assertIn(".scopeacts .btn{font-size:var(--text-xs);padding:6px 11px}", CSS)
-        self.assertIn("cursor:pointer;padding:6px 10px;", CSS[CSS.index(".sq-rb{"):])
+        sq = CSS[CSS.index(".sq-rb{"):]
+        self.assertIn("cursor:pointer;padding:6px 10px;", sq[:sq.index("}")])
         phone = CSS[CSS.index("@media screen and (max-width:720px){"):]
         phone = phone[:phone.index("\n}\n")]
         for rule in (".back{display:inline-block;padding:5px 0}", ".bs-site{padding:3px 0}", ".cov{display:inline-block;padding:4px 0}",
-                     ".gl-index a{display:inline-block;padding:5px 0}", "table.twin td:first-child a{white-space:nowrap}"):
+                     ".gl-index a{display:inline-block;padding:5px 0}",
+                     ".fp-twinwrap table.twin td:first-child a,.pb-twinwrap table.twin td:first-child a{white-space:nowrap}"):
             self.assertIn(rule, phone)
             self.assertEqual(CSS.count(rule), 1, rule)                           # a phone's alone: desktop and paper unchanged
-        self.assertIn(".player.local .phint{position:static;background:none;color:var(--muted)}", CSS)
+        # a tape the station keeps says so on the player's own dark ground, in the rule's light colour (11.8:1)
+        self.assertIn(".player.local .phint{position:static;background:none;color:var(--rule)}", CSS)
+        self.assertIn(".player{", CSS); self.assertIn("background:var(--surface-inverse)", CSS[CSS.index(".player{"):][:400])
         # a tape's 48 slices: each link reaches a pixel into the gaps beside its bar — one strip, no dead gaps
         self.assertIn(".fp-sbar::after{content:\"\";position:absolute;top:0;bottom:0;left:-1px;right:-1px}", CSS)
-        self.assertIn("gap:2px;height:24px", CSS[CSS.index(".fp-sbars{"):])
+        bars = CSS[CSS.index(".fp-sbars{"):]
+        self.assertIn("gap:2px;height:24px", bars[:bars.index("}")])
+
+
+    def test_the_word_cloud_s_rarest_words_still_read(self):
+        """The cloud fades its rarer words — down to 0.40, 2.5:1 on the paper
+        (a review's catch). The fade now stops where a word reads at AA: 4.5:1
+        for the smaller bold words, 3:1 for the large."""
+        from web import charts
+        words = [{"word": f"w{i:02d}{'x' * (i % 5)}", "count": 200 - i * 3} for i in range(60)]
+        svg = charts.word_cloud(words)
+        ink = (0x19, 0x17, 0x12)
+        for fs, op in re.findall(r'font-size="([\d.]+)" fill="#[0-9A-Fa-f]{6}" fill-opacity="([\d.]+)"', svg):
+            fs, op = float(fs), float(op)
+            for bg in ((251, 249, 244), (243, 238, 227)):                       # the card and the paper
+                fg = tuple(op * i + (1 - op) * b for i, b in zip(ink, bg))
+                self.assertGreaterEqual(_ratio(fg, bg), 4.5 if fs < 18.66 else 3.0, (fs, op))
 
 
 if __name__ == "__main__":
