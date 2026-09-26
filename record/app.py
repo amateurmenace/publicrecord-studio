@@ -213,7 +213,10 @@ def create_app(corpus=None, papers=None) -> FastAPI:
         Deliberately NOT the edition date: `edition_date` is the newest meeting
         in the record, not the moment of pressing, because the bake must stay
         byte-idempotent. So freshness is the corpus fingerprint, named for what
-        it is, and a reader compares it with the one baked into its edition."""
+        it is, and a reader compares it with the corpus part of the edition's
+        `pressing.json` fingerprint — the part before the first `|`; what
+        follows digests the day's own parts (the share store's listing, the
+        weeks still going), which this endpoint does not read."""
         from . import press
         try:
             return {"fingerprint": press.corpus_fingerprint(store()),

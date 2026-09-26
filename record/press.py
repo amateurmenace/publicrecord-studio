@@ -812,7 +812,7 @@ def main(argv=None):
             print("  front pages: the last pressing's moment could not be read — the strip waits two days by the calendar")
         if not args.force and not needs_press(corpus, manifest_path, shared=shared, today=today, listed_before=listed_before):
             print(f"the record has not moved since the last pressing "
-                  f"({corpus_fingerprint(corpus)}) — nothing to press")
+                  f"({edition_fingerprint(corpus, shared, today, listed_before)}) — nothing to press")
             return 0
         stills = None
         if not args.no_stills:

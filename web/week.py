@@ -306,7 +306,7 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
     more_n = n_of(len(ths) - SHOWN, "thread")
     rest = (f'<details class="wk-rest"><summary>and {more_n} more</summary>'
             f'<ul class="wk-list wk-threads">{"".join(row(t) for t in ths[SHOWN:])}</ul></details>'
-            f'<p class="wk-rest-print hint">and {more_n} more, every one on this week’s page: '
+            f'<p class="wk-rest-print wk-more hint">and {more_n} more, every one on this week’s page: '
             f'publicrecord.studio/app/week/{esc(d["key"])}/</p>') if len(ths) > SHOWN else ""
     followed = d.get("followed") or []
     if ths:

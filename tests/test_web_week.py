@@ -109,7 +109,7 @@ class TestTheWeek(unittest.TestCase):
                  "timeline": [bk("a", 1)]} for k in range(week.SHOWN + 2)]
         crowd = emit.page_week(week.week_data("2026-09-21", ms, many, today=dt.date(2026, 9, 28)), counts, MANIFEST, "https://example.org")
         self.assertIn('<details class="wk-rest"><summary>and 2 threads more</summary>', crowd)
-        self.assertIn('<p class="wk-rest-print hint">and 2 threads more, every one on this week’s page: '
+        self.assertIn('<p class="wk-rest-print wk-more hint">and 2 threads more, every one on this week’s page: '
                       'publicrecord.studio/app/week/2026-09-21/</p>', crowd)
         self.assertEqual(crowd.count('href="/app/i/issue_brookline_t'), week.SHOWN + 2)    # every thread on the page
         so_far = emit.page_week(week.week_data("2026-09-21", ms, issues, today=dt.date(2026, 9, 23)), counts, MANIFEST, "https://example.org")
@@ -171,6 +171,14 @@ class TestTheWeek(unittest.TestCase):
                 self.assertEqual(press.weeks_digest(c, dt.date(2026, 6, 22)), "")
                 pressing.write_text(json.dumps({"fingerprint": press.edition_fingerprint(c, today=dt.date(2026, 6, 22))}))
                 self.assertFalse(press.needs_press(c, str(pressing), today=dt.date(2026, 6, 23)))   # and quiet after
+                # and the press itself writes what the gate compares: a Sunday's pressing, asked on its
+                # Sunday, is current; asked the Monday after, it is owed (a re-review's catch: no test
+                # ran the press, so it could write the old fingerprint and every test stay green)
+                sunday = d / "sunday"
+                press.press(c, str(sunday), "9.9.9", "https://example.org", today=dt.date(2026, 6, 21))
+                self.assertTrue(json.loads((sunday / press.PRESSING).read_text())["fingerprint"].endswith("|" + going))
+                self.assertFalse(press.needs_press(c, str(sunday / "manifest.json"), today=dt.date(2026, 6, 21)))
+                self.assertTrue(press.needs_press(c, str(sunday / "manifest.json"), today=dt.date(2026, 6, 22)))
             finally:
                 c.close()
             self.assertIn("so far", (out / "week" / "index.html").read_text())
@@ -232,6 +240,11 @@ class TestTheWeek(unittest.TestCase):
         got = json.loads(out.stdout)
         self.assertEqual(got[0], link["scope"])                                   # what the press wrote, the reader reads
         self.assertEqual(got[1:], [[], [], [], [], [], [], [], [], [], [["A", "B"]]])
+        # and the front page reads its scope through it — a twin the page never calls holds nothing (a re-review's catch)
+        fh = re.search(r"async function filterHome\(ed\) \{.+?\n  \}", js, re.S)
+        self.assertTrue(fh, "filterHome not found in the reader — did it move?")
+        self.assertIn("const pairs = wkScope(wl.dataset.scope);", fh.group(0))
+        self.assertNotIn("JSON.parse", fh.group(0))
 
     def test_a_wrapped_week_card_keeps_its_last_lines(self):
         """The studio wraps a card in a column; the card's 250 px basis — a width
