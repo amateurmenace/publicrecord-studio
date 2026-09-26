@@ -15,6 +15,7 @@ third-party script, font, or beacon rides in.
 
 from __future__ import annotations
 
+import datetime as _dt
 import html
 import re
 import shutil
@@ -455,7 +456,7 @@ def page_week(d, counts, manifest, base, stills=None):
     body = _week.page_body(d, counts, stills or {}, base="/app")
     n = len(d["meetings"])
     title = f'{_week.week_label(d["key"])} — publicrecord.studio'
-    desc = (f'{n_of(n, "meeting")} and {len(d["rolls"])} roll call{"" if len(d["rolls"]) == 1 else "s"} on the public record '
+    desc = (f'{n_of(n, "meeting")} and {n_of(len(d["rolls"]), "roll call")} on the public record '
             f'the {_week.week_label(d["key"])[4:]}, with the sums the rooms named and the threads that moved — counted from the tapes.')
     return shell(title, desc, f'{base}/app/week/{d["key"]}/', body, "week", manifest, version=manifest["version"],
                  feed={"href": "/app/feeds/week.xml", "title": "The week in the record"})
@@ -2033,7 +2034,8 @@ def page_ai(manifest, base):
             that the keywords named it. The names on the record today were
             drafted by OpenAI <code>gpt-4o-mini</code>
             (<code>ai:gpt-4o-mini</code>), and each issue page says “Named by
-            a model”</td>
+            a model” — as the week in the record says beside the threads it
+            lists</td>
           <td>the desk, when a steward built the threads on their own key, and
             carried here by the import — never at press time, never in your
             browser. A rebuild on the hosted service carries no model key and
@@ -2420,8 +2422,9 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     from . import week as _week
     ks = _week.weeks(meetings)
     counts = {k: sum(1 for m in meetings if _week.monday_of(m.get("date")) == k) for k in ks}
+    today = _dt.date.today()     # the press's day: a week not yet out says "so far"
     for i, k in enumerate(ks):
-        page = page_week(_week.week_data(k, meetings, issues, ks), counts, manifest, base, stills=stills)
+        page = page_week(_week.week_data(k, meetings, issues, ks, today=today), counts, manifest, base, stills=stills)
         (out / "week" / k).mkdir(parents=True, exist_ok=True)
         (out / "week" / k / "index.html").write_text(page, encoding="utf-8")
         if i == 0:

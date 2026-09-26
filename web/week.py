@@ -52,9 +52,12 @@ def weeks(meetings: Sequence[dict]) -> List[str]:
     return sorted({k for k in (monday_of(m.get("date")) for m in meetings) if k}, reverse=True)
 
 
-def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_weeks: Sequence[str] = ()) -> dict:
+def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_weeks: Sequence[str] = (),
+              today: Optional[_dt.date] = None) -> dict:
     """One week, counted: its meetings (in date order), its tape, its roll
-    calls and decisions, its sums, the threads that moved and its lenses."""
+    calls and decisions, its sums, the threads that moved and its lenses —
+    and whether it is still going (`so_far`: the press ran before its
+    Sunday was out, so more meetings may come)."""
     ms = sorted((m for m in meetings if monday_of(m.get("date")) == key),
                 key=lambda m: (str(m.get("date")), str(m.get("pid"))))
     pids = {str(m.get("pid")) for m in ms}
@@ -71,11 +74,18 @@ def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_we
         for mo in charts.score_moments(m):
             if mo["kind"] in ("decision", "tension"):
                 decisions.append({**where(m), **mo})
+        # one row per sum a meeting named: the analyzer keeps "$50" and "$50."
+        # apart, and they are one sum said — counted together, from its first
+        # saying (a review's catch: "$50" stood twice beside one meeting)
+        here: Dict[str, dict] = {}
         for e in (((m.get("analysis") or {}).get("entities") or {}).get("money") or []):
             if e.get("t") is None or not e.get("name"):
                 continue
-            sums.append({**where(m), "t": float(e["t"]), "label": charts.money_label(e["name"]),
-                         "count": int(e.get("count") or 0)})
+            label = charts.money_label(e["name"])
+            row = here.setdefault(label, {**where(m), "t": float(e["t"]), "label": label, "count": 0})
+            row["t"] = min(row["t"], float(e["t"]))
+            row["count"] += int(e.get("count") or 0)
+        sums.extend(here.values())
     rolls.sort(key=lambda r: (r["date"], r["pid"], r["t"]))
     # the loudest decisions first — the score the moments plane gave them
     decisions.sort(key=lambda d: (-d["score"], d["date"], d["pid"], d["t"]))
@@ -87,20 +97,36 @@ def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_we
         tl = [n for n in (i.get("timeline") or []) if isinstance(n, dict)]
         here = [n for n in tl if str(n.get("pid")) in pids]
         if here:
-            # how often the week said it — the timeline's own moments in the week's meetings
-            said = sum(len(n.get("beads") or []) for n in here)
+            # the moments the record filed under it in the week's meetings — its
+            # own timeline's beads, what the issue page calls its moments (a
+            # review's catch: they were "times said", and most never say its name)
+            moments = sum(len(n.get("beads") or []) for n in here)
+            origin = str(i.get("name_origin") or "")
             threads.append({"slug": str(i.get("slug") or ""), "name": str(i.get("name") or i.get("slug") or ""),
-                            "said": said, "week": len({str(n.get("pid")) for n in here}),
-                            "all": len({str(n.get("pid")) for n in tl})})
-    threads.sort(key=lambda t: (-t["said"], -t["week"], -t["all"], t["name"]))
+                            "moments": moments, "week": len({str(n.get("pid")) for n in here}),
+                            "all": len({str(n.get("pid")) for n in tl}),
+                            "model": origin[3:] if origin.startswith("ai:") else ""})
+    threads.sort(key=lambda t: (-t["moments"], -t["week"], -t["all"], t["name"]))
+    # the towns whose threads the record follows at all — so a week with none
+    # of them says whose they are, not that nothing moved
+    followed = sorted({_town_of_slug(str(i.get("slug") or "")) for i in (issues or []) if isinstance(i, dict)} - {""})
     ks = list(all_weeks) or weeks(meetings)
     at = ks.index(key) if key in ks else -1
-    return {"key": key, "meetings": ms, "seconds": sum(float(m.get("duration") or 0) for m in ms),
+    monday = _day(key)
+    so_far = bool(monday and (today or _dt.date.today()) <= monday + _dt.timedelta(days=6))
+    return {"key": key, "meetings": ms, "seconds": sum(float(m.get("duration") or 0) for m in ms), "so_far": so_far,
+            "followed": followed,
             "towns": sorted({str(m.get("town")) for m in ms if m.get("town")}),
             "rolls": rolls, "decisions": decisions, "sums": sums, "threads": threads,
             "lens": lens_shares(ms, meetings),
             "newer": ks[at - 1] if at > 0 else None,
             "older": ks[at + 1] if 0 <= at < len(ks) - 1 else None}
+
+
+def _town_of_slug(slug: str) -> str:
+    """The town an issue id names (web/gallery.py's own rule)."""
+    m = re.match(r"^issue_([a-z0-9-]+)_", slug)
+    return " ".join(w.capitalize() for w in m.group(1).split("-") if w) if m else ""
 
 
 def _framed(ms: Sequence[dict]) -> Dict[str, int]:
@@ -154,6 +180,12 @@ def _more(n: int, what: str) -> str:
     return f'<p class="hint wk-more">and {charts.n_of(n, what)} more, on the meetings’ own pages</p>' if n > 0 else ""
 
 
+def words_of(n: int, noun: str) -> str:
+    """'two meetings', 'one meeting' — a count said in words, its noun agreeing."""
+    from . import story
+    return f"{story.number_words(n)} {noun if n == 1 else noun + 's'}"
+
+
 def week_label(key: str) -> str:
     """'The week of September 21, 2026' — a week, by its Monday."""
     from . import story
@@ -174,7 +206,9 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
     if d["newer"]:
         nav.append(f'<a class="wk-nav-a" href="{base}/week/{d["newer"]}/" rel="next">{esc(week_label(d["newer"]).replace("The week", "the week"))} →</a>')
     nav_html = f'<nav class="wk-nav" aria-label="the weeks before and after">{"".join(nav)}</nav>' if nav else ""
-    lede = (f'{story.number_words(n).capitalize()} meeting{"" if n == 1 else "s"}, {story.hours_prose(d["seconds"])} of tape'
+    foot_nav = f'<p class="wk-nav">{"".join(nav)}</p>' if nav else ""        # one landmark, at the top (a review's catch: two shared a name)
+    so_far = " so far" if d.get("so_far") else ""
+    lede = (f'{words_of(n, "meeting").capitalize()}{so_far}, {story.hours_prose(d["seconds"])} of tape'
             + (f', in {esc(story.the_list(towns))}' if towns else "") + ".")
     # the meetings, as the front page's week draws them, each with its counted headline
     cards = []
@@ -209,11 +243,24 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
         + "</ul>" + _more(len(sums) - SHOWN, "sum")) if sums else '<p class="hint">No sum of money was named on this week’s tapes.</p>'
     # the threads that moved: the issues the record follows, as this week took them up
     ths = d["threads"]
-    threads_html = (f'<ul class="wk-list wk-threads">' + "".join(
-        f'<li><a href="{base}/i/{esc(t["slug"])}"><b>{esc(t["name"])}</b>'
-        f'<span class="wk-when">said {n_of(t["said"], "time")} this week, in {t["week"]} of its {n_of(n, "meeting")} · {n_of(t["all"], "meeting")} on the record</span></a></li>'
-        for t in ths[:SHOWN]) + "</ul>" + _more(len(ths) - SHOWN, "thread")) if ths else \
-        '<p class="hint">No thread the record follows came up this week.</p>'
+    where_n = lambda t: "in the week’s one meeting" if n == 1 else f"in {t['week']} of its {n} meetings"
+    models = sorted({t["model"] for t in ths[:SHOWN] if t["model"]})
+    named = (f'<p class="hint wk-named">These threads were named by a model ({esc(", ".join(models))}), as each thread’s page says; '
+             f'the moments are the record’s own, filed under each by its words.</p>') if models else ""
+    more = (f'<p class="hint wk-more">and {n_of(len(ths) - SHOWN, "thread")} more — '
+            f'<a href="{base}/graph">every thread, on the issue graph</a></p>') if len(ths) > SHOWN else ""
+    followed = d.get("followed") or []
+    if ths:
+        threads_html = (f'<ul class="wk-list wk-threads">' + "".join(
+            f'<li><a href="{base}/i/{esc(t["slug"])}"><b>{esc(t["name"])}</b>'
+            f'<span class="wk-when">{n_of(t["moments"], "moment")} filed under it this week, {where_n(t)} · {n_of(t["all"], "meeting")} on the record</span></a></li>'
+            for t in ths[:SHOWN]) + "</ul>" + named + more)
+    elif followed and not set(followed) & set(towns):
+        # the record follows threads only in some towns: say whose, not that nothing moved (a review's catch)
+        threads_html = (f'<p class="hint">The threads the record follows are {esc(story.the_list(followed))}’s; '
+                        f'this week’s meetings were {esc(story.the_list(towns))}’s.</p>')
+    else:
+        threads_html = '<p class="hint">No thread the record follows came up this week.</p>'
     # how the week talked, against the whole record
     lz = d["lens"]
     if lz:
@@ -234,16 +281,16 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
         f'<li><a href="{base}/week/{k}/"{here if k == key else ""}>{esc(week_label(k).replace("The week of ", ""))}'
         f' <span class="wk-when">{n_of(c, "meeting")}</span></a></li>' for k, c in counts.items())
     return f'''<article class="wk-page">
-  <p class="kicker">the week in the record</p>
+  <p class="kicker">the week in the record{" — so far" if d.get("so_far") else ""}</p>
   <h1 class="wk-title">{esc(week_label(key))}</h1>
   <p class="fp-lede">{lede}</p>
   {nav_html}
   {part("wk-meetings", "The meetings", "each opens its tape and its page", f'<div class="mcards wk-cards">{"".join(cards)}</div>')}
   {part("wk-decided", "What was decided", "the roll calls read from the tapes, and the loudest decisions and pushback", decided_html)}
-  {part("wk-sums", "The sums named", "every dollar figure the room said, the most said first", sums_html)}
-  {part("wk-threads", "The threads that moved", "the issues the record follows, the most said this week first", threads_html, "every thread →", f"{base}/#threads")}
+  {part("wk-sums", "The sums named", "the dollar figures each room said most, the most said first", sums_html)}
+  {part("wk-threads", "The threads that moved", "the issues the record follows, the most moments this week first", threads_html, "every thread →", f"{base}/graph")}
   {part("wk-talk", "How the week talked", "the eight lenses, this week against the whole record", talk_html, "the lenses, explained →", f"{base}/analytics")}
-  <p class="decksrc">counted by the press from the record’s own planes — the meetings’ roll calls, moments, sums and lenses, and the threads’ timelines; no model wrote a word of it, and every line opens the tape</p>
-  {nav_html}
+  <p class="decksrc">counted by the press from the record’s own planes — the meetings’ roll calls, moments, sums and lenses, and the threads’ timelines; no model counted any of it, and the threads’ names are a model’s, as their pages say; every line opens the tape</p>
+  {foot_nav}
   <section class="wk-part wk-every" aria-labelledby="wk-every">{bs.section_head("Every week on the record", "", "", "", hid="wk-every")}<ul class="wk-weeks">{every}</ul></section>
 </article>'''

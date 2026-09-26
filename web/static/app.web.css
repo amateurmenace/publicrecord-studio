@@ -2415,7 +2415,8 @@ a.tp-mcol:hover b{text-decoration:underline}
 .wk-link a{color:var(--write);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--rule)}
 .wk-page{max-width:1160px}
 .wk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px}
-.wk-cards .mcard.bs-week-card{width:auto;flex:none}
+.wk-cards>.mcard.bs-week-card{width:auto;flex:none}   /* a card the grid holds itself; a wrapped one fills its wrap */
+@media print{.wk-cards>*,.wk-list li{break-inside:avoid}.wk-part .bs-sechead{break-after:avoid}}
 .wk-title{font-family:var(--font-display);font-weight:500;font-size:44px;line-height:1.08;margin:6px 0 10px;color:var(--ink)}
 .wk-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0 4px;font-family:var(--font-mono);font-size:var(--text-xs)}
 .wk-nav-a{color:var(--ink-2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--rule)}

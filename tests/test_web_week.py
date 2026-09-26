@@ -43,27 +43,40 @@ class TestTheWeek(unittest.TestCase):
                           {"t": 90.0, "kind": "decision", "quote": "so moved", "score": 0.4},
                           {"t": 120.0, "kind": "tension", "quote": "I object", "score": 0.8},
                           {"t": 150.0, "kind": "question", "quote": "why?", "score": 0.99}],
-                 money=[{"name": "$5 million", "t": 40.0, "count": 1}, {"name": "$146,000", "t": 50.0, "count": 3}],
+                 money=[{"name": "$5 million", "t": 40.0, "count": 1}, {"name": "$146,000", "t": 50.0, "count": 3},
+                        {"name": "$50.", "t": 70.0, "count": 1}, {"name": "$50", "t": 60.0, "count": 2}],
                  lenses=[("financial", 60), ("community", 40)]),
               _m("b", "2026-09-24", town="Boston", body="City Council", dur=7200.0, money=[{"name": "$2 MILLION", "t": 10.0, "count": 2}],
                  lenses=[("community", 90), ("financial", 10)]),
               _m("c", "2026-09-14", lenses=[("financial", 10), ("safety", 90)])]
-        issues = [{"slug": "i1", "name": "Budget", "timeline": [{"pid": "a", "beads": [{"t": 1}, {"t": 2}]}, {"pid": "c", "beads": [{"t": 1}]}]},
-                  {"slug": "i2", "name": "Parking", "timeline": [{"pid": "a", "beads": [{"t": 1}]}, {"pid": "b", "beads": [{"t": 1}, {"t": 2}, {"t": 3}]}]},
-                  {"slug": "i3", "name": "Elsewhere", "timeline": [{"pid": "c", "beads": [{"t": 1}]}]}, "junk"]
-        d = week.week_data("2026-09-21", ms, issues)
+        issues = [{"slug": "issue_brookline_budget", "name": "Budget", "name_origin": "ai:gpt-4o-mini",
+                   "timeline": [{"pid": "a", "beads": [{"t": 1}, {"t": 2}]}, {"pid": "c", "beads": [{"t": 1}]}]},
+                  {"slug": "issue_brookline_parking", "name": "Parking", "name_origin": "keywords",
+                   "timeline": [{"pid": "a", "beads": [{"t": 1}]}, {"pid": "b", "beads": [{"t": 1}, {"t": 2}, {"t": 3}]}]},
+                  {"slug": "issue_brookline_elsewhere", "name": "Elsewhere", "timeline": [{"pid": "c", "beads": [{"t": 1}]}]}, "junk"]
+        import datetime as dt
+        d = week.week_data("2026-09-21", ms, issues, today=dt.date(2026, 9, 28))
         self.assertEqual([m["pid"] for m in d["meetings"]], ["a", "b"])
         self.assertEqual(d["seconds"], 10800.0)
         self.assertEqual(d["towns"], ["Boston", "Brookline"])
         self.assertEqual([(r["motion"], r["outcome"], r["tally"]) for r in d["rolls"]], [("move to adopt the budget", "passes", "5-0-0")])
         self.assertEqual([x["kind"] for x in d["decisions"]], ["tension", "decision"])     # loudest first; no vote, no question
-        self.assertEqual([(s["label"], s["count"]) for s in d["sums"]], [("$146,000", 3), ("$2 million", 2), ("$5 million", 1)])
-        self.assertEqual([(t["name"], t["said"], t["week"], t["all"]) for t in d["threads"]], [("Parking", 4, 2, 2), ("Budget", 2, 1, 2)])
+        # "$50" and "$50." are one sum said three times, from its first saying (a review's catch)
+        self.assertEqual([(s["label"], s["count"]) for s in d["sums"]], [("$146,000", 3), ("$50", 3), ("$2 million", 2), ("$5 million", 1)])
+        self.assertEqual([s["t"] for s in d["sums"] if s["label"] == "$50"], [60.0])
+        self.assertEqual([(t["name"], t["moments"], t["week"], t["all"], t["model"]) for t in d["threads"]],
+                         [("Parking", 4, 2, 2, ""), ("Budget", 2, 1, 2, "gpt-4o-mini")])
+        self.assertFalse(d["so_far"])                                              # the press ran after its Sunday
+        self.assertTrue(week.week_data("2026-09-21", ms, issues, today=dt.date(2026, 9, 27))["so_far"])   # on its Sunday: still going
         lz = d["lens"]
         self.assertEqual((lz["loudest"], round(lz["loudest_week"], 3)), ("community", round(130 / 200, 3)))
         self.assertEqual(lz["words"], 200)
         self.assertEqual((d["newer"], d["older"]), (None, "2026-09-14"))
         self.assertEqual(week.week_data("2026-09-14", ms, issues)["newer"], "2026-09-21")
+        # a week of towns whose threads the record does not follow says whose it follows, not that nothing moved
+        boston = week.week_data("2026-09-28", [_m("x", "2026-09-29", town="Boston", body="City Council")], issues, today=dt.date(2026, 10, 9))
+        self.assertIn("The threads the record follows are Brookline’s; this week’s meetings were Boston’s.",
+                      emit.page_week(boston, {"2026-09-28": 1}, MANIFEST, "https://example.org"))
         self.assertIsNone(week.week_data("2026-09-14", [_m("z", "2026-09-15")], [])["lens"])       # nothing framed, nothing claimed
         # the page: every part, every number a link into the tape; nothing of the studio
         counts = {"2026-09-21": 2, "2026-09-14": 1}
@@ -73,8 +86,15 @@ class TestTheWeek(unittest.TestCase):
         self.assertIn('href="/app/m/a#t30"', page)                               # the roll call opens its tape
         self.assertIn(">passed 5-0-0<", page)
         self.assertIn("<b class=\"wk-sum\">$146,000</b>", page)
-        self.assertIn('href="/app/i/i2"><b>Parking</b>', page)
-        self.assertIn("said 4 times this week, in 2 of its 2 meetings · 2 meetings on the record", page)
+        self.assertIn('href="/app/i/issue_brookline_parking"><b>Parking</b>', page)
+        self.assertIn("4 moments filed under it this week, in 2 of its 2 meetings · 2 meetings on the record", page)
+        self.assertIn("These threads were named by a model (gpt-4o-mini), as each thread’s page says", page)   # the ledger's promise
+        self.assertIn("the threads’ names are a model’s, as their pages say", page)
+        self.assertNotIn("no model wrote a word", page)
+        self.assertEqual(page.count('<nav class="wk-nav"'), 1)                   # one landmark for the weeks around it
+        so_far = emit.page_week(week.week_data("2026-09-21", ms, issues, today=dt.date(2026, 9, 23)), counts, MANIFEST, "https://example.org")
+        self.assertIn("the week in the record — so far", so_far)
+        self.assertIn("Two meetings so far, three hours of tape", so_far)
         self.assertIn('href="/app/week/2026-09-14/" rel="prev"', page)
         self.assertIn('<link rel="canonical" href="https://example.org/app/week/2026-09-21/">', page)
         self.assertIn('href="/app/feeds/week.xml"', page)
@@ -89,21 +109,22 @@ class TestTheWeek(unittest.TestCase):
             db = d / "c.db"
             test_web_bake.TestBakeEdition._seed(db)
             from web import bake
-            bake.bake(str(db), str(d / "app"), "9.9.9", "https://example.org")
-            out = d / "app"
+            import datetime as dt
             import json
+            # the press's day falls inside the latest week: that week is still going
+            bake.bake(str(db), str(d / "app"), "9.9.9", "https://example.org", today=dt.date(2026, 6, 19))
+            out = d / "app"
             meta = json.loads((out / "search" / "meta.json").read_text())
             ks = week.weeks(meta)
-            self.assertTrue(ks)
+            self.assertEqual(ks, ["2026-06-15", "2026-03-09"])
             for k in ks:
                 self.assertTrue((out / "week" / k / "index.html").exists(), k)
             self.assertEqual((out / "week" / "index.html").read_text(), (out / "week" / ks[0] / "index.html").read_text())
             feed = (out / "feeds" / "week.xml").read_text()
-            self.assertEqual(len(re.findall(r"<item>", feed)), min(12, len(ks)))
-            self.assertIn(f"<link>https://example.org/app/week/{ks[0]}/</link>", feed)
+            # an item a FINISHED week: the week still going is on its page, not in the feed (a review's catch)
+            self.assertEqual(re.findall(r"<link>(https://example.org/app/week/[^<]+)</link>", feed), ["https://example.org/app/week/2026-03-09/"])
             home = (out / "index.html").read_text()
-            latest = max((m["date"] for m in meta if m.get("date")), default="")
-            self.assertIn(f'<p class="wk-link"><a href="/app/week/{week.monday_of(latest)}/">', home)
+            self.assertIn('<p class="wk-link"><a href="/app/week/2026-06-15/">The week of June 15, 2026 — 1 meeting — in the record:', home)
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -117,6 +138,14 @@ class TestTheWeek(unittest.TestCase):
             self.assertIn(rule, studio)
             self.assertEqual(CSS.count(rule), 1, rule)
         self.assertNotIn(".cz-", CSS[CSS.index("THE CIVIC BROADSHEET"):])       # nothing of the studio's among the broadsheet's rules
+        self.assertIn(".wk-cards>.mcard.bs-week-card{width:auto;flex:none}", CSS)   # only a card the grid holds itself: a wrapped one fills its wrap
+        self.assertIn("@media print{.wk-cards>*,.wk-list li{break-inside:avoid}", CSS)
+
+    def test_the_constitution_names_the_week_beside_the_models_names(self):
+        """The week lists threads a model named; the AI Constitution's ledger
+        says so in the same commit (CLAUDE.md: a promise with a page)."""
+        page = emit.page_ai(MANIFEST, "https://example.org")
+        self.assertIn("as the week in the record says beside the threads it\n            lists", page)
 
 
 if __name__ == "__main__":

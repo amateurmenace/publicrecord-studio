@@ -409,7 +409,10 @@ def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: 
     # the calendar week of the latest meeting, as its own page (web/week.py)
     from . import week as _week
     wk = _week.monday_of(ms[0]["date"])
-    wk_link = (f'<p class="wk-link"><a href="{base}/week/{wk}/">{esc(_week.week_label(wk))}, in the record — '
+    # it says how many meetings its week holds: the row above may be the
+    # latest five across months (a review's catch: it named a week of two)
+    wk_n = sum(1 for m in ms if _week.monday_of(m.get("date")) == wk)
+    wk_link = (f'<p class="wk-link"><a href="{base}/week/{wk}/">{esc(_week.week_label(wk))} — {n_of(wk_n, "meeting")} — in the record: '
                f'what was decided, the sums named, the threads that moved →</a></p>') if wk else ""
     return f'''<section class="bs-week" id="week">
   {section_head(title, "", "every meeting, by town and body →", f"{base}/s")}

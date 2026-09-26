@@ -1284,19 +1284,27 @@ class Bake:
                rss("publicrecord.studio — the record",
                    "New on the record, and issues that resurfaced.",
                    f"{site_base}/app/", items))
-        # the week in the record: one item per week, the newest twelve
+        # the week in the record: an item a finished week, the newest twelve —
+        # a week still going is on its page ("so far"), not in the feed, whose
+        # readers keep an item by its link and would never see the week end
+        # (a review's catch)
+        import datetime as _dt
         from . import week as _week
+        today = self.today or _dt.date.today()
         ks = _week.weeks(meetings)
         witems = []
-        for k in ks[:12]:
-            d = _week.week_data(k, meetings, issues, ks)
+        for k in ks:
+            d = _week.week_data(k, meetings, issues, ks, today=today)
+            if d["so_far"]:
+                continue
             last = max((str(m.get("date") or "") for m in d["meetings"]), default=k)
             ths = [t["name"] for t in d["threads"][:3]]
-            witems.append({"title": f"{_week.week_label(k)} — {len(d['meetings'])} meeting{'' if len(d['meetings']) == 1 else 's'}",
+            witems.append({"title": f"{_week.week_label(k)} — {emit.n_of(len(d['meetings']), 'meeting')}",
                            "link": f"{site_base}/app/week/{k}/", "date": last,
-                           "desc": (f"{len(d['rolls'])} roll call{'' if len(d['rolls']) == 1 else 's'}, "
-                                    f"{len(d['sums'])} sum{'' if len(d['sums']) == 1 else 's'} named"
-                                    + (f"; threads: {', '.join(ths)}" if ths else ""))})
+                           "desc": (f"{emit.n_of(len(d['rolls']), 'roll call')}, {emit.n_of(len(d['sums']), 'sum')} named"
+                                    + (f"; threads (named by a model): {', '.join(ths)}" if ths else ""))})
+            if len(witems) == 12:
+                break
         _write(self.out / "feeds" / "week.xml",
                rss("publicrecord.studio — the week in the record",
                    "Each week's meetings, what was decided, the sums named and the threads that moved.",
