@@ -79,7 +79,9 @@ without it). **Never rebake the public edition from a local corpus.**
   line), `dg-` (drag to reorder), `gl-` (the glossary) — specs/27; `pb-chip`/`pb-beside`
   (the phrases beside an issue, on a paper and the issue page) — specs/29 board 6. Plus `bs-` (the civic
   broadsheet: the masthead, the spine and its type-ahead, the score, the
-  year, the columns, the river, the strips, the doors) — specs/29.
+  year, the columns, the river, the strips, the doors) — specs/29. Plus
+  `wk-` (the week in the record: its page, its lists, the front page's
+  link to it, and the rest of its threads on paper) — v2.2.11.
 - **A model's answer is whole or it is nothing** (specs/27): the seam gives
   a thinking model its own room (`GEMINI_THINKING_ROOM`) and refuses an
   answer cut off at its length limit on every provider; a caller's fallback

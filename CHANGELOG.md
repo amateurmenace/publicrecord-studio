@@ -2,6 +2,39 @@
 
 ## unreleased
 
+### The week in the record — 2026-09-25 (v2.2.11)
+
+A weekly edition of the record, counted from the tapes. Every calendar week
+that holds a meeting — Monday to Sunday, by the meetings' own dates — has
+a page of its own at `/app/week/<its Monday>/`, and the latest is at
+`/app/week/`:
+
+- **the meetings**, as the front page's week lays them out, each with the
+  headline its own tape earns;
+- **what was decided** — the roll calls read from the tapes, then the
+  week's loudest decisions and pushback;
+- **the sums named** — the dollar figures each room said most, the most
+  said first, one row a sum however the analyzer wrote it;
+- **the threads that moved** — the issues the record follows, the most
+  moments that week first, beside how many meetings each holds; a thread
+  whose name a model drafted says so beside it, as its issue page does
+  (the AI Constitution's ledger names the week too), and every thread the
+  week took up is on its page — the first twelve shown, the rest a press
+  away, and on paper a line that says how many more and where;
+- **how the week talked** — its loudest lens against the whole record's.
+
+Every line opens the tape where it was said. The weeks before and after,
+and every week on the record, are a link away. A week still going says
+"so far", and the night it ends, returning readers see it end; the feed
+carries an item once a week is over, so a reader's feed holds the
+finished week, not its first night; and the front page's week links to
+its calendar week, says how many meetings it holds, and steps aside for
+a reader whose town or board holds none of them.
+
+Found on the way: the front page's week cards lost their last lines once
+the studio's script wrapped them — 11 to 59 pixels on the live page. The
+wrap now takes the card's width, and the card keeps its height.
+
 ### The reach: what a reader could not reach or read — 2026-09-25 (v2.2.10)
 
 A second sweep of the live edition, this time for reach: duplicate ids and

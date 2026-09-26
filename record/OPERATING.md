@@ -619,6 +619,32 @@ is your window, and the one move above is the whole act. (The stance, the words 
 listing threshold were Stephen's open decisions after v2.2.2; he handed
 them over on 2026-09-24 and they were decided as written here.)
 
+### The week in the record (v2.2.11)
+
+Every calendar week that holds a meeting — Monday to Sunday, by the
+meetings' own dates — is pressed to `/app/week/<its Monday>/`, the latest
+to `/app/week/`, with a feed at `/app/feeds/week.xml`. Nothing is stored
+and no model writes a word of it; a thread whose name a model drafted says
+so beside it, as its issue page does. Three things to know when you run it:
+
+- **The press's day decides "so far".** A week is still going while the
+  press's own day (`Bake.today` — the container's UTC day, the front
+  pages' day) is on or before its Sunday. A hand press late on a Sunday
+  evening ET is already Monday in UTC, so it closes the week a few hours
+  early; the nightly press (04:30 ET, 08:30 UTC — the same day on both
+  clocks) never does.
+- **The feed carries a week once it is over.** An unfinished week lives on
+  its page, not in a reader's feed; the Monday it ends, its item comes.
+  A finished week can still change under its item (a tape transcribed
+  late, a thread renamed) — the page is the truth, and the item links to
+  it.
+- **The Monday a week ends presses.** The weeks still going ride in the
+  manifest (`week_state`), the service worker's key and the pressing's
+  fingerprint (`record/press.py::edition_fingerprint`), so returning
+  readers see the week end, and a desk that keeps its last pressing does
+  not say "nothing to press" that morning. With no week going, all three
+  are what they always were.
+
 ## 6. When something is broken
 
 ### The API returns 503 and says the corpus is unreachable
@@ -675,8 +701,10 @@ paper.json are theirs, and the record itself never changed.
 
 ### The edition looks stale
 
-`GET /api/freshness` returns the corpus fingerprint. If it differs from the one
-in the served edition's `manifest.json`, a press is owed. Note the **edition
+`GET /api/freshness` returns the corpus fingerprint. If it differs from the
+corpus part of the served edition's `pressing.json` fingerprint — the part
+before the first `|` (what follows digests the share store's listing and the
+weeks still going, which the endpoint does not read) — a press is owed. Note the **edition
 date is the newest meeting, not the press time** — that is deliberate, so the
 bake stays byte-identical for identical input. A re-press with no new meetings
 correctly shows an unchanged date.
