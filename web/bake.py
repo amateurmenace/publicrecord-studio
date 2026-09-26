@@ -1284,6 +1284,23 @@ class Bake:
                rss("publicrecord.studio — the record",
                    "New on the record, and issues that resurfaced.",
                    f"{site_base}/app/", items))
+        # the week in the record: one item per week, the newest twelve
+        from . import week as _week
+        ks = _week.weeks(meetings)
+        witems = []
+        for k in ks[:12]:
+            d = _week.week_data(k, meetings, issues, ks)
+            last = max((str(m.get("date") or "") for m in d["meetings"]), default=k)
+            ths = [t["name"] for t in d["threads"][:3]]
+            witems.append({"title": f"{_week.week_label(k)} — {len(d['meetings'])} meeting{'' if len(d['meetings']) == 1 else 's'}",
+                           "link": f"{site_base}/app/week/{k}/", "date": last,
+                           "desc": (f"{len(d['rolls'])} roll call{'' if len(d['rolls']) == 1 else 's'}, "
+                                    f"{len(d['sums'])} sum{'' if len(d['sums']) == 1 else 's'} named"
+                                    + (f"; threads: {', '.join(ths)}" if ths else ""))})
+        _write(self.out / "feeds" / "week.xml",
+               rss("publicrecord.studio — the week in the record",
+                   "Each week's meetings, what was decided, the sums named and the threads that moved.",
+                   f"{site_base}/app/week/", witems))
         for i in issues:
             items = [{"title": f"{n['title']} — {n['date'] or 'undated'}",
                       "link": f"{site_base}/app/m/{n['pid']}",

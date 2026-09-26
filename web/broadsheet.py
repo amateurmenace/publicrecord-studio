@@ -406,10 +406,16 @@ def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: 
                      f'<span class="bs-wkkick">{esc(" · ".join(x for x in (m.get("town"), m.get("body")) if x))}</span>'
                      f'<b>{esc(m.get("title") or pid)}</b><span class="bs-wkmeta">{esc(story.day_name(m.get("date") or ""))} · {esc(story.hours_words(m.get("duration") or 0))}</span></span></a>')
     title = "The latest on the record" if (fell_back or since is None) else "This week on the record"
+    # the calendar week of the latest meeting, as its own page (web/week.py)
+    from . import week as _week
+    wk = _week.monday_of(ms[0]["date"])
+    wk_link = (f'<p class="wk-link"><a href="{base}/week/{wk}/">{esc(_week.week_label(wk))}, in the record — '
+               f'what was decided, the sums named, the threads that moved →</a></p>') if wk else ""
     return f'''<section class="bs-week" id="week">
   {section_head(title, "", "every meeting, by town and body →", f"{base}/s")}
   {bodies_html}
   <div class="mcards bs-weekrow">{"".join(cards)}</div>
+  {wk_link}
   <p class="scopeline" id="scopeline" hidden></p>
 </section>'''
 

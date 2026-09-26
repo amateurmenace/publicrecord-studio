@@ -447,6 +447,20 @@ def page_topic(t, issues, manifest, base, analytics=None):
                  version=manifest["version"])
 
 
+def page_week(d, counts, manifest, base, stills=None):
+    """The week in the record — /app/week/<its Monday>/ (and /app/week/, the
+    latest): a calendar week's meetings, what was decided, the sums named, the
+    threads that moved and how the week talked, counted by web/week.py."""
+    from . import week as _week
+    body = _week.page_body(d, counts, stills or {}, base="/app")
+    n = len(d["meetings"])
+    title = f'{_week.week_label(d["key"])} — publicrecord.studio'
+    desc = (f'{n_of(n, "meeting")} and {len(d["rolls"])} roll call{"" if len(d["rolls"]) == 1 else "s"} on the public record '
+            f'the {_week.week_label(d["key"])[4:]}, with the sums the rooms named and the threads that moved — counted from the tapes.')
+    return shell(title, desc, f'{base}/app/week/{d["key"]}/', body, "week", manifest, version=manifest["version"],
+                 feed={"href": "/app/feeds/week.xml", "title": "The week in the record"})
+
+
 def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None, topics=None,
               stills=None, frontpages=None):
     """The front page — the civic broadsheet (specs/29 P0).
@@ -2401,6 +2415,17 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
         d.mkdir(parents=True, exist_ok=True)
         (d / "index.html").write_text(
             page_topic(t, issues, manifest, base, analytics=analytics), encoding="utf-8")
+    # the week in the record: every calendar week that holds a meeting, at its
+    # Monday's address, and the latest at /app/week/ — counted by web/week.py
+    from . import week as _week
+    ks = _week.weeks(meetings)
+    counts = {k: sum(1 for m in meetings if _week.monday_of(m.get("date")) == k) for k in ks}
+    for i, k in enumerate(ks):
+        page = page_week(_week.week_data(k, meetings, issues, ks), counts, manifest, base, stills=stills)
+        (out / "week" / k).mkdir(parents=True, exist_ok=True)
+        (out / "week" / k / "index.html").write_text(page, encoding="utf-8")
+        if i == 0:
+            (out / "week" / "index.html").write_text(page, encoding="utf-8")
     (out / "s" / "index.html").parent.mkdir(parents=True, exist_ok=True)
     (out / "s" / "index.html").write_text(
         page_search(manifest, base, examples=_examples(analytics, issues), topics=topics), encoding="utf-8")
