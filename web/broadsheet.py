@@ -385,7 +385,8 @@ def _day_of(d) -> Optional[story._dt.datetime]:
         return None
 
 
-def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: str, base: str = "/app") -> str:
+def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: str, base: str = "/app",
+                 week_link: Optional[dict] = None) -> str:
     ms = sorted((m for m in meetings if m.get("date")), key=lambda m: (str(m["date"]), str(m.get("pid"))), reverse=True)
     if not ms:
         return ""
@@ -406,14 +407,20 @@ def week_section(meetings: Sequence[dict], stills: Optional[dict], bodies_html: 
                      f'<span class="bs-wkkick">{esc(" · ".join(x for x in (m.get("town"), m.get("body")) if x))}</span>'
                      f'<b>{esc(m.get("title") or pid)}</b><span class="bs-wkmeta">{esc(story.day_name(m.get("date") or ""))} · {esc(story.hours_words(m.get("duration") or 0))}</span></span></a>')
     title = "The latest on the record" if (fell_back or since is None) else "This week on the record"
-    # the calendar week of the latest meeting, as its own page (web/week.py)
+    # the calendar week of the latest meeting, as its own page (web/week.py) —
+    # how many meetings it holds (the row above may be the latest five across
+    # months), whether it is still going, and each meeting's town and body:
+    # the reader's scope hides the link when it holds none of them (review catches)
     from . import week as _week
-    wk = _week.monday_of(ms[0]["date"])
-    # it says how many meetings its week holds: the row above may be the
-    # latest five across months (a review's catch: it named a week of two)
-    wk_n = sum(1 for m in ms if _week.monday_of(m.get("date")) == wk)
-    wk_link = (f'<p class="wk-link"><a href="{base}/week/{wk}/">{esc(_week.week_label(wk))} — {n_of(wk_n, "meeting")} — in the record: '
-               f'what was decided, the sums named, the threads that moved →</a></p>') if wk else ""
+    wl = week_link
+    if wl is None:
+        wk = _week.monday_of(ms[0]["date"])
+        wl = {"key": wk, "n": sum(1 for m in ms if _week.monday_of(m.get("date")) == wk), "so_far": False,
+              "scope": [[str(m.get("town") or ""), str(m.get("body") or "")] for m in ms if _week.monday_of(m.get("date")) == wk]} if wk else None
+    import json as _json
+    wk_link = (f'<p class="wk-link" data-scope="{esc(_json.dumps(wl["scope"], separators=(",", ":")))}">'
+               f'<a href="{base}/week/{wl["key"]}/">{esc(_week.week_label(wl["key"]))} — {n_of(wl["n"], "meeting")}{" so far" if wl["so_far"] else ""} — '
+               f'in the record: what was decided, the sums named, the threads that moved →</a></p>') if wl and wl.get("key") else ""
     return f'''<section class="bs-week" id="week">
   {section_head(title, "", "every meeting, by town and body →", f"{base}/s")}
   {bodies_html}
@@ -494,7 +501,7 @@ def tell_section(lead: Optional[dict], stats: dict, base: str = "/app") -> str:
 def page_body(meetings: Sequence[dict], issues: Sequence[dict], stats: dict, base: str = "/app",
               featured: Optional[Sequence[dict]] = None, analytics: Optional[dict] = None,
               topics: Optional[Sequence[dict]] = None, stills: Optional[dict] = None,
-              bodies_html: str = "", shared: Optional[Sequence[dict]] = None) -> str:
+              bodies_html: str = "", shared: Optional[Sequence[dict]] = None, week_link: Optional[dict] = None) -> str:
     """The front page's body, in the order of board 1 — the masthead and the
     spine are the shell's (emit.masthead), the footer the shell's too."""
     ms = sorted(meetings, key=lambda m: (str(m.get("date") or ""), str(m.get("pid"))), reverse=True)
@@ -513,7 +520,7 @@ def page_body(meetings: Sequence[dict], issues: Sequence[dict], stats: dict, bas
     parts.append(columns_section(meetings, analytics or {}, issues, stills, base))
     parts.append(river_section(meetings, analytics or {}, base))
     parts.append(frontpages_section(featured or [], meetings, stills, base, shared=shared))
-    parts.append(week_section(meetings, stills, bodies_html, base))
+    parts.append(week_section(meetings, stills, bodies_html, base, week_link=week_link))
     parts.append(threads_section(analytics or {}, issues, topics or [], meetings, base, stats=stats))
     parts.append(tell_section(lead, stats, base))
     return "\n".join(p for p in parts if p)

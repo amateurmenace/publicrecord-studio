@@ -108,8 +108,10 @@ def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_we
                             "model": origin[3:] if origin.startswith("ai:") else ""})
     threads.sort(key=lambda t: (-t["moments"], -t["week"], -t["all"], t["name"]))
     # the towns whose threads the record follows at all — so a week with none
-    # of them says whose they are, not that nothing moved
-    followed = sorted({_town_of_slug(str(i.get("slug") or "")) for i in (issues or []) if isinstance(i, dict)} - {""})
+    # of them says whose they are, not that nothing moved; the timelines' own
+    # towns, never one rebuilt from a slug (a re-review's catch)
+    followed = sorted({str(n.get("town")) for i in (issues or []) if isinstance(i, dict)
+                       for n in (i.get("timeline") or []) if isinstance(n, dict) and n.get("town")})
     ks = list(all_weeks) or weeks(meetings)
     at = ks.index(key) if key in ks else -1
     monday = _day(key)
@@ -123,10 +125,35 @@ def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_we
             "older": ks[at + 1] if 0 <= at < len(ks) - 1 else None}
 
 
-def _town_of_slug(slug: str) -> str:
-    """The town an issue id names (web/gallery.py's own rule)."""
-    m = re.match(r"^issue_([a-z0-9-]+)_", slug)
-    return " ".join(w.capitalize() for w in m.group(1).split("-") if w) if m else ""
+def all_weeks(meetings: Sequence[dict], issues: Sequence[dict], today: _dt.date) -> dict:
+    """Every week, counted, for the press's day: {keys (newest first), counts
+    (meetings a week), data (week_data per key)}. The one reading of the day
+    is the press's own `today`, handed in, as the front pages' is."""
+    ks = weeks(meetings)
+    counts = {k: sum(1 for m in meetings if monday_of(m.get("date")) == k) for k in ks}
+    return {"keys": ks, "counts": counts, "data": [week_data(k, meetings, issues, ks, today=today) for k in ks]}
+
+
+def state(ws: dict) -> str:
+    """The weeks' day-dependent state for the service worker's key — empty
+    when no week is still going (so the key is what it always was), else the
+    weeks still going: the night a week ends, the key changes and returning
+    readers see it end (a re-review's catch: 'so far' outlived its week)."""
+    going = [d["key"] for d in (ws or {}).get("data", []) if d.get("so_far")]
+    return ("w" + "".join(k.replace("-", "") for k in going))[:24] if going else ""
+
+
+def link_of(ws: dict) -> Optional[dict]:
+    """What the front page's week needs to link to the latest calendar week:
+    its key, its meetings' count, whether it is still going, and the
+    (town, body) of each meeting — the reader's scope hides the link when it
+    holds none of them."""
+    data = (ws or {}).get("data") or []
+    if not data:
+        return None
+    d = data[0]
+    return {"key": d["key"], "n": len(d["meetings"]), "so_far": bool(d.get("so_far")),
+            "scope": [[str(m.get("town") or ""), str(m.get("body") or "")] for m in d["meetings"]]}
 
 
 def _framed(ms: Sequence[dict]) -> Dict[str, int]:
@@ -244,18 +271,18 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
     # the threads that moved: the issues the record follows, as this week took them up
     ths = d["threads"]
     where_n = lambda t: "in the week’s one meeting" if n == 1 else f"in {t['week']} of its {n} meetings"
-    models = sorted({t["model"] for t in ths[:SHOWN] if t["model"]})
-    named = (f'<p class="hint wk-named">These threads were named by a model ({esc(", ".join(models))}), as each thread’s page says; '
-             f'the moments are the record’s own, filed under each by its words.</p>') if models else ""
-    more = (f'<p class="hint wk-more">and {n_of(len(ths) - SHOWN, "thread")} more — '
-            f'<a href="{base}/graph">every thread, on the issue graph</a></p>') if len(ths) > SHOWN else ""
+    # each thread says who named it, as its own page does — a model, or the record's words (a re-review's catch:
+    # one label spoke for them all)
+    row = lambda t: (f'<li><a href="{base}/i/{esc(t["slug"])}"><b>{esc(t["name"])}</b>'
+                     + (f'<span class="wk-origin">named by a model</span>' if t["model"] else "")
+                     + f'<span class="wk-when">{n_of(t["moments"], "moment")} filed under it this week, {where_n(t)} · {n_of(t["all"], "meeting")} on the record</span></a></li>')
+    # the rest are here too, a press away — nowhere else lists every thread a week took up
+    rest = (f'<details class="wk-rest"><summary>and {n_of(len(ths) - SHOWN, "thread")} more</summary>'
+            f'<ul class="wk-list wk-threads">{"".join(row(t) for t in ths[SHOWN:])}</ul></details>') if len(ths) > SHOWN else ""
     followed = d.get("followed") or []
     if ths:
-        threads_html = (f'<ul class="wk-list wk-threads">' + "".join(
-            f'<li><a href="{base}/i/{esc(t["slug"])}"><b>{esc(t["name"])}</b>'
-            f'<span class="wk-when">{n_of(t["moments"], "moment")} filed under it this week, {where_n(t)} · {n_of(t["all"], "meeting")} on the record</span></a></li>'
-            for t in ths[:SHOWN]) + "</ul>" + named + more)
-    elif followed and not set(followed) & set(towns):
+        threads_html = f'<ul class="wk-list wk-threads">{"".join(row(t) for t in ths[:SHOWN])}</ul>' + rest
+    elif followed and towns and not set(followed) & set(towns):
         # the record follows threads only in some towns: say whose, not that nothing moved (a review's catch)
         threads_html = (f'<p class="hint">The threads the record follows are {esc(story.the_list(followed))}’s; '
                         f'this week’s meetings were {esc(story.the_list(towns))}’s.</p>')
@@ -288,9 +315,9 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
   {part("wk-meetings", "The meetings", "each opens its tape and its page", f'<div class="mcards wk-cards">{"".join(cards)}</div>')}
   {part("wk-decided", "What was decided", "the roll calls read from the tapes, and the loudest decisions and pushback", decided_html)}
   {part("wk-sums", "The sums named", "the dollar figures each room said most, the most said first", sums_html)}
-  {part("wk-threads", "The threads that moved", "the issues the record follows, the most moments this week first", threads_html, "every thread →", f"{base}/graph")}
+  {part("wk-threads", "The threads that moved", "the issues the record follows, the most moments this week first", threads_html)}
   {part("wk-talk", "How the week talked", "the eight lenses, this week against the whole record", talk_html, "the lenses, explained →", f"{base}/analytics")}
-  <p class="decksrc">counted by the press from the record’s own planes — the meetings’ roll calls, moments, sums and lenses, and the threads’ timelines; no model counted any of it, and the threads’ names are a model’s, as their pages say; every line opens the tape</p>
+  <p class="decksrc">counted by the press from the record’s own planes — the meetings’ roll calls, moments, sums and lenses, and the threads’ timelines; no model counted any of it{"; a thread a model named says so" if any(t["model"] for t in ths) else ""}; every line opens the tape</p>
   {foot_nav}
   <section class="wk-part wk-every" aria-labelledby="wk-every">{bs.section_head("Every week on the record", "", "", "", hid="wk-every")}<ul class="wk-weeks">{every}</ul></section>
 </article>'''

@@ -560,6 +560,8 @@ class Bake:
         self.today = today                 # the pressing's day for the front pages' words; None = today
         self.listed_before = listed_before  # the last pressing's moment — a page shared before it has been listed (gallery.seasoned_at)
         self.shared_hash = ""              # a digest of the listed pages — the worker's key changes with the list
+        self.weeks = None                  # every week, counted (bake_weeks)
+        self.week_state = ""               # the weeks still going, for the worker's key (web/week.py state)
 
     def note(self, label, gz):
         self.budgets.append((label, gz))
@@ -1288,21 +1290,20 @@ class Bake:
         # a week still going is on its page ("so far"), not in the feed, whose
         # readers keep an item by its link and would never see the week end
         # (a review's catch)
-        import datetime as _dt
         from . import week as _week
-        today = self.today or _dt.date.today()
-        ks = _week.weeks(meetings)
+        ws = self.weeks if self.weeks is not None else self.bake_weeks(meetings, issues)
         witems = []
-        for k in ks:
-            d = _week.week_data(k, meetings, issues, ks, today=today)
+        for d in ws["data"]:
             if d["so_far"]:
                 continue
+            k = d["key"]
             last = max((str(m.get("date") or "") for m in d["meetings"]), default=k)
-            ths = [t["name"] for t in d["threads"][:3]]
+            # each thread says who named it, as the page does (a re-review's catch)
+            ths = [t["name"] + (" (named by a model)" if t["model"] else "") for t in d["threads"][:3]]
             witems.append({"title": f"{_week.week_label(k)} — {emit.n_of(len(d['meetings']), 'meeting')}",
                            "link": f"{site_base}/app/week/{k}/", "date": last,
                            "desc": (f"{emit.n_of(len(d['rolls']), 'roll call')}, {emit.n_of(len(d['sums']), 'sum')} named"
-                                    + (f"; threads (named by a model): {', '.join(ths)}" if ths else ""))})
+                                    + (f"; threads: {', '.join(ths)}" if ths else ""))})
             if len(witems) == 12:
                 break
         _write(self.out / "feeds" / "week.xml",
@@ -1341,6 +1342,8 @@ class Bake:
         }
         if self.shared_hash:
             manifest["shared_hash"] = self.shared_hash   # the listed pages' digest, when a store was listed
+        if self.week_state:
+            manifest["week_state"] = self.week_state     # the weeks still going: their end changes the worker's key
         # Only when there is one, so a desk pressing's manifest is byte-for-byte
         # what it was before this key existed. The reader does not read it here
         # (the meta tag in `<head>` is what it uses); this is for the operator
@@ -1351,6 +1354,18 @@ class Bake:
         return manifest
 
     # -- report -----------------------------------------------------------
+    # -- the week in the record (web/week.py): every calendar week, counted ------
+    def bake_weeks(self, meetings, issues):
+        """Every week that holds a meeting, counted for the press's day — the
+        same `today` the front pages read, handed in, never the page's own
+        clock (a re-review's catch). Kept for the feed and the pages, and its
+        day-dependent state (a week still going) for the worker's key."""
+        import datetime as _dt
+        from . import week as _week
+        self.weeks = _week.all_weeks(meetings, issues, self.today or _dt.date.today())
+        self.week_state = _week.state(self.weeks)
+        return self.weeks
+
     # -- the front pages (specs/29 P2): readers' shared pages as cards ------
     def bake_frontpages(self, meetings, issues):
         """The share store's pages as cards (web/gallery.py) — the press
@@ -1438,6 +1453,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     topics = b.bake_topics(meetings)
     graph = b.bake_graph(issues)
     frontpages = b.bake_frontpages(meetings, issues)
+    weeks = b.bake_weeks(meetings, issues)
     b.bake_urls(meetings)
     idx = b.bake_search(meetings)
     b.bake_feeds(meetings, issues, stats, site_base)
@@ -1448,7 +1464,7 @@ def bake(corpus_db: str, out_dir: str, version: str, site_base: str,
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
                     towns=towns, tombstones=tombstones, kits=kits, topics=topics,
-                    stills=b.have_stills, frontpages=frontpages)
+                    stills=b.have_stills, frontpages=frontpages, weeks=weeks)
 
     if stills:
         print(f"  stills: {len(b.have_stills)} meeting(s) with pictures — {stills.note()}")

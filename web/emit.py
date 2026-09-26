@@ -456,14 +456,14 @@ def page_week(d, counts, manifest, base, stills=None):
     body = _week.page_body(d, counts, stills or {}, base="/app")
     n = len(d["meetings"])
     title = f'{_week.week_label(d["key"])} — publicrecord.studio'
-    desc = (f'{n_of(n, "meeting")} and {n_of(len(d["rolls"]), "roll call")} on the public record '
+    desc = (f'{n_of(n, "meeting")}{" so far" if d.get("so_far") else ""} and {n_of(len(d["rolls"]), "roll call")} on the public record '
             f'the {_week.week_label(d["key"])[4:]}, with the sums the rooms named and the threads that moved — counted from the tapes.')
     return shell(title, desc, f'{base}/app/week/{d["key"]}/', body, "week", manifest, version=manifest["version"],
                  feed={"href": "/app/feeds/week.xml", "title": "The week in the record"})
 
 
 def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=None, topics=None,
-              stills=None, frontpages=None):
+              stills=None, frontpages=None, week=None):
     """The front page — the civic broadsheet (specs/29 P0).
 
     In the order of board 1: the masthead with the municipality switch and
@@ -479,7 +479,7 @@ def page_home(meetings, issues, stats, manifest, base, featured=None, analytics=
     from . import broadsheet as _bs
     body = _bs.page_body(meetings, issues, stats, base="/app", featured=featured,
                          analytics=analytics, topics=topics, stills=stills,
-                         bodies_html=body_strip(), shared=frontpages)
+                         bodies_html=body_strip(), shared=frontpages, week_link=week)
     c = stats["counts"]
     return shell("The Public Record — publicrecord.studio",
                  f"{c['meetings']} meetings, {c['hours']} hours, {c['issues']} issues "
@@ -2330,8 +2330,11 @@ def _write_pwa(out: Path, manifest):
     # the key names the corpus AND the listed front pages (specs/29 P2): a
     # page taken down or newly listed on a quiet week must reach returning
     # readers, and a cache-first shell changes only when its key does
+    # …and the weeks still going (web/week.py state): the night a week ends,
+    # its page stops saying "so far" for a returning reader too
     cache = f"cz-record-{manifest.get('version','0')}-{manifest.get('corpus_hash','0')}" + (
-        f"-{manifest['shared_hash']}" if manifest.get("shared_hash") else "")
+        f"-{manifest['shared_hash']}" if manifest.get("shared_hash") else "") + (
+        f"-{manifest['week_state']}" if manifest.get("week_state") else "")
     v = esc(manifest.get("version", "0"))
     # Stub URLs precache in their TRAILING-SLASH canonical form: the host
     # serves the bare form as a 301, addAll would store the redirected
@@ -2393,7 +2396,7 @@ self.addEventListener('fetch', e => {{
 
 def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
                analytics=None, graph=None, towns=None, tombstones=None,
-               kits=None, topics=None, stills=None, frontpages=None):
+               kits=None, topics=None, stills=None, frontpages=None, weeks=None):
     v = manifest["version"]
     # before a single stub renders: the chrome needs to know what it may offer
     set_edition(towns)
@@ -2406,10 +2409,13 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
     # the featured papers are computed HERE, from arguments bake and press
     # already pass identically — so the two pressings cannot drift apart
     featured = featured_papers(meetings, issues, stats)
+    # the week in the record, counted for the press's day by its stage (web/bake.py bake_weeks)
+    from . import week as _week
+    ws = weeks if weeks is not None else _week.all_weeks(meetings, issues, _dt.date.today())
     (out / "index.html").write_text(
         page_home(meetings, issues, stats, manifest, base, featured=featured,
                   analytics=analytics, topics=topics, stills=stills or {},
-                  frontpages=frontpages),
+                  frontpages=frontpages, week=_week.link_of(ws)),
         encoding="utf-8")
     # a word, over time — each featured topic story at an address of its own
     for t in (topics or []):
@@ -2417,16 +2423,12 @@ def emit_stubs(out, meetings, issues, stats, manifest, base, officials=None,
         d.mkdir(parents=True, exist_ok=True)
         (d / "index.html").write_text(
             page_topic(t, issues, manifest, base, analytics=analytics), encoding="utf-8")
-    # the week in the record: every calendar week that holds a meeting, at its
-    # Monday's address, and the latest at /app/week/ — counted by web/week.py
-    from . import week as _week
-    ks = _week.weeks(meetings)
-    counts = {k: sum(1 for m in meetings if _week.monday_of(m.get("date")) == k) for k in ks}
-    today = _dt.date.today()     # the press's day: a week not yet out says "so far"
-    for i, k in enumerate(ks):
-        page = page_week(_week.week_data(k, meetings, issues, ks, today=today), counts, manifest, base, stills=stills)
-        (out / "week" / k).mkdir(parents=True, exist_ok=True)
-        (out / "week" / k / "index.html").write_text(page, encoding="utf-8")
+    # every calendar week that holds a meeting, at its Monday's address, and
+    # the latest at /app/week/
+    for i, d in enumerate(ws["data"]):
+        page = page_week(d, ws["counts"], manifest, base, stills=stills)
+        (out / "week" / d["key"]).mkdir(parents=True, exist_ok=True)
+        (out / "week" / d["key"] / "index.html").write_text(page, encoding="utf-8")
         if i == 0:
             (out / "week" / "index.html").write_text(page, encoding="utf-8")
     (out / "s" / "index.html").parent.mkdir(parents=True, exist_ok=True)

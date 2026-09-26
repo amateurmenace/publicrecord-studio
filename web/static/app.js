@@ -1646,6 +1646,16 @@
       const w = c.parentElement;
       if (w && w.classList.contains("cz-mkwrap")) w.hidden = !ok;
     });
+    // the week's link (web/week.py) names its calendar week's meetings: a scope
+    // that holds none of them hides it, as it hides their cards (a re-review's
+    // catch: a Brookline reader was offered a week of Boston's); unreadable, it stands
+    const wl = $(".wk-link[data-scope]");
+    if (wl) {
+      let pairs = null;
+      try { pairs = JSON.parse(wl.dataset.scope); } catch (e) { pairs = null; }
+      wl.hidden = Array.isArray(pairs) && pairs.length > 0
+        && !pairs.some(p => Array.isArray(p) && inScope(String(p[0] || ""), String(p[1] || "")));
+    }
     // the rail must say when a scope has emptied it, or an empty column reads
     // as "the record has nothing" instead of "your filter has nothing"
     let none = $("#mcards-none");

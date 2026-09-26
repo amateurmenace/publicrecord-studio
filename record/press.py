@@ -246,6 +246,8 @@ def press(corpus, out_dir: str, version: str = "",
     topics = b.bake_topics(meetings)
     graph = b.bake_graph(issues)
     frontpages = b.bake_frontpages(meetings, issues)
+    # the week in the record: every week, counted for the press's day (web/week.py)
+    weeks = b.bake_weeks(meetings, issues)
     b.bake_urls(meetings)
     idx = b.bake_search(meetings)
     b.bake_feeds(meetings, issues, stats, site_base)
@@ -255,7 +257,7 @@ def press(corpus, out_dir: str, version: str = "",
     emit.emit_stubs(out, meetings, issues, stats, manifest, site_base,
                     officials=officials, analytics=analytics, graph=graph,
                     towns=towns, tombstones=tombstones, kits=kits, topics=topics,
-                    stills=b.have_stills, frontpages=frontpages)
+                    stills=b.have_stills, frontpages=frontpages, weeks=weeks)
 
     pressing = _write_pressing(out, manifest, fingerprint, stamp=pressed_at)
 
