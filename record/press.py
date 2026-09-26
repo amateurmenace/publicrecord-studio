@@ -214,7 +214,7 @@ def press(corpus, out_dir: str, version: str = "",
     # corpus this edition was pressed from; taking it afterwards would name a
     # corpus that may have moved during the press and quietly certify an
     # edition as fresher than it is.
-    fingerprint = corpus_fingerprint(corpus) + shared_digest(shared, today, listed_before)
+    fingerprint = edition_fingerprint(corpus, shared, today, listed_before)
 
     b = _bake.Bake(corpus, out, version, _no_sidecars, stills=stills, shared=shared, today=today, listed_before=listed_before)
 
@@ -463,6 +463,30 @@ def shared_digest(shared, today=None, listed_before=None) -> str:
     return ("|s" + hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()[:12]) if rows else ""
 
 
+def weeks_digest(corpus, today=None) -> str:
+    """The weeks still going, digested onto the fingerprint (v2.2.11): the
+    night a week ends, its page stops saying "so far", the week feed gains
+    its item and the worker's key moves — a night the edition changes though
+    no row did, so it presses (a re-review's catch: the gate never saw a week
+    end — the class `shared_digest` was fixed for). Read over the live
+    meetings the press counts its weeks from, by the week module's own
+    reading of "so far", so it moves when the pressed `week_state` does.
+    Empty when no week is going, so a quiet night is quiet and an edition
+    with no week going keeps the fingerprint it always had."""
+    from web import week as _week
+    rows = [m for m in corpus.list_meetings(limit=_MEETING_LIMIT) if m.get("status") == "live"]
+    st = _week.state_of(_week.going(rows, today or _dt.date.today()))
+    return ("|" + st) if st else ""
+
+
+def edition_fingerprint(corpus, shared=None, today=None, listed_before=None) -> str:
+    """Everything that decides an edition's bytes: the corpus, the share
+    store's listing for the day, and the weeks still going. The press writes
+    it and the gate compares against it — one function, so the two can never
+    read different things."""
+    return corpus_fingerprint(corpus) + shared_digest(shared, today, listed_before) + weeks_digest(corpus, today)
+
+
 def _stamp_of(raw: bytes):
     """A pressing.json's `pressed_at` as an aware UTC datetime, or None —
     gzip bytes accepted, any other shape refused quietly."""
@@ -537,7 +561,7 @@ def needs_press(corpus, manifest_path: str, shared=None, today=None, listed_befo
                  or "")
     if not fp:
         return True
-    return fp != corpus_fingerprint(corpus) + shared_digest(shared, today, listed_before)
+    return fp != edition_fingerprint(corpus, shared, today, listed_before)
 
 
 def _read_json(p: Path) -> Optional[dict]:

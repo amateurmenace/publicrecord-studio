@@ -64,7 +64,10 @@ class TestTheWeek(unittest.TestCase):
         self.assertEqual([(s["label"], s["count"]) for s in d["sums"]], [("$146,000", 3), ("$50", 3), ("$2 million", 2), ("$5 million", 1)])
         self.assertEqual([s["t"] for s in d["sums"] if s["label"] == "$50"], [60.0])
         self.assertEqual([(t["name"], t["moments"], t["week"], t["all"], t["model"]) for t in d["threads"]],
-                         [("Parking", 4, 2, 2, ""), ("Budget", 2, 1, 2, "gpt-4o-mini")])
+                         [("Parking", 4, 2, 2, False), ("Budget", 2, 1, 2, True)])
+        # a bare "ai:" is still a model's naming, as the issue page reads it (a re-review's nit)
+        bare = week.week_data("2026-09-21", ms, [dict(issues[1], name_origin="ai:")], today=dt.date(2026, 9, 28))
+        self.assertEqual([t["model"] for t in bare["threads"]], [True])
         self.assertFalse(d["so_far"])                                              # the press ran after its Sunday
         self.assertTrue(week.week_data("2026-09-21", ms, issues, today=dt.date(2026, 9, 27))["so_far"])   # on its Sunday: still going
         lz = d["lens"]
@@ -99,6 +102,16 @@ class TestTheWeek(unittest.TestCase):
         untowned = week.week_data("2026-10-05", [_m("u", "2026-10-06", town="")], issues, today=dt.date(2026, 10, 20))
         self.assertIn("No thread the record follows came up this week.", emit.page_week(untowned, {"2026-10-05": 1}, MANIFEST, "https://example.org"))
         self.assertEqual(page.count('<nav class="wk-nav"'), 1)                   # one landmark for the weeks around it
+        self.assertNotIn("wk-rest", page)                                          # two threads: nothing more to say
+        # past the twelve shown, the rest wait in a list a press opens — and on paper, which opens
+        # nothing, a line says how many and where every one is (a re-review's catch)
+        many = [{"slug": f"issue_brookline_t{k:02d}", "name": f"Thread {k:02d}", "name_origin": "keywords",
+                 "timeline": [bk("a", 1)]} for k in range(week.SHOWN + 2)]
+        crowd = emit.page_week(week.week_data("2026-09-21", ms, many, today=dt.date(2026, 9, 28)), counts, MANIFEST, "https://example.org")
+        self.assertIn('<details class="wk-rest"><summary>and 2 threads more</summary>', crowd)
+        self.assertIn('<p class="wk-rest-print hint">and 2 threads more, every one on this week’s page: '
+                      'publicrecord.studio/app/week/2026-09-21/</p>', crowd)
+        self.assertEqual(crowd.count('href="/app/i/issue_brookline_t'), week.SHOWN + 2)    # every thread on the page
         so_far = emit.page_week(week.week_data("2026-09-21", ms, issues, today=dt.date(2026, 9, 23)), counts, MANIFEST, "https://example.org")
         self.assertIn("the week in the record — so far", so_far)
         self.assertIn("Two meetings so far, three hours of tape", so_far)
@@ -135,12 +148,31 @@ class TestTheWeek(unittest.TestCase):
             self.assertIn('<p class="wk-link" data-scope="[[&quot;', home)                  # its meetings' town and body, for the scope
             # the worker's key carries the week still going; the night it ends, the key changes (a re-review's catch)
             manifest = json.loads((out / "manifest.json").read_text())
-            self.assertEqual(manifest["week_state"], "w20260615")
-            self.assertIn("-w20260615", (out / "sw.js").read_text())
+            going = week.state_of(["2026-06-15"])
+            self.assertRegex(going, r"^w[0-9a-f]{10}$")
+            self.assertEqual(manifest["week_state"], going)
+            key = lambda root: re.search(r"cz-record-[0-9A-Za-z.\-]+", (root / "sw.js").read_text()).group(0)
+            self.assertTrue(key(out).endswith("-" + going), key(out))
             after = d / "after"
             bake.bake(str(db), str(after), "9.9.9", "https://example.org", today=dt.date(2026, 6, 22))
             self.assertNotIn("week_state", json.loads((after / "manifest.json").read_text()))
-            self.assertNotIn("-w2026", (after / "sw.js").read_text())
+            self.assertNotRegex(key(after), r"-w[0-9a-f]{10}$")
+            # the press's gate sees the week end too: a disk that keeps its last pressing presses the
+            # Monday a week ends, and a quiet night after is quiet (a re-review's catch)
+            from memory.store import Corpus
+            from record import press
+            c = Corpus(str(db))
+            try:
+                self.assertEqual(press.weeks_digest(c, dt.date(2026, 6, 19)), "|" + going)     # the gate reads what the press wrote
+                pressing = d / "pressing.json"
+                pressing.write_text(json.dumps({"fingerprint": press.edition_fingerprint(c, today=dt.date(2026, 6, 19))}))
+                self.assertFalse(press.needs_press(c, str(pressing), today=dt.date(2026, 6, 21)))   # its Sunday: still going
+                self.assertTrue(press.needs_press(c, str(pressing), today=dt.date(2026, 6, 22)))    # the Monday it ends
+                self.assertEqual(press.weeks_digest(c, dt.date(2026, 6, 22)), "")
+                pressing.write_text(json.dumps({"fingerprint": press.edition_fingerprint(c, today=dt.date(2026, 6, 22))}))
+                self.assertFalse(press.needs_press(c, str(pressing), today=dt.date(2026, 6, 23)))   # and quiet after
+            finally:
+                c.close()
             self.assertIn("so far", (out / "week" / "index.html").read_text())
             self.assertNotIn("so far", (after / "week" / "index.html").read_text())
             self.assertEqual(re.findall(r"<link>(https://example.org/app/week/[^<]+)</link>", (after / "feeds" / "week.xml").read_text()),
@@ -152,6 +184,54 @@ class TestTheWeek(unittest.TestCase):
                 self.assertEqual((after / rel).read_bytes(), (again / rel).read_bytes(), rel)
         finally:
             shutil.rmtree(d, ignore_errors=True)
+
+    def test_the_weeks_still_going_are_said_whole(self):
+        """The worker's key says the weeks still going as a digest of them all,
+        never a cut: three future-dated weeks read alike the night the current
+        one ended when the list was cut at 24 characters (a re-review's catch)."""
+        import datetime as dt
+        ms = [_m("a", "2026-09-23"), _m("b", "2026-10-06"), _m("c", "2026-10-13"), _m("d", "2026-10-20"), _m("e", "2026-09-01")]
+        self.assertEqual(week.going(ms, dt.date(2026, 9, 25)), ["2026-10-19", "2026-10-12", "2026-10-05", "2026-09-21"])
+        self.assertEqual(week.going(ms, dt.date(2026, 9, 28)), ["2026-10-19", "2026-10-12", "2026-10-05"])
+        before = week.state(week.all_weeks(ms, [], dt.date(2026, 9, 25)))
+        after = week.state(week.all_weeks(ms, [], dt.date(2026, 9, 28)))
+        self.assertNotEqual(before, after)                                            # the week ended; the key moves
+        self.assertEqual(before, week.state_of(week.going(ms, dt.date(2026, 9, 25))))  # one reading of "so far"
+        self.assertEqual(week.state_of(["2026-10-05", "2026-09-21"]), week.state_of(["2026-09-21", "2026-10-05"]))   # order-blind
+        self.assertEqual(week.state_of([]), "")
+        self.assertEqual(week.going(ms + ["junk", None], dt.date(2026, 10, 21)), ["2026-10-19"])                    # never a crash
+
+    def test_the_front_links_scope_reads_as_the_press_writes_it(self):
+        """The press writes the week's (town, body) pairs; the reader's wkScope
+        reads them back — a node twin holds the two alike, and whatever is not a
+        pair is dropped, never a throw, so a malformed scope leaves the link
+        standing (a re-review's catch: `[1]` hid it from every reader)."""
+        import html
+        import json
+        import shutil as _sh
+        import subprocess
+        node = _sh.which("node")
+        if not node:
+            self.skipTest("node not available")
+        js = (REPO / "web" / "static" / "app.js").read_text()
+        m = re.search(r"function wkScope\(raw\) \{.+?\n  \}", js, re.S)
+        self.assertTrue(m, "wkScope not found in the reader — did it move?")
+        import datetime as dt
+        ms = [_m("a", "2026-09-22", town="Brookline", body="Select Board"),
+              _m("b", "2026-09-23", town="O’Brien & \"Sons\" </script>", body="Zoning Board — é")]
+        link = week.link_of(week.all_weeks(ms, [], dt.date(2026, 9, 28)))
+        from web import broadsheet
+        attr = re.search(r'<p class="wk-link" data-scope="([^"]*)"', broadsheet.week_section(ms, {}, "", "/app", week_link=link))
+        self.assertTrue(attr, "the front page's week link carries no scope")
+        raw = html.unescape(attr.group(1))                                          # what the browser's dataset hands the reader
+        cases = [raw, "[1]", '[{"town":"Brookline"}]', "{}", '"x"', "null", "not json", "", '[["a"]]', '[["a",1]]',
+                 '[["A","B"],1,["C","D","E"]]']
+        out = subprocess.run([node, "-e", m.group(0) + "\nconsole.log(JSON.stringify(" + json.dumps(cases) + ".map(wkScope)))"],
+                             capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        self.assertEqual(got[0], link["scope"])                                   # what the press wrote, the reader reads
+        self.assertEqual(got[1:], [[], [], [], [], [], [], [], [], [], [["A", "B"]]])
 
     def test_a_wrapped_week_card_keeps_its_last_lines(self):
         """The studio wraps a card in a column; the card's 250 px basis — a width
@@ -165,6 +245,10 @@ class TestTheWeek(unittest.TestCase):
         self.assertNotIn(".cz-", CSS[CSS.index("THE CIVIC BROADSHEET"):])       # nothing of the studio's among the broadsheet's rules
         self.assertIn(".wk-cards>.mcard.bs-week-card{width:auto;flex:none}", CSS)   # only a card the grid holds itself: a wrapped one fills its wrap
         self.assertIn("@media print{.wk-cards>*,.wk-list li{break-inside:avoid}", CSS)
+        broadsheet = CSS[CSS.index("THE CIVIC BROADSHEET"):]
+        self.assertIn(".wk-origin{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--muted)", broadsheet)   # said, not shouted
+        self.assertIn(".wk-rest-print{display:none}", broadsheet)
+        self.assertIn("@media print{.wk-rest summary{display:none}.wk-rest:not([open])+.wk-rest-print{display:block}}", broadsheet)
 
     def test_the_constitution_names_the_week_beside_the_models_names(self):
         """The week lists threads a model named; the AI Constitution's ledger

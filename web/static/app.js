@@ -1635,6 +1635,17 @@
     filterHome(ed);
   }
 
+  /* the week link's scope (web/week.py link_of): its meetings' [town, body]
+     pairs, each two strings — decodeReel's law: whatever is not a pair is
+     dropped, never a throw, so malformed it reads as no pairs and the link
+     stands (a re-review's catch: `[1]` hid it from every reader) */
+  function wkScope(raw) {
+    let v = null;
+    try { v = JSON.parse(String(raw == null ? "" : raw)); } catch (e) { return []; }
+    return Array.isArray(v) ? v.filter(p => Array.isArray(p) && p.length === 2
+      && typeof p[0] === "string" && typeof p[1] === "string") : [];
+  }
+
   async function filterHome(ed) {
     let shown = 0, hidden = 0;
     // the lead story re-scopes with the briefs — it carries the same data-town
@@ -1651,10 +1662,8 @@
     // catch: a Brookline reader was offered a week of Boston's); unreadable, it stands
     const wl = $(".wk-link[data-scope]");
     if (wl) {
-      let pairs = null;
-      try { pairs = JSON.parse(wl.dataset.scope); } catch (e) { pairs = null; }
-      wl.hidden = Array.isArray(pairs) && pairs.length > 0
-        && !pairs.some(p => Array.isArray(p) && inScope(String(p[0] || ""), String(p[1] || "")));
+      const pairs = wkScope(wl.dataset.scope);
+      wl.hidden = pairs.length > 0 && !pairs.some(p => inScope(p[0], p[1]));
     }
     // the rail must say when a scope has emptied it, or an empty column reads
     // as "the record has nothing" instead of "your filter has nothing"

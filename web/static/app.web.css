@@ -2417,6 +2417,10 @@ a.tp-mcol:hover b{text-decoration:underline}
 .wk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px}
 .wk-cards>.mcard.bs-week-card{width:auto;flex:none}   /* a card the grid holds itself; a wrapped one fills its wrap */
 @media print{.wk-cards>*,.wk-list li{break-inside:avoid}.wk-part .bs-sechead{break-after:avoid}}
+/* the rest of a week's threads: on paper the closed list gives way to its count and address; opened, it prints */
+.wk-rest summary{margin-top:10px;cursor:pointer;font:var(--weight-bold) var(--text-xs)/1.4 var(--font-mono);color:var(--text-secondary)}
+.wk-rest-print{display:none}
+@media print{.wk-rest summary{display:none}.wk-rest:not([open])+.wk-rest-print{display:block}}
 .wk-title{font-family:var(--font-display);font-weight:500;font-size:44px;line-height:1.08;margin:6px 0 10px;color:var(--ink)}
 .wk-nav{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0 4px;font-family:var(--font-mono);font-size:var(--text-xs)}
 .wk-nav-a{color:var(--ink-2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--rule)}
@@ -2432,6 +2436,7 @@ a.tp-mcol:hover b{text-decoration:underline}
 .wk-out{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink);text-transform:uppercase;letter-spacing:.06em}
 .wk-sum{font-family:var(--font-display);font-weight:500;font-size:20px}
 .wk-threads b{font-weight:var(--weight-medium)}
+.wk-origin{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--muted);font-style:italic}   /* said, not shouted: the name is the thread's */
 .wk-more{margin-top:8px}
 .wk-weeks{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 18px;font-size:var(--text-sm)}
 .wk-weeks a{display:inline-flex;gap:8px;align-items:baseline;padding:4px 0;color:var(--ink)}

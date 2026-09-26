@@ -52,6 +52,20 @@ def weeks(meetings: Sequence[dict]) -> List[str]:
     return sorted({k for k in (monday_of(m.get("date")) for m in meetings) if k}, reverse=True)
 
 
+def _going(key: str, today: _dt.date) -> bool:
+    """Is the week that begins on `key` still going on `today` — its Sunday
+    not yet out? The one reading of 'so far' the page, the worker's key and
+    the press's gate all share."""
+    monday = _day(key)
+    return bool(monday and today <= monday + _dt.timedelta(days=6))
+
+
+def going(meetings: Sequence[dict], today: _dt.date) -> List[str]:
+    """The weeks still going on `today`, newest first — the weeks holding a
+    meeting whose Sunday is not yet out."""
+    return [k for k in weeks([m for m in meetings or () if isinstance(m, dict)]) if _going(k, today)]
+
+
 def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_weeks: Sequence[str] = (),
               today: Optional[_dt.date] = None) -> dict:
     """One week, counted: its meetings (in date order), its tape, its roll
@@ -105,7 +119,9 @@ def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_we
             threads.append({"slug": str(i.get("slug") or ""), "name": str(i.get("name") or i.get("slug") or ""),
                             "moments": moments, "week": len({str(n.get("pid")) for n in here}),
                             "all": len({str(n.get("pid")) for n in tl}),
-                            "model": origin[3:] if origin.startswith("ai:") else ""})
+                            # a model named it whenever its origin says ai:, the model's own name or
+                            # none (a re-review's nit: a bare "ai:" went unlabelled here alone)
+                            "model": origin.startswith("ai:")})
     threads.sort(key=lambda t: (-t["moments"], -t["week"], -t["all"], t["name"]))
     # the towns whose threads the record follows at all — so a week with none
     # of them says whose they are, not that nothing moved; the timelines' own
@@ -114,8 +130,7 @@ def week_data(key: str, meetings: Sequence[dict], issues: Sequence[dict], all_we
                        for n in (i.get("timeline") or []) if isinstance(n, dict) and n.get("town")})
     ks = list(all_weeks) or weeks(meetings)
     at = ks.index(key) if key in ks else -1
-    monday = _day(key)
-    so_far = bool(monday and (today or _dt.date.today()) <= monday + _dt.timedelta(days=6))
+    so_far = _going(key, today or _dt.date.today())
     return {"key": key, "meetings": ms, "seconds": sum(float(m.get("duration") or 0) for m in ms), "so_far": so_far,
             "followed": followed,
             "towns": sorted({str(m.get("town")) for m in ms if m.get("town")}),
@@ -139,8 +154,16 @@ def state(ws: dict) -> str:
     when no week is still going (so the key is what it always was), else the
     weeks still going: the night a week ends, the key changes and returning
     readers see it end (a re-review's catch: 'so far' outlived its week)."""
-    going = [d["key"] for d in (ws or {}).get("data", []) if d.get("so_far")]
-    return ("w" + "".join(k.replace("-", "") for k in going))[:24] if going else ""
+    return state_of([d["key"] for d in (ws or {}).get("data", []) if d.get("so_far")])
+
+
+def state_of(keys: Sequence[str]) -> str:
+    """The weeks still going, said short: a digest of the whole list, never a
+    cut of it — a cut let three going weeks read the same the night one of
+    them ended (a re-review's catch). Empty for none."""
+    import hashlib
+    ks = sorted({str(k) for k in keys or ()})
+    return ("w" + hashlib.sha256(",".join(ks).encode("utf-8")).hexdigest()[:10]) if ks else ""
 
 
 def link_of(ws: dict) -> Optional[dict]:
@@ -277,8 +300,14 @@ def page_body(d: dict, counts: Dict[str, int], stills: Optional[dict], base: str
                      + (f'<span class="wk-origin">named by a model</span>' if t["model"] else "")
                      + f'<span class="wk-when">{n_of(t["moments"], "moment")} filed under it this week, {where_n(t)} · {n_of(t["all"], "meeting")} on the record</span></a></li>')
     # the rest are here too, a press away — nowhere else lists every thread a week took up
-    rest = (f'<details class="wk-rest"><summary>and {n_of(len(ths) - SHOWN, "thread")} more</summary>'
-            f'<ul class="wk-list wk-threads">{"".join(row(t) for t in ths[SHOWN:])}</ul></details>') if len(ths) > SHOWN else ""
+    # on paper a press opens nothing: the closed list gives way to a line that
+    # says how many more and where every one is (a re-review's catch: paper
+    # printed "and 92 threads more" with nothing behind it); opened, it prints
+    more_n = n_of(len(ths) - SHOWN, "thread")
+    rest = (f'<details class="wk-rest"><summary>and {more_n} more</summary>'
+            f'<ul class="wk-list wk-threads">{"".join(row(t) for t in ths[SHOWN:])}</ul></details>'
+            f'<p class="wk-rest-print hint">and {more_n} more, every one on this week’s page: '
+            f'publicrecord.studio/app/week/{esc(d["key"])}/</p>') if len(ths) > SHOWN else ""
     followed = d.get("followed") or []
     if ths:
         threads_html = f'<ul class="wk-list wk-threads">{"".join(row(t) for t in ths[:SHOWN])}</ul>' + rest
