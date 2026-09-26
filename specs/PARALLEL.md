@@ -157,6 +157,17 @@ section below, updated on main.
 
 ## State of main (lane A updates this)
 
+- 2026-09-26, 01:40Z — **v2.2.11 / r58 is LIVE: the week in the record**
+  (tag `v2.2.11` at 6563c86, the commit the image was built from; the
+  service and all six jobs on r58; the press at `--version 2.2.11`). Every
+  calendar week that holds a meeting pressed to `/app/week/<its Monday>/`
+  (the latest at `/app/week/`): its meetings, what was decided, the sums
+  named, the threads that moved — each saying who named it — and how it
+  talked, counted from the tapes; a feed (`feeds/week.xml`) with an item a
+  finished week; the front page's week linking to it, scoped. The weeks
+  still going ride the manifest, the worker's key and the pressing's
+  fingerprint. Reviewed through four passes (eleven, six, five and a nit,
+  four — all folded). r58 / 2.2.11 are spent; next numbers r59 / 2.2.12.
 - 2026-09-25, 13:52Z — **v2.2.10 / r57 is LIVE: the reach** (tag `v2.2.10` at
   7ca9e66, the commit the image was built from; the service and all six jobs
   on r57; the press at `--version 2.2.10`). A sweep for what a reader could

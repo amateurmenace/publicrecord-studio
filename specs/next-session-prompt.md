@@ -1,4 +1,4 @@
-# Session prompt — publicrecord-studio: after v2.2.10, what is Stephen's
+# Session prompt — publicrecord-studio: after v2.2.11, what is Stephen's
 
 **Open this session in a checkout of github.com/amateurmenace/publicrecord-studio**
 (`main`, at or after the merge of PR #1 — v2.1.21 / r44 is live)
@@ -93,6 +93,99 @@ state.** Written 2026-09-23, late; the topic-story branch noted later that night
   folded (thirteen findings), a re-review of the fixes. 584 tests at HEAD.
 - `main` = what is live, plus docs. Branches `fold-v2.1.15`, `nightly-intake`
   and `story-paths` are merged and can be deleted (Stephen's).
+
+## 2026-09-26, 01:40Z — v2.2.11 / r58 IS LIVE: the week in the record
+
+Stephen asked what to build next and said go to the first of a ranked six
+(the week in the record; agenda items to the tape; search that scales;
+captions in other languages — his budget call; embeds for newsrooms;
+Boston's roll calls). The shape:
+
+- **`web/week.py`** — pure over the press's meetings and issues:
+  `monday_of` (a strictly written day, as the reader's TP_DAY), `weeks`
+  (every week holding a dated meeting, newest first), `week_data(key,
+  meetings, issues, all_weeks, today)` → the week's meetings, seconds,
+  towns, roll calls (m.votes), decisions (score_moments' decision and
+  tension, loudest first), sums (money entities merged per meeting by
+  `money_label`), threads (issues whose timeline holds the week's
+  meetings: `moments` = beads there, `model` from `name_origin`), the
+  lens shares against the record's, newer/older, `so_far` (the press's
+  day ≤ the week's Sunday — `_going`, the one reading the page, the key
+  and the gate share), `followed` (the towns whose threads the record
+  follows, from the timelines' own towns); `page_body` draws it with the
+  broadsheet's own parts (`bs-week-card`, `section_head`, `story.tonight`
+  headlines), `wk-` for its own.
+- **A press stage, `Bake.bake_weeks`** (in both `web/bake.py bake()` and
+  `record/press.py press()`, after the front pages — the parity test holds
+  it): every week counted for the press's own day (`Bake.today`, the front
+  pages' day, never the page's clock); `week.state()` — the weeks still
+  going, as `state_of`'s digest (w + 10 hex; never a cut) — rides in the
+  manifest (`week_state`) and the service worker's key, so the night a
+  week ends returning readers see it end, and with none going the key is
+  what it always was. **The gate sees it too**: `record/press.py
+  edition_fingerprint` (corpus + `shared_digest` + `weeks_digest`, read
+  over the same live meetings) is what the press writes and `needs_press`
+  compares, so a disk that keeps its pressing presses the Monday a week
+  ends. Pages in `emit.emit_stubs`
+  (`weeks=`: `/app/week/<Monday>/` and `/app/week/`); **the feed** in
+  `bake_feeds` from the same stage (`feeds/week.xml`, an item a finished
+  week, the newest twelve). The front page's `week_section(week_link=)`
+  links to the calendar week of the latest meeting, with its count, "so
+  far" while it goes, and `data-scope` — its meetings' (town, body) —
+  which `app.js wkScope` (a pure decoder, node-twinned to `link_of`;
+  malformed → no pairs → the link stands) and `filterHome` read to hide
+  it under a scope holding none.
+- **Each thread says who named it** (`name_origin` starting `ai:`,
+  `.wk-origin`), on the page and in the feed; the footer speaks of a
+  model only when one is listed; the week's other threads are on its
+  page behind a `<details class="wk-rest">` — on paper, which opens
+  nothing, `.wk-rest-print` says how many and the page's address.
+- **Known**: a finished week can change under its feed item (a tape
+  transcribed late, a thread renamed) — the page is the truth; the press's
+  day is the container's UTC day, so a hand press late on a Sunday evening
+  ET closes the week a few hours early (the nightly, 04:30 ET, never
+  does); `/api/freshness` answers the corpus part of the fingerprint only
+  (before the first `|`), and nothing calls it; the print line hardcodes
+  publicrecord.studio, as `page_ai` does.
+- **The ledger** (`emit.page_ai`, issue names row) names the week beside
+  the model's names — the same commit.
+- **Found on the way**: the studio's `cz-mkwrap-card` column turned the
+  week card's 250 px flex basis into its height; the wrap takes the width
+  now (rules among the studio's own, before the broadsheet's section —
+  the palette guard forbids "studio" there).
+- **Tests**: 1025 (110 PG-backed skip without a DSN) — `tests/test_web_week.py`.
+- **Deploy**: r58 (image `sha256:d0bfe5b1…`, built from 6563c86) on the service
+  (revision record-api-00050-mzr) and all six jobs; the press at `--version 2.2.11`
+  (execution record-press-7kkll, by the nightly-edition workflow, run
+  36209063698 — the record still 31 meetings, of 2026-09-24); Pages 4bb6415
+  (01:40Z); `sw.js` key `cz-record-2.2.11-64730f48c11c9e8e-w36eba6c30d` (the
+  week of September 21 still going: `state_of(["2026-09-21"])`); tag
+  `v2.2.11` at 6563c86. Verified live: `/app/week/` is the week of September
+  21 — nine meetings so far, all Boston's, twenty-one hours and forty-five
+  minutes of tape — and its threads line says the record follows
+  Brookline's; the feed carries the twelve finished weeks, not this one; the
+  front page links "9 meetings so far" with its scope; the week of June 15
+  lists 103 threads, each labelled, 91 behind "and 91 threads more", with the
+  print line and its address; the ledger row, `wkScope` and the new rules
+  are in the served files.
+- **Reviewed**: one adversarial pass (eleven found — the model's names
+  unlabelled, "times said" that were moments, a sum split in two, the
+  feed's unfinished week, the front link's size, the grid with the
+  script, print, landmarks, counted nouns — folded); the folds
+  re-reviewed (six found: the page's clock, not the press's; the worker's
+  key blind to a week ending; one label for every thread; the rest of the
+  threads nowhere; the followed towns guessed from slugs; the front link
+  deaf to the scope — folded); those folds re-reviewed (five low and a
+  nit: the gate blind to a week ending, the key's cut, paper's bare
+  summary, the label's loudness, a malformed scope hiding the link — folded);
+  those re-reviewed (four low: no test ran the press, so it could write
+  the old fingerprint; no test held `filterHome` to `wkScope`; the print
+  line flush under its rule; the freshness endpoint's docs naming a
+  fingerprint `manifest.json` never carried — folded; the two new tests
+  proved by putting their bugs back and watching them fail).
+- **Next, as ranked**: agenda items to the tape; search that scales (the
+  index is 2.5 MB gz for 31 meetings); then captions in other languages
+  (Stephen's budget), embeds, Boston's roll calls.
 
 ## 2026-09-25, 13:52Z — v2.2.10 / r57 IS LIVE: the reach
 
